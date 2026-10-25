@@ -5,7 +5,7 @@ const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGON
 const wrap=a=>(a%TAU+TAU)%TAU;
 function intersect(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],axis=[p[i][1]-q[1],q[0]-p[i][0]];const aa=a.map(v=>v[0]*axis[0]+v[1]*axis[1]),bb=b.map(v=>v[0]*axis[0]+v[1]*axis[1]);if(Math.max(...aa)<Math.min(...bb)||Math.max(...bb)<Math.min(...aa))return false}return true}
 function wallPoly(r,sector,thickness=30,sides=6){const step=TAU/sides,a=sector*step,b=a+step;return [[Math.cos(a)*r,Math.sin(a)*r],[Math.cos(b)*r,Math.sin(b)*r],[Math.cos(b)*(r+thickness),Math.sin(b)*(r+thickness)],[Math.cos(a)*(r+thickness),Math.sin(a)*(r+thickness)]]}
-function playerPoly(angle){return [[73,0],[59,-5],[59,5]].map(([x,y])=>[x*Math.cos(angle)-y*Math.sin(angle),x*Math.sin(angle)+y*Math.cos(angle)])}
+function playerPoly(angle){return [[73,0],[62.5,-6.0621778265],[62.5,6.0621778265]].map(([x,y])=>[x*Math.cos(angle)-y*Math.sin(angle),x*Math.sin(angle)+y*Math.cos(angle)])}
 class Game{
  constructor(level=0,random=Math.random){this.level=level;this.random=random;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false}
  get bpm(){return [130,140,150,150,160,170][this.level]}
@@ -16,8 +16,8 @@ class Game{
  if(this.pattern===0)gap=(this.lastGap+1)%sides;
  else if(this.pattern===1)gap=(this.lastGap+(this.rings%2?1:sides-1))%sides;
  else if(this.pattern===2)gap=(this.lastGap+direction+sides)%sides;
- else gap=this.lastGap;
- const wide=this.rings<2||this.pattern===3;const holes=[gap];if(wide)holes.push((gap+1)%sides);
+ else gap=(this.lastGap+(this.rings%2?1:sides-1))%sides;
+ const wide=this.rings<2;const holes=[gap];if(wide)holes.push((gap+1)%sides);
  const distance=Math.min((gap-this.lastGap+sides)%sides,(this.lastGap-gap+sides)%sides)*step;
  const minimum=Math.max(.58,30/this.speed+distance/5.1+.27);const halfBeat=30/this.bpm;this.next=this.time+Math.ceil(minimum/halfBeat)*halfBeat;
  for(let i=0;i<sides;i++)if(!holes.includes(i))this.walls.push({r:460,sector:i,sides});
