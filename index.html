@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HEXAGON — Menu</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#180608;color:#fff;font-family:Arial,Helvetica,sans-serif}button{font:inherit;color:inherit;cursor:pointer}canvas{position:fixed;inset:0;width:100%;height:100%}.screen{position:relative;min-height:100%;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 20px;text-shadow:0 3px 0 #0005}.top{position:absolute;top:26px;left:30px;right:30px;display:flex;justify-content:space-between;font-size:11px;font-weight:800;letter-spacing:3px}.top button{background:none;border:0;font-size:11px;letter-spacing:2px}.brand{font-size:clamp(52px,12vw,132px);font-weight:950;letter-spacing:-.065em;line-height:.9;transform:skew(-8deg);margin:0 0 24px}.eyebrow{font-size:11px;letter-spacing:7px;margin:0 0 19px;font-weight:800}.rule{width:50px;height:4px;background:white;margin:0 auto 27px}.selector{display:flex;align-items:center;gap:clamp(18px,5vw,65px);margin-bottom:19px}.arrow{background:transparent;border:1px solid #ffffff50;width:44px;height:44px;font-size:28px;transition:background .15s}.arrow:hover{background:#ffffff28}.level{width:240px}.level h2{font-size:35px;letter-spacing:2px;margin:0 0 8px;font-weight:900}.difficulty{font-size:12px;letter-spacing:5px;font-weight:bold}.dots{display:flex;gap:10px;justify-content:center;margin-bottom:27px}.dot{padding:0;width:7px;height:7px;transform:rotate(45deg);background:transparent;border:1px solid #fff9}.dot.active{background:#fff}.play{min-width:265px;background:#fff;color:#891e2d;border:0;clip-path:polygon(5% 0,100% 0,95% 100%,0 100%);padding:17px 40px;font-weight:900;font-size:17px;letter-spacing:4px;transition:transform .15s}.play:hover{transform:scale(1.04)}.help{font-size:10px;letter-spacing:2px;opacity:.6;margin-top:19px}.bottom{position:absolute;bottom:24px;left:30px;right:30px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:2px;opacity:.65}.bottom button{background:none;border:0;font-size:10px;letter-spacing:2px}button:focus-visible{outline:3px solid #fff;outline-offset:6px}dialog{background:#20090ff5;color:#fff;border:1px solid #fff5;max-width:420px;padding:35px;text-align:center;line-height:1.8}dialog::backdrop{background:#0009}dialog h2{letter-spacing:3px}dialog button{border:1px solid #fff7;background:transparent;padding:10px 28px;margin-top:15px}dialog p{font-size:14px;opacity:.8}.toggle{display:flex;justify-content:space-between;gap:30px;padding:12px 0;font-size:14px}@media(max-height:600px){.brand{font-size:65px;margin-bottom:14px}.eyebrow{margin-bottom:12px}.rule{margin-bottom:15px}.dots{margin-bottom:15px}.selector{margin-bottom:12px}.help{margin-top:10px}}@media(max-width:420px){.top,.bottom{left:18px;right:18px}.level{width:205px}.selector{gap:12px}.level h2{font-size:29px}.top{letter-spacing:1px}.bottom{font-size:8px;letter-spacing:1px}}
+</style>
+</head>
+<body>
+<canvas id="background" aria-hidden="true"></canvas>
+<main class="screen">
+<header class="top"><span>HEXAGON / MENU 01</span><button id="settingsButton" aria-label="설정 열기">SETTINGS ↗</button></header>
+<p class="eyebrow">KEEP MOVING. STAY ALIVE.</p><h1 class="brand">HEXAGON</h1><div class="rule"></div>
+<section class="selector" aria-label="난이도 선택"><button class="arrow" id="previous" aria-label="이전 난이도">‹</button><div class="level" aria-live="polite"><h2 id="levelName">HEXAGON</h2><div class="difficulty" id="difficulty">HARD</div></div><button class="arrow" id="next" aria-label="다음 난이도">›</button></section>
+<nav class="dots" id="dots" aria-label="레벨 목록"></nav>
+<button class="play" id="play">ENTER TO START</button><p class="help">← → SELECT &nbsp; / &nbsp; ENTER CONFIRM</p>
+<footer class="bottom"><span>MENU PREVIEW · 001</span><button id="motionButton">MOTION ON</button><span>HEADPHONES RECOMMENDED</span></footer>
+</main>
+<dialog id="settings"><h2>SETTINGS</h2><label class="toggle">메뉴 효과음 <input id="sound" type="checkbox" checked></label><label class="toggle">배경 애니메이션 <input id="motion" type="checkbox" checked></label><p>현재는 메뉴 화면입니다.<br>원작 음악은 포함되어 있지 않습니다.</p><button data-close>돌아가기</button></dialog>
+<dialog id="startDialog"><h2 id="selectedTitle">HEXAGON</h2><p>난이도가 선택되었습니다.<br>게임 플레이는 다음 제작 단계에서 연결됩니다.</p><button data-close>메뉴로 돌아가기</button></dialog>
+<script src="menu.js"></script>
+</body></html>
