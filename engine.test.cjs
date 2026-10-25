@@ -6,3 +6,11 @@ let a=new Game(0,()=>.5),b=new Game(0,()=>.5);a.next=b.next=999;for(let i=0;i<60
 g=new Game();g.next=999;for(let i=0;i<3601;i++)g.update(1/60);assert(g.completed);assert(!g.dead);
 for(let i=0;i<6;i++){g=new Game(i,()=>.5);for(let n=0;n<3000&&!g.dead;n++)g.update(1/120);assert(g.dead,'stationary player eventually hits a wall');assert(g.walls.every(w=>Number.isFinite(w.r)))}
 console.log('PASS collision, movement, frame-rate independence, completion, all six levels');
+for(const sides of [4,5,6]){
+ const a=Math.PI/sides;
+ assert(intersect(playerPoly(a),wallPoly(64,0,24,sides)),`${sides}-sided wall collision`);
+ assert(!intersect(playerPoly(a+Math.PI),wallPoly(64,0,24,sides)),`${sides}-sided opposite gap`);
+}
+g=new Game();g.time=19.99;g.next=999;g.walls=[{r:1000,sector:0,sides:6}];g.update(.02);assert.equal(g.sides,6,'never change shape through existing walls');assert.equal(g.shapeWait,true);g.walls=[];g.update(.02);assert.equal(g.sides,5);assert(g.morph<1);g.time=40;g.update(.02);assert.equal(g.sides,4);g.time=50;g.update(.02);assert.equal(g.sides,6);
+for(let l=0;l<6;l++){g=new Game(l,()=>.3);g.next=999;for(let n=0;n<7200;n++)g.update(1/120);assert(Number.isFinite(g.zoom)&&Number.isFinite(g.tilt));assert(g.zoom>.85&&g.zoom<1.2);assert(Math.abs(g.tilt)<.25)}
+console.log('PASS 4/5/6-sided collisions, safe transitions, bounded camera transforms');
