@@ -42,23 +42,82 @@ function header(left,right){if(left){polygon([[0,0],[400,0],[380,42],[0,42]],'#0
 function format(n){return n.toFixed(2).padStart(5,'0')}
 function updatePalette(dt){const neutral=['title','options','credits','quit','scores'].includes(screen),mono=selected===5;let hue=levels[selected][2];if(game&&['play','over','paused','complete'].includes(screen)){const section=game.time/10,index=Math.floor(section);hue+=index*24+24*ease((section-index-.7)/.3)}const blend=1-Math.exp(-dt*5);const delta=((hue-displayedHue+540)%360)-180;displayedHue+=delta*blend;const sat=neutral||mono?0:89;displayedSat+=(sat-displayedSat)*blend;const lights=neutral?[14,19,93]:mono?[21,45,100]:[12,19,59];displayedLight=displayedLight.map((v,i)=>v+(lights[i]-v)*blend)}
 function palette(){return displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)')}
-function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';ctx.fillRect(0,0,canvas.width,canvas.height);const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();const [dark,light,accent]=palette();const playing=['play','over','paused','complete'].includes(screen);const launchBlend=launch?1-Math.pow(1-Math.min(1,launch.age/launch.duration),3):1;let cx=480,cy=playing?300:screen==='select'?470:600;const rotation=settings.motion?(playing?game.rotation:spin):0;ctx.save();ctx.translate(cx,cy);const camera=playing&&settings.motion&&!launch?game.referenceCamera:null;if(camera){if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}else{if(playing&&settings.motion){ctx.rotate(game.tilt*.55);ctx.transform(1,0,Math.sin(game.tilt)*.3,Math.cos(game.tilt*1.65),0,0);ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const angle=game.tilt*.55,c=Math.cos(angle),s=Math.sin(angle),shear=Math.sin(game.tilt)*.3,compress=Math.cos(game.tilt*1.65),z=game.zoom,cr=Math.cos(rotation),sr=Math.sin(rotation);const a=c*z,b=s*z,d=(s*shear+c*compress)*z,k=(c*shear-s*compress)*z;game.lastDrawCamera=[a*cr+k*sr,b*cr+d*sr,-a*sr+k*cr,-b*sr+d*cr,0,0];game.cameraWasActive=false}}const sides=playing?game.sides:6;for(let i=0;i<sides;i++){const a=i*Math.PI*2/sides,b=(i+1)*Math.PI*2/sides;polygon([[0,0],[Math.cos(a)*1800,Math.sin(a)*1800],[Math.cos(b)*1800,Math.sin(b)*1800]],i%2?dark:light)}if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera?50:45.8807,dark,accent);ctx.restore();const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead?'#fff':accent)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
+
+function drawBackdrop(game,dark,light,playing){
+ const paint=(sides,opacity)=>{
+  ctx.save();ctx.globalAlpha*=opacity;
+  for(let i=0;i<sides;i++){
+   const a=i*Math.PI*2/sides,b=(i+1)*Math.PI*2/sides;
+   polygon([[0,0],[Math.cos(a)*1800,Math.sin(a)*1800],
+    [Math.cos(b)*1800,Math.sin(b)*1800]],i%2?dark:light);
+  }
+  ctx.restore();
+ };
+ if(!playing||game.morph>=1||game.fromSides===game.sides){
+  paint(playing?game.sides:6,1);
+ }else{
+  // The old stripes remain visible beneath a smoothly fading new pattern.
+  // Without this, the entire playfield strobes when one sector disappears.
+  const u=game.morph*game.morph*(3-2*game.morph);
+  paint(game.fromSides,1);
+  paint(game.sides,u);
+ }
+}
+function drawTeleportEffect(g,color){
+ const warp=g.teleport;
+ if(!warp||!settings.motion)return;
+ const u=Math.min(1,warp.age/warp.duration),fade=(1-u)*(1-u);
+ ctx.save();
+ // White triangular echo remains at the former position; the real player
+ // has already arrived at the opposite side and can collide there.
+ ctx.globalAlpha=fade*.65;
+ polygon(playerPoly(warp.from,g.playerLean),'#fff');
+ // Two opposing, short-lived circular traces convey a rapid 180° swap.
+ ctx.strokeStyle='#fff';ctx.lineWidth=3.1*(1-u)+.5;
+ for(const sign of [-1,1]){
+  ctx.save();ctx.globalAlpha=fade*(sign===1?.62:.3);
+  ctx.beginPath();
+  ctx.arc(0,0,66,warp.from,warp.from+sign*Math.PI*Math.min(1,u*5),sign<0);
+  ctx.stroke();ctx.restore();
+ }
+ const x=Math.cos(g.angle)*66,y=Math.sin(g.angle)*66;
+ ctx.globalAlpha=.75*fade;
+ ctx.strokeStyle='#fff';ctx.lineWidth=2.7;
+ ctx.beginPath();ctx.arc(x,y,7+u*19,0,Math.PI*2);ctx.stroke();
+ ctx.globalAlpha=.46*fade;
+ polygon(playerPoly(g.angle,g.playerLean),color,'#fff',2);
+ ctx.restore();
+}
+
+function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';ctx.fillRect(0,0,canvas.width,canvas.height);const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();const [dark,light,accent]=palette();const playing=['play','over','paused','complete'].includes(screen);const launchBlend=launch?1-Math.pow(1-Math.min(1,launch.age/launch.duration),3):1;let cx=480,cy=playing?300:screen==='select'?470:600;const rotation=settings.motion?(playing?game.rotation:spin):0;ctx.save();ctx.translate(cx,cy);const camera=playing&&settings.motion&&!launch?game.referenceCamera:null;if(camera){if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}else{if(playing&&settings.motion){ctx.rotate(game.tilt*.55);ctx.transform(1,0,Math.sin(game.tilt)*.3,Math.cos(game.tilt*1.65),0,0);ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const angle=game.tilt*.55,c=Math.cos(angle),s=Math.sin(angle),shear=Math.sin(game.tilt)*.3,compress=Math.cos(game.tilt*1.65),z=game.zoom,cr=Math.cos(rotation),sr=Math.sin(rotation);const a=c*z,b=s*z,d=(s*shear+c*compress)*z,k=(c*shear-s*compress)*z;game.lastDrawCamera=[a*cr+k*sr,b*cr+d*sr,-a*sr+k*cr,-b*sr+d*cr,0,0];game.cameraWasActive=false}}drawBackdrop(game,dark,light,playing)if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera?50:45.8807,dark,accent);ctx.restore();drawTeleportEffect(game,accent);const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead?'#fff':accent)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
 if(screen==='title'){header('','ESC - QUIT');drawLogo('SUPER',220,160,520,100);drawLogo('HEXAGON',305,268,490,65);arrows();ctx.save();ctx.translate(selectionSlide*slideDirection*35,0);panel(['START GAME','OPTIONS','CREDITS'][menuItem]);ctx.restore();text('PRESS SPACE TO SELECT',480,565,23,'#fff')}
 if(screen==='select'){header('TAB - HIGH SCORES','ESC - RETURN TO MENU');ctx.fillStyle='#000';ctx.fillRect(0,95,960,155);text(levels[selected][0],480+selectionSlide*slideDirection*45,115,49,accent);text('DIFFICULTY: '+levels[selected][1],480,177,23,'#ddd');text('BEST TIME: '+format(records[selected]),480,211,23,'#ddd');if(selected>=3)text('HYPER MODE',885,68,16,accent,'right');panel(unlocked(selected)?'PRESS SPACE TO START':'LOCKED',270,470);if(!unlocked(selected))text('SURVIVE 60S IN '+levels[selected-3][0],480,345,17,'#ddd');arrows()}
 if(playing){ctx.save();header('BEST: '+format(records[selected]),'');polygon([[670,0],[960,0],[960,65],[815,65],[800,43],[690,43]],'#000b');text(game.time>=60||selected>=3?'HYPER MODE':'TIME',695,9,18,'#fff','left',120);text(format(game.time),942,12,42,'#fff','right',140);if(screen==='play'){if(game.time>=60&&game.time<63)text('LEVEL COMPLETE',480,155,36,'#fff')}if(screen==='over'){ctx.fillStyle='#000b';ctx.fillRect(0,150,960,210);text('GAME OVER',480,175,64);text('TIME: '+format(game.time),480,265,30,accent);text(game.time>=records[selected]?'NEW RECORD':'TRY AGAIN',480,313,22);panel('PRESS SPACE TO RETRY',435,470)}if(screen==='paused'){ctx.fillStyle='#0009';ctx.fillRect(0,130,960,260);text('PAUSED',480,220,65);panel('PRESS SPACE TO RESUME',435,500)}if(screen==='complete'){ctx.fillStyle='#000b';ctx.fillRect(0,130,960,260);text('CONGRATULATIONS',480,180,42);text('LEVEL COMPLETE',480,245,45,accent);text('A NEW HYPER MODE IS AVAILABLE',480,325,20);panel('PRESS SPACE TO CONTINUE',435,500)}ctx.restore()}
-if(screen==='options'){ctx.fillStyle='#ffffff10';ctx.fillRect(230,185+optionIndex*75,500,65);header('','ESC - RETURN');text('OPTIONS',480,100,52);panel('MUSIC / SFX: '+(settings.sound?'ON':'OFF'),190,440);panel('ROTATION: '+(settings.motion?'ON':'OFF'),265,440);panel('FULLSCREEN',340,440);text('ARROWS / A D - MOVE',480,450,19);text('SPACE - SELECT    ESC - BACK',480,490,17)}
+if(screen==='options'){ctx.fillStyle='#ffffff10';ctx.fillRect(230,185+optionIndex*75,500,65);header('','ESC - RETURN');text('OPTIONS',480,100,52);panel('MUSIC / SFX: '+(settings.sound?'ON':'OFF'),190,440);panel('ROTATION: '+(settings.motion?'ON':'OFF'),265,440);panel('FULLSCREEN',340,440);text('LEFT RIGHT / A D - MOVE',480,450,19);text('W S / UP DOWN - FLIP 180°',480,490,17)}
 if(screen==='scores'){header('','ESC - RETURN');text('HIGH SCORES',480,95,48);levels.forEach((l,i)=>{text((i>=3?'HYPER ':'')+l[0],95,185+i*53,19,'#ddd','left',540);text(format(records[i]),865,185+i*53,24,'#fff','right')})}
 if(screen==='credits'){header('','ESC - RETURN');text('CREDITS',480,105,50);text('ORIGINAL GAME',480,205,21,'#aaa');text('TERRY CAVANAGH',480,250,32);text('ORIGINAL MUSIC - CHIPZEL',480,320,22);text('UNOFFICIAL WEB RECREATION',480,410,22);text('MUSIC BY CHIPZEL',480,455,17,'#aaa')}
 if(screen==='quit'){text('THANKS FOR PLAYING',480,210,40);text('CLOSE THIS TAB TO EXIT',480,300,23);panel('RETURN TO MENU',435,400)}if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash*.5})`;ctx.fillRect(0,0,960,600)}ctx.restore()}
 function resize(){const dpr=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;scale=Math.min(innerWidth/960,innerHeight/600);ox=(innerWidth-960*scale)/2;oy=(innerHeight-600*scale)/2;buildControls();draw()}
 function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;clock+=dt;uiAge+=dt;pressAge+=dt;hoverAmount+=(Number(!!hovered)-hoverAmount)*(1-Math.exp(-dt*16));updatePalette(dt);if(pendingAction){pendingAction.left-=dt;if(pendingAction.left<=0){const fn=pendingAction.fn;pendingAction=null;fn()}}if(launch&&screen==='play'){launch.age+=dt;if(launch.age>=launch.duration)launch=null}if(settings.motion)spin+=dt*.18;selectionSlide=Math.max(0,selectionSlide-dt*5);flash=Math.max(0,flash-dt*3);if(transition){transition.age+=dt;if(transition.age>=.24)transition=null}
 if(screen==='play'){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touches.values()].includes(-1),right=keys.has('ArrowRight')||keys.has('KeyD')||[...touches.values()].includes(1);
-let elapsed=dt;if(music.active&&music.context.state==='running'){const behind=music.position-game.time;if(behind>.12){music.play(selected,game.time);elapsed=0}else elapsed=Math.max(0,behind)}
+// Gameplay owns the steady timebase. Never pause/jump wall movement to
+ // follow fluctuating audio playback latency. Only the sound transport seeks.
+ let elapsed=dt;
+ if(music.active&&music.context?.state==='running'&&Math.abs(music.position-game.time)>.22)
+  music.play(selected,game.time);
 game.update(elapsed,Number(right)-Number(left));game.zoom=music.visualZoom(dt);game.referenceCamera=gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&records[selected]<60){records[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){records[selected]=Math.max(records[selected],game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
 draw();
 if(transition){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=(1-transition.age/.24)**2;ctx.drawImage(transition.snapshot,0,-transition.age*canvas.height*.04);ctx.restore()}
 if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected%3];canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
-addEventListener('keydown',e=>{if(e.ctrlKey||e.altKey||e.metaKey)return;if(['ArrowLeft','ArrowRight','Space','Enter','KeyA','KeyD'].includes(e.code)&&!e.repeat)enableAudio();if(['ArrowLeft','ArrowRight','Space','Escape','Tab','KeyA','KeyD','Enter','ArrowUp','ArrowDown'].includes(e.code)){if(e.code==='Tab'&&screen!=='select')return;e.preventDefault();keys.add(e.code);if(e.repeat)return;if(screen==='options'&&['ArrowUp','ArrowDown'].includes(e.code)){optionIndex=(optionIndex+(e.code==='ArrowUp'?2:1))%3;beep();return}if(e.code==='Escape')back();else if(e.code==='Tab'&&screen==='select')change('scores');else if(['Space','Enter'].includes(e.code))queueAction(confirm,{x:250,y:screen==='select'?270:435,w:460,h:65});else if((screen==='title'||screen==='select')&&['ArrowLeft','ArrowRight','KeyA','KeyD'].includes(e.code))choose(['ArrowLeft','KeyA'].includes(e.code)?-1:1)}});
+addEventListener('keydown',e=>{if(e.ctrlKey||e.altKey||e.metaKey)return;
+ if(['KeyW','KeyS','ArrowUp','ArrowDown'].includes(e.code)&&screen==='play'){
+  e.preventDefault();
+  if(e.repeat||keys.has(e.code))return;
+  keys.add(e.code);
+  enableAudio();
+  if(game?.teleportHalfTurn())music.effect('warp');
+  return;
+ }if(['ArrowLeft','ArrowRight','Space','Enter','KeyA','KeyD'].includes(e.code)&&!e.repeat)enableAudio();if(['ArrowLeft','ArrowRight','Space','Escape','Tab','KeyA','KeyD','KeyW','KeyS','Enter','ArrowUp','ArrowDown'].includes(e.code)){if(e.code==='Tab'&&screen!=='select')return;e.preventDefault();keys.add(e.code);if(e.repeat)return;if(screen==='options'&&['ArrowUp','ArrowDown'].includes(e.code)){optionIndex=(optionIndex+(e.code==='ArrowUp'?2:1))%3;beep();return}if(e.code==='Escape')back();else if(e.code==='Tab'&&screen==='select')change('scores');else if(['Space','Enter'].includes(e.code))queueAction(confirm,{x:250,y:screen==='select'?270:435,w:460,h:65});else if((screen==='title'||screen==='select')&&['ArrowLeft','ArrowRight','KeyA','KeyD'].includes(e.code))choose(['ArrowLeft','KeyA'].includes(e.code)?-1:1)}});
 addEventListener('keyup',e=>keys.delete(e.code));function suspend(){keys.clear();touches.clear();music.stop();if(screen==='play')change('paused')}addEventListener('blur',suspend);document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend()});canvas.addEventListener('pointerdown',e=>{if(screen!=='play')return;enableAudio();canvas.setPointerCapture(e.pointerId);touches.set(e.pointerId,e.clientX<innerWidth/2?-1:1)});canvas.addEventListener('pointerup',e=>touches.delete(e.pointerId));canvas.addEventListener('pointercancel',e=>touches.delete(e.pointerId));canvas.addEventListener('contextmenu',e=>e.preventDefault());addEventListener('resize',resize);resize();change('title');requestAnimationFrame(frame);
 
 function drawLogo(word,x,y,width,height){ctx.save();const intro=settings.motion?ease(uiAge/.38):1;ctx.globalAlpha*=intro;ctx.translate(x,y+(1-intro)*16);ctx.scale(width/(word.length*.95-.1),height);VectorFont.draw(ctx,word,0,0,1,'#fff','left');ctx.restore()}

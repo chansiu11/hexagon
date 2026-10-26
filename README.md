@@ -77,3 +77,9 @@ A generated, deterministic `wall-lifecycle-patches.js` records source-video trac
 For recorded transitions (for example Hexagon 6 → 5 sides), all existing and arriving wall sectors and the center use **one shared 0.45-second polygon morph**. Both old and new video fragments are projected to the same global polygon shape; they do not draw separate six- and five-sided wall geometries simultaneously. Rendering and collision use the exact same geometry. The original measured pattern transcription may still differ from authentic gameplay; the fix targets discontinuities rather than claiming exact frame-by-frame fidelity.
 
 Run `node wall-morph-stability.test.cjs` alongside the other checks.
+
+## Stable wall movement and 180° jump controls
+
+**W**, **S**, **Up** or **Down** triggers an instant half-turn to the opposite side of the central polygon during active play, with a short (0.18-second) afterimage/arc/pulse and synthesized electronic blip. Only a fresh keydown triggers the move; held keys do not auto-repeat. There is no immunity: landing in a wall is a collision. Left/right orbit speed stays unchanged. The flip effect is original-inspired rather than sampled from the commercial game.
+
+Wall positions now use a steady frame-time clock independent of audio playback latency; audio re-syncs if it drifts instead of pausing or jumping the simulation. Recorded polygon-side changes crossfade the background sector stripes over the same existing 0.45-second wall/core morph to avoid a full-screen color pop. Existing constant-speed wall timelines and lifecycle patches are unchanged.

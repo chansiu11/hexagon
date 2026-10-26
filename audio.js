@@ -15,7 +15,11 @@ class BeatAudio {
  referenceWalls(){const r=root.ReferenceWalls;if(!this.active||!r||this.level!==r.level)return null;const duration=this.source?.buffer.duration;const frame=((duration?this.position%duration:this.position)-r.start)*r.sampleRate;if(frame<0||frame>=r.frames.length-1)return null;const i=Math.floor(frame),u=frame-i,a=r.frames[i],b=r.frames[i+1];return a&&b?a.map((v,k)=>v*(1-u)+b[k]*u):null}
  tone(hz,time,duration,gain=.1,type='square',endHz=null){const c=this.context,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(hz,time);if(endHz)o.frequency.exponentialRampToValueAtTime(endHz,time+duration);g.gain.setValueAtTime(.0001,time);g.gain.exponentialRampToValueAtTime(Math.max(.0002,gain),time+.004);g.gain.exponentialRampToValueAtTime(.0001,time+duration);o.connect(g).connect(this.master);this.nodes.add(o);o.onended=()=>{this.nodes.delete(o);o.disconnect();g.disconnect()};o.start(time);o.stop(time+duration+.01)}
  hiss(time,duration,gain,frequency){const c=this.context,n=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();n.buffer=this.noise;f.type='highpass';f.frequency.value=frequency;g.gain.setValueAtTime(gain,time);g.gain.exponentialRampToValueAtTime(.0001,time+duration);n.connect(f).connect(g).connect(this.master);this.nodes.add(n);n.onended=()=>{this.nodes.delete(n);n.disconnect();f.disconnect();g.disconnect()};n.start(time);n.stop(time+duration)}
- effect(kind='select'){if(!this.context||!this.enabled)return;const t=this.context.currentTime;if(kind==='die'){this.tone(150,t,.22,.22,'sawtooth',30);this.hiss(t,.12,.14,250)}else if(kind==='start'){this.tone(440,t,.07,.09);this.tone(660,t+.07,.1,.08)}else this.tone(480,t,.035,.05,'triangle')}
+ effect(kind='select'){if(!this.context||!this.enabled)return;const t=this.context.currentTime;if(kind==='warp'){
+  this.tone(820,t,.065,.1,'triangle',330);
+  this.tone(1200,t+.017,.08,.055,'sawtooth',460);
+  this.hiss(t,.1,.035,1800);
+ }else if(kind==='die'){this.tone(150,t,.22,.22,'sawtooth',30);this.hiss(t,.12,.14,250)}else if(kind==='start'){this.tone(440,t,.07,.09);this.tone(660,t+.07,.1,.08)}else this.tone(480,t,.035,.05,'triangle')}
  measure(){if(!this.analyser)return 0;const a=new Uint8Array(256);this.analyser.getByteTimeDomainData(a);return Math.sqrt(a.reduce((s,v)=>s+(v-128)**2,0)/a.length)/128}
 }
 root.BeatAudio=BeatAudio;

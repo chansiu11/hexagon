@@ -25,3 +25,4 @@ jobs:
           node seventeen-second.test.cjs
           node stage-two-lifecycle.test.cjs
           node wall-morph-stability.test.cjs
+          node teleport-and-clock.test.cjs

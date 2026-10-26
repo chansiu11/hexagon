@@ -85,7 +85,7 @@ function observedWaveRadius(w,time){
 }
 
 class Game{
- constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false}
+ constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
@@ -110,7 +110,23 @@ class Game{
  this.walls=frame.walls.map(([id,points,holes=[]])=>({id,points,holes}));
  }
 
- update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;const target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
+
+ // The player changes position instantly; only the decorative trail animates.
+ // The short cooldown rejects held-key auto-repeat and accidental double inputs.
+ teleportHalfTurn(){
+  if(this.dead||this.timelineEnded||this.teleportCooldown>0)return false;
+  const from=this.angle,to=wrap(from+Math.PI);
+  this.angle=to;
+  this.teleport={from,to,age:0,duration:.18};
+  this.teleportCooldown=.18;
+  const player=playerPoly(this.angle,this.playerLean);
+  if(this.walls.some(w=>w.points?polygonOverlap(player,w.points,w.holes):
+    intersect(player,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,
+      this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,
+      this.timeline?.mode==='batched-wall-waves'?this.morph:1))))this.dead=true;
+  return true;
+ }
+ update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.teleportCooldown=Math.max(0,this.teleportCooldown-h);if(this.teleport){this.teleport.age+=h;if(this.teleport.age>=this.teleport.duration)this.teleport=null;}this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;const target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
 this.shapeWait=this.pendingSides!==this.sides;
 if(this.shapeWait&&(this.profile&&this.time<60||this.walls.length===0)){this.fromSides=this.sides;this.sides=this.pendingSides;this.morph=0;this.lastGap=Math.floor(wrap(this.angle)/TAU*this.sides);this.shapeWait=false}
 this.morph=Math.min(1,this.morph+h/0.45);
