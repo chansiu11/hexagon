@@ -1,7 +1,16 @@
 const assert=require('node:assert/strict');
-const {Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,wrap}=require('./engine');
-assert.equal(PLAYER_SPEED,8.2);
-assert.deepEqual(PLAYER_SPEED_BY_LEVEL,[8.2,8.2,10.2,9.2,9.2,11.2]);
+const {Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,wrap}=require('./engine');
+const expectedPerTick=[7,7,9,7,7,9];
+assert.equal(ORIGINAL_TICK_RATE,60);
+assert.deepEqual(ORIGINAL_ARROW_DEGREES_PER_TICK,expectedPerTick);
+assert(Math.abs(PLAYER_SPEED-7*Math.PI/3)<1e-12);
+assert.equal(PLAYER_SPEED_BY_LEVEL.length,6);
+for(let level=0;level<6;level++){
+ assert(Math.abs(PLAYER_SPEED_BY_LEVEL[level]-expectedPerTick[level]*Math.PI/3)<1e-12);
+ const originalDegreesForOneFrame=PLAYER_SPEED_BY_LEVEL[level]/ORIGINAL_TICK_RATE*180/Math.PI;
+ assert(Math.abs(originalDegreesForOneFrame-expectedPerTick[level])<1e-10,'1/60 second must match original units');
+}
+
 const initial=-Math.PI/2;
 for(let level=0;level<6;level++){
  const speed=PLAYER_SPEED_BY_LEVEL[level];
@@ -16,4 +25,4 @@ for(let level=0;level<6;level++){
  assert(Math.abs(still.angle-wrap(initial))<1e-9,'neutral input must not move player');
 }
 assert(PLAYER_SPEED_BY_LEVEL[2]>PLAYER_SPEED_BY_LEVEL[0]);
-console.log('PASS increased symmetric player movement, stage difficulty speeds and frame independence');
+console.log('PASS original 7/9 degree-per-tick movement, symmetry, stage mapping and frame independence');
