@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const {Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,wrap}=require('./engine');
-assert.equal(PLAYER_SPEED,8.5);
-assert.deepEqual(PLAYER_SPEED_BY_LEVEL,[8.5,8.5,10.5,9.5,9.5,11.5]);
+assert.equal(PLAYER_SPEED,8.2);
+assert.deepEqual(PLAYER_SPEED_BY_LEVEL,[8.2,8.2,10.2,9.2,9.2,11.2]);
 const initial=-Math.PI/2;
 for(let level=0;level<6;level++){
  const speed=PLAYER_SPEED_BY_LEVEL[level];
