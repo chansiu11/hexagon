@@ -23,7 +23,7 @@ Arrow keys or A/D rotate. Space/Enter selects or retries. Escape pauses/returns.
 - The three supplied recordings are in assets/music. Sound effects are synthesized.
 
 
-- Left/right orbit movement uses symmetric controls. The current calibrated speeds are 8.2, 8.2, 10.2, 9.2, 9.2, and 11.2 rad/s across stages one to six. These are tuned estimates rather than confirmed original-engine constants.
+- Left/right orbit movement uses symmetric controls with the original 60-Hz game's reported `arrow_speed` of **7 degrees/tick** in Hexagon, Hexagoner and their Hyper stages, and **9 degrees/tick** in Hexagonest and Hyper Hexagonest. The browser converts these to **7.330383** and **9.424778 rad/s** respectively, independent of display frame rate. Source: [SuperHexagonRE reverse-engineering notes](https://github.com/sumguytho/SuperHexagonRE#arrow_speed). This is an implementation-based calibration; a frame-by-frame video measurement has not been independently completed.
 - In stage one, 165 sufficiently well-tracked walls now persist up to 0.75 seconds longer toward the center, without crossing the next recorded shape transition. An angular passage audit detects no fully sealed frames in the first 60 seconds.
 
 ## Validation
