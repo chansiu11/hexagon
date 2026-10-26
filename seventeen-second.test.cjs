@@ -21,7 +21,8 @@ assert(!first.waves.some(w=>w.glitchCorrection),'stage one recording is untouche
 
 for(let level=1;level<=5;level++){
  const d=require('./assets/timelines/waves-stage-'+level+'.json');
- const patched=d.waves.filter(w=>w.glitchCorrection);
+ const ids=new Set(new Game(level,d).timeline.waves.map(w=>w.id));
+ const patched=d.waves.filter(w=>w.glitchCorrection&&ids.has(w.id));
  // Reported repairs include actors later excluded as tracking conflicts.
  assert(d.repair.glitchLifetimeExtensions>=patched.length);
  assert(d.repair.glitchLifetimeExtensions-patched.length<=d.repair.discardedSourceActors.length);

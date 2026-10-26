@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Game,intersect,playerPoly,wallPoly,observedWaveRadius}=require('./engine');
+const {Game,intersect,playerPoly,wallVisualPoly,observedWaveRadius}=require('./engine');
 const {buildObservedWaves}=require('./build_observed_waves.cjs');
 const first=require('./assets/timelines/waves-stage-0.json');
 assert.equal(first.waves.length,561,'stage one wall source must remain unchanged');
@@ -91,7 +91,7 @@ for(let level=1;level<=5;level++){
   let open=false;
   for(let i=0;i<144;i++){
    const p=playerPoly(i*Math.PI*2/144);
-   if(!near.some(w=>intersect(p,wallPoly(w.r,w.sector,w.thickness,w.sides)))){open=true;break;}
+   if(!near.some(w=>intersect(p,wallVisualPoly(w,g.fromSides,g.sides,g.morph)))){open=true;break;}
   }
   assert(open,'sampled passage must stay open in stage '+(level+1)+' at '+t.toFixed(3));
  }

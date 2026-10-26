@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Game,wallPoly,playerPoly,intersect}=require('./engine');
+const {Game,wallVisualPoly,playerPoly,intersect}=require('./engine');
 const data=require('./assets/timelines/waves-stage-0.json');
 assert.equal(data.mode,'batched-wall-waves');
 assert(data.waves.some(w=>w.sectors.length>1));
@@ -12,9 +12,11 @@ for(const w of data.waves){
  assert(w.r*Math.cos(Math.PI/w.sides)*birthZoom>Math.hypot(480,300),'new wall must be wholly outside viewport');
  assert.equal(w.sectors.length,new Set(w.sectors).size);
  const g=new Game(0,data);
- for(const time of [w.start-.000001,w.start,(w.start+w.end)/2,w.end-.000001,w.end]){
+ const repaired=g.timeline.waves.find(v=>v.id===w.id);
+ if(!repaired)continue; // rejected contradictory recording, original asset preserved
+ for(const time of [w.start-.000001,w.start,(w.start+w.end)/2,repaired.end-.000001,repaired.end]){
   g.time=time;g.sampleWalls();const pieces=g.walls.filter(p=>p.waveId===w.id);
-  assert.equal(pieces.length,time>=w.start&&time<w.end?w.sectors.length:0,'atomic spawn/despawn');
+  assert.equal(pieces.length,time>=w.start&&time<repaired.end?w.sectors.length:0,'atomic spawn/despawn');
   for(const piece of pieces){assert.equal(piece.r,pieces[0].r);assert.equal(piece.thickness,pieces[0].thickness);}
  }
 }
@@ -23,7 +25,7 @@ for(let t=1;t<60;t+=.1){
  const g=new Game(0,data);g.time=t;g.sampleWalls();
  const near=g.walls.filter(w=>w.r<110&&w.r+w.thickness>50);
  let free=false;
- for(let a=0;a<144;a++)if(!near.some(w=>intersect(playerPoly(a*Math.PI/72),wallPoly(w.r,w.sector,w.thickness,w.sides)))){free=true;break;}
+ for(let a=0;a<144;a++)if(!near.some(w=>intersect(playerPoly(a*Math.PI/72),wallVisualPoly(w,g.fromSides,g.sides,g.morph)))){free=true;break;}
  if(!free)blocked.push(t);
 }
 assert.deepEqual(blocked,[],'grouping must not create completely closed sampled frames');

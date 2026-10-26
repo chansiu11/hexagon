@@ -24,3 +24,4 @@ jobs:
           node observed-waves.test.cjs
           node seventeen-second.test.cjs
           node stage-two-lifecycle.test.cjs
+          node wall-morph-stability.test.cjs

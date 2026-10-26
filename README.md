@@ -69,3 +69,11 @@ Patterns, order, speed, thickness and shape changes for all six stages are fitte
 Stage two (Hexagoner) retains its video-fitted wall sector order, position, width, speed and camera. Its rigid wave actors now follow stage one's constant inward movement until their outer edge passes behind the core, rather than disappearing at prematurely short video-tracking cutoffs. This corrects 477 such cutoffs. Seven contradictory short source fragments are documented and excluded after auditing open passages at 30 Hz. The stage-one wall timeline is unchanged. The video transcription is still approximate and should not be described as a pixel-identical recreation.
 
 Run `node stage-two-lifecycle.test.cjs` to check the stage-two lifecycle, measured source integrity and uniform player rotation.
+
+## Wall flicker and polygon transition repairs
+
+A generated, deterministic `wall-lifecycle-patches.js` records source-video tracking cutoffs that were incorrectly ending walls before they reached the core. The browser applies these physical-exit continuations without modifying the original measured tracks, along with documented rejected contradictory observations. The actor's ID, spawn, thickness, sector pattern and constant inward speed remain unchanged. A 30-Hz, 144-angle passage audit checks against the same morphing wall geometry used for rendering and collision. The stage-two fix remains unchanged.
+
+For recorded transitions (for example Hexagon 6 → 5 sides), all existing and arriving wall sectors and the center use **one shared 0.45-second polygon morph**. Both old and new video fragments are projected to the same global polygon shape; they do not draw separate six- and five-sided wall geometries simultaneously. Rendering and collision use the exact same geometry. The original measured pattern transcription may still differ from authentic gameplay; the fix targets discontinuities rather than claiming exact frame-by-frame fidelity.
+
+Run `node wall-morph-stability.test.cjs` alongside the other checks.

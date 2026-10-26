@@ -10,7 +10,52 @@ const ORIGINAL_ARROW_DEGREES_PER_TICK=Object.freeze([7,7,9,7,7,9]);
 // Preserve the original game's documented stage differences as reference,
 // but intentionally use the first stage's orbit rate on every map.
 const PLAYER_SPEED=ORIGINAL_ARROW_DEGREES_PER_TICK[0]*TAU/360*ORIGINAL_TICK_RATE;
-const PLAYER_SPEED_BY_LEVEL=Object.freeze(ORIGINAL_ARROW_DEGREES_PER_TICK.map(()=>PLAYER_SPEED));const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
+const PLAYER_SPEED_BY_LEVEL=Object.freeze(ORIGINAL_ARROW_DEGREES_PER_TICK.map(()=>PLAYER_SPEED));
+const LIFECYCLE=typeof module!=='undefined'?require('./wall-lifecycle-patches.js'):(root.HexWallLifecyclePatches||[]);
+const repairedTimelines=new WeakMap();
+function stabilizeTimeline(level,data){
+ if(!data||data.mode!=='batched-wall-waves')return data;
+ let cache=repairedTimelines.get(data);
+ if(!cache){cache=new Map();repairedTimelines.set(data,cache);}
+ if(cache.has(level))return cache.get(level);
+ const patch=LIFECYCLE[level];
+ if(!patch){cache.set(level,data);return data;}
+ const discarded=new Set(patch.omit);
+ const overrides=new Map(patch.extend);
+ const waves=data.waves.filter(w=>!discarded.has(w.id)).map(w=>{
+  const end=overrides.get(w.id);
+  return end===undefined?w:{...w,end};
+ });
+ const copy={...data,waves,stability:{sourceWaves:data.waves.length,continued:overrides.size,excluded:discarded.size}};
+ cache.set(level,copy);
+ return copy;
+}
+// One global polygon transition applies to the core, walls and collision
+// alike, regardless of each video fragment's old recorded side count.
+const MORPH_SECONDS=.45;
+function shapeStateAt(t,schedule){
+ if(!Array.isArray(schedule)||!schedule.length)return {from:6,to:6,progress:1};
+ let index=0;
+ for(let i=1;i<schedule.length;i++)if(schedule[i][0]<=t)index=i;else break;
+ const to=schedule[index][1],from=index?schedule[index-1][1]:to;
+ return {from,to,progress:index?Math.max(0,Math.min(1,(t-schedule[index][0])/MORPH_SECONDS)):1};
+}
+function wallVisualPoly(w,fromSides=w.sides||6,toSides=fromSides,progress=1){
+ const src=w.sides||6,from=fromSides||src,to=toSides||from;
+ const oldSector=Math.max(0,Math.min(from-1,Math.floor((w.sector+.5)*from/src)));
+ const newSector=Math.max(0,Math.min(to-1,Math.floor((w.sector+.5)*to/src)));
+ const blend=Math.max(0,Math.min(1,progress));
+ const u=blend*blend*(3-2*blend);
+ const inside=Math.max(0,w.r),outside=Math.max(inside,w.r+(w.thickness||30));
+ const point=(sides,sector,r)=>{const angle=sector*TAU/sides;return [Math.cos(angle)*r,Math.sin(angle)*r];};
+ const vertex=(oldIdx,newIdx,r)=>{
+  const a=point(from,oldIdx,r),b=point(to,newIdx,r);
+  return [a[0]*(1-u)+b[0]*u,a[1]*(1-u)+b[1]*u];
+ };
+ return [vertex(oldSector,newSector,inside),vertex(oldSector+1,newSector+1,inside),
+  vertex(oldSector+1,newSector+1,outside),vertex(oldSector,newSector,outside)];
+}
+const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
 const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGONEST','HARDEST',285,290],['HEXAGON','HARDESTER',190,300],['HEXAGONER','HARDESTEST',225,335],['HEXAGONEST','HARDESTESTEST',0,370]];
 const wrap=a=>(a%TAU+TAU)%TAU;
 function intersect(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],axis=[p[i][1]-q[1],q[0]-p[i][0]];const aa=a.map(v=>v[0]*axis[0]+v[1]*axis[1]),bb=b.map(v=>v[0]*axis[0]+v[1]*axis[1]);if(Math.max(...aa)<Math.min(...bb)||Math.max(...bb)<Math.min(...aa))return false}return true}
@@ -40,7 +85,7 @@ function observedWaveRadius(w,time){
 }
 
 class Game{
- constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?timeline:null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false}
+ constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
@@ -52,6 +97,8 @@ class Game{
   const a=data.camera[index],b=data.camera[Math.min(index+1,data.camera.length-1)];
   this.wallFrame=index;this.recordedCamera=a.map((v,k)=>v+(b[k]-v)*u);
   if(data.mode==='batched-wall-waves'){
+   const shape=shapeStateAt(this.time,data.shapeSchedule);
+   this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
    this.waves=data.waves.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:observedWaveRadius(w,this.time)}));
    this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness})));
   }else this.walls=data.walls.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
@@ -71,9 +118,9 @@ const phase=beat%1,accent=Math.exp(-phase*10);const targetZoom=1+accent*.075+.04
 const tiltTarget=Math.min(1,Math.max(0,this.time-1))*.24*Math.sin(beat*Math.PI/16)*Math.sin(Math.min(this.time/4,1)*Math.PI/2);this.tilt+=(tiltTarget-this.tilt)*Math.min(1,h*3);
 if(this.timeline)this.sampleWalls();else for(const w of this.walls)w.r-=this.speed*h;
 const p=playerPoly(this.angle,this.playerLean);
-if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallPoly(w.r,w.sector,w.thickness||30,w.sides||6)))){this.dead=true;break}
+if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 

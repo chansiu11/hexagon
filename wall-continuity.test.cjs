@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Game,intersect,playerPoly,wallPoly}=require('./engine');
+const {Game,intersect,playerPoly,wallVisualPoly}=require('./engine');
 const data=require('./assets/timelines/waves-stage-0.json');
 assert.equal(data.continuity.version,1);
 const extended=data.waves.filter(w=>w.continuityExtension>0);
@@ -19,7 +19,7 @@ for(let frame=30;frame<1800;frame++){
  let free=false;
  for(let i=0;i<144;i++){
   const player=playerPoly(i*Math.PI*2/144);
-  if(!close.some(w=>intersect(player,wallPoly(w.r,w.sector,w.thickness,w.sides)))){free=true;break}
+  if(!close.some(w=>intersect(player,wallVisualPoly(w,game.fromSides,game.sides,game.morph)))){free=true;break}
  }
  assert(free,'no escape route at '+time.toFixed(3)+' s');
 }
