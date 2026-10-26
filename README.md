@@ -22,6 +22,10 @@ Arrow keys or A/D rotate. Space/Enter selects or retries. Escape pauses/returns.
 - Runtime uses uniform camera rotation/zoom, polygon collision, music transport and local records.
 - The three supplied recordings are in assets/music. Sound effects are synthesized.
 
+
+- Player orbit speeds are increased with symmetric left/right controls: 8.5 rad/s for Hexagon/Hexagoner, faster in the higher stages. These are tuned estimates rather than confirmed original constants.
+- In stage one, 165 sufficiently well-tracked walls now persist up to 0.75 seconds longer toward the center, without crossing the next recorded shape transition. An angular passage audit detects no fully sealed frames in the first 60 seconds.
+
 ## Validation
 
 ```sh
@@ -29,6 +33,8 @@ node engine.test.cjs
 node rigid-walls.test.cjs
 node stage-one-continuity.test.cjs
 node waves.test.cjs
+node wall-continuity.test.cjs
+node player-speed.test.cjs
 ```
 
 The tests check geometry, collision, shared wave movement, offscreen births, entrance survival, and sampled open passages. They do not establish exact original-game fidelity or prove a continuous solution for every recorded sequence.
