@@ -21,7 +21,7 @@ function change(s){const starting=s==='play'&&screen==='select';if(!starting)cap
 function choose(d){selectionSlide=1;slideDirection=d;beep();if(screen==='title')menuItem=(menuItem+d+3)%3;else if(screen==='select'){selected=(selected+d+6)%6;status.textContent=levels[selected][0]+' '+levels[selected][1]+(unlocked(selected)?'':' 잠김')}buildControls()}
 let starting=false;const timelineCache=new Map();
 async function loadTimeline(level){
- if(!timelineCache.has(level))timelineCache.set(level,fetch('assets/timelines/'+'waves-stage-'+level+'.json?v=5',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('wall timeline '+r.status);return r.json();}).catch(e=>{timelineCache.delete(level);throw e;}));
+ if(!timelineCache.has(level))timelineCache.set(level,fetch('assets/timelines/'+'waves-stage-'+level+'.json?v=6',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('wall timeline '+r.status);return r.json();}).catch(e=>{timelineCache.delete(level);throw e;}));
  return timelineCache.get(level);
 }
 async function start(){
