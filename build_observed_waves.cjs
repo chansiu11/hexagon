@@ -85,7 +85,7 @@ function buildObservedWaves(data,level){
   if(active.reduce((count,w)=>count+w.sectors.length,0)<4)return null;
   const obstacles=[];
   for(const w of active){
-   const r=w.r-w.speed*(t-w.start),outer=r+w.thickness;
+   const raw=w.r-w.speed*(t-w.start),r=Math.max(0,raw),outer=Math.max(r,raw+w.thickness);
    for(const sector of w.sectors){
     const a=sector*TAU/w.sides,b=(sector+1)*TAU/w.sides;
     obstacles.push([[Math.cos(a)*r,Math.sin(a)*r],[Math.cos(b)*r,Math.sin(b)*r],
@@ -119,6 +119,32 @@ function buildObservedWaves(data,level){
  }
  const unresolved=firstClosed();
  if(unresolved)throw Error('No angular escape on stage '+(level+1)+' at '+unresolved.t);
+
+// Recorded wall tracks can end while still on screen, particularly near 17s.
+// Retain measured, reliable waves on the SAME linear inward trajectory.
+let corrected=0,reverted=0;
+for(const w of waves){
+ if(w.end<15.5||w.end>19||w.samples<12)continue;
+ const endRadius=w.r-w.speed*(w.end-w.start)+w.thickness;
+ if(endRadius<85)continue;
+ const nextShape=data.shapeSchedule.find(s=>s[0]>w.end+1e-6)?.[0]??data.duration;
+ const physicalExit=w.start+(w.r+w.thickness-42)/w.speed;
+ const end=Math.max(w.end,Math.min(physicalExit,w.end+2,nextShape,data.duration));
+ if(end-w.end<.18)continue;
+ w.glitchCorrection={baselineEnd:w.end,extendedSeconds:end-w.end};
+ w.end=end;corrected++;
+}
+for(let retry=0;retry<128;retry++){
+ const failure=firstClosed();
+ if(!failure)break;
+ const changes=failure.actors.filter(w=>w.glitchCorrection&&failure.t>=w.glitchCorrection.baselineEnd-1e-8);
+ if(!changes.length)throw Error('Unrepairable closed passage at '+failure.t+' on stage '+(level+1));
+ const victim=changes.sort(lessReliable)[0];
+ victim.end=victim.glitchCorrection.baselineEnd;
+ delete victim.glitchCorrection;reverted++;
+}
+if(firstClosed())throw Error('Open passage invariant failed after wave continuity repair');
+
  if(waves.some(w=>w.approach||!Number.isFinite(w.r)||w.end<=w.start))throw Error('Invalid actor at '+level);
  return {version:8,mode:'batched-wall-waves',offscreenBirth:true,generator:'stage-one-rigid-v7',
   continuity,sharedSpeed,speedSampleCount:reliable.length,source:data.source,
@@ -127,7 +153,7 @@ function buildObservedWaves(data,level){
   repair:{observedTracks:data.walls.length,groupCount:groups.length,
    multiPieceWaves:groups.filter(g=>g.length>1).length,
    discardedSourceActors:excluded,clippedExtensions:clipped,
-   extendedWaves:waves.filter(w=>w.continuityExtension).length,checkedPassagesAtHz:30}};
+   extendedWaves:waves.filter(w=>w.continuityExtension).length,glitchWindow:[15.5,19],glitchLifetimeExtensions:corrected-reverted,glitchLifetimeRejected:reverted,checkedPassagesAtHz:30}};
 }
 if(require.main===module){
  for(let level=1;level<=5;level++){
