@@ -1,54 +1,76 @@
 const assert=require('node:assert/strict');
 const {Game,intersect,playerPoly,wallPoly,observedWaveRadius}=require('./engine');
+const {buildObservedWaves}=require('./build_observed_waves.cjs');
 const first=require('./assets/timelines/waves-stage-0.json');
-assert.equal(first.waves.length,561,'stage one must retain its previously verified waves');
-for(const w of first.waves.slice(0,25))for(const t of [w.start,Math.min(w.end,w.start+.1)]){
- assert.equal(observedWaveRadius(w,t),w.r-w.speed*(t-w.start),'stage one is unchanged');
+assert.equal(first.waves.length,561,'stage one wall source must remain unchanged');
+assert.equal(first.version,7,'stage one wall timeline version is frozen');
+for(const w of first.waves){
+ for(const t of [w.start,Math.min(w.end,w.start+.1)]){
+  assert.equal(observedWaveRadius(w,t),w.r-w.speed*(t-w.start),
+   'stage one motion remains exactly as before');
+ }
 }
 for(let level=1;level<=5;level++){
  const raw=require('./assets/timelines/rigid-stage-'+level+'.json');
  const d=require('./assets/timelines/waves-stage-'+level+'.json');
  assert.equal(d.mode,'batched-wall-waves');
  assert.equal(d.stage,level);
- assert.equal(d.waves.length+d.repair.discardedSuspectTracks.length,d.repair.groups);
- assert.deepEqual(d.shapeSchedule,raw.shapeSchedule,'retain observed stage transformations');
+ assert.equal(d.generator,'stage-one-rigid-v7','same generation rule as stage one');
+ assert.equal(d.version,8);
+ assert.equal(d.offscreenBirth,true);
+ assert.equal(d.continuity.minObservedSeconds,first.continuity.minObservedSeconds);
+ assert.equal(d.continuity.maxExtensionSeconds,first.continuity.maxExtensionSeconds);
+ assert.equal(d.continuity.physicalExitRadius,first.continuity.physicalExitRadius);
+ assert.deepEqual(d.shapeSchedule,raw.shapeSchedule,'preserve original stage shape transitions');
  assert.equal(d.duration,60);
  assert.equal(d.sampleRate,60);
- assert(d.waves.some(w=>w.sectors.length>1),'build connected walls, stage '+level);
- assert.equal(new Set(d.waves.map(w=>w.speed)).size,1,'stage uses stable wave speed');
- const registered=d.waves.flatMap(w=>w.sourceTrackIds);
- const dropped=d.repair.discardedSuspectTracks.flatMap(w=>w.sourceTrackIds);
- assert.equal(registered.length+ dropped.length,raw.walls.length,'retain every source track or explain exclusion');
- assert.equal(new Set([...registered,...dropped]).size,raw.walls.length,'source tracks must be unique');
+ assert(d.waves.some(w=>w.sectors.length>1),'stage contains connected wall actors');
+ assert.equal(new Set(d.waves.map(w=>w.speed)).size,1,'same constant speed for every wave in stage');
+ assert.equal(d.waves[0].speed,d.sharedSpeed);
+ const discarded=d.repair.discardedSourceActors;
+ assert.equal(d.waves.length+discarded.length,d.repair.groupCount,
+  'every built wave is retained or has documented exclusion');
+ const registered=d.waves.flatMap(w=>w.sourceTrackIds),dropped=discarded.flatMap(w=>w.sourceTrackIds);
+ assert.equal(registered.length+dropped.length,raw.walls.length,'preserve or explicitly exclude source tracks');
+ assert.equal(new Set([...registered,...dropped]).size,raw.walls.length,'source tracks cannot be duplicated');
  const zoom=Math.min(1,...d.camera.map(c=>Math.hypot(c[0],c[1])));
  let previous=-Infinity;
  for(const w of d.waves){
-  assert(w.observedStart>=previous-1e-8,'preserve recorded appearance order');previous=w.observedStart;
-  assert(w.start>=0&&w.end>w.start&&w.end<=d.duration&&w.observedStart>=w.start);
-  assert(w.r*Math.cos(Math.PI/w.sides)*zoom>Math.hypot(480,300),'no mid-screen wall births');
+  assert(w.observedStart>=previous-1e-8,'preserve observed appearance order');
+  previous=w.observedStart;
+  assert(w.start>=0&&w.start<=w.observedStart&&w.end>w.start&&w.end<=d.duration);
+  assert(!('approach' in w),'no special entrance animations; stage one straight-line travel only');
+  const birthZoom=w.start===0?Math.min(1,Math.hypot(d.camera[0][0],d.camera[0][1])):zoom;
+  assert(w.r*Math.cos(Math.PI/w.sides)*birthZoom>Math.hypot(480,300),
+   'wall actor must begin entirely outside the viewport');
   assert(w.sectors.length>0&&w.sectors.length<w.sides);
-  assert.equal(new Set(w.sectors).size,w.sectors.length,'unique sectors inside each wave');
+  assert.equal(new Set(w.sectors).size,w.sectors.length);
   assert(w.thickness>=12&&w.speed>0);
   const shape=raw.shapeSchedule.filter(s=>s[0]<=w.observedStart+1e-7).at(-1)[1];
-  assert.equal(w.sides,shape,'respect observed side transitions');
-  if(w.approach){
-   assert(Math.abs(observedWaveRadius(w,w.observedStart)-w.approach.observedR)<1e-7);
-   assert(Math.abs(observedWaveRadius(w,w.observedStart-1e-6)-w.approach.observedR)<.1,'continuous entry');
+  assert.equal(w.sides,shape,'preserve observed number of sides');
+  for(const t of [w.start,Math.min(w.end-.000001,w.start+.15)]){
+   assert(Math.abs(observedWaveRadius(w,t)-(w.r-w.speed*(t-w.start)))<1e-9,
+    'stage-one linear movement applies to every wave');
   }
-  if(w.continuityExtension)assert(w.end-w.observedEnd<=.6500001,'no unbounded lifetime speculation');
+  if(w.continuityExtension){
+   assert(w.end-w.observedEnd<=first.continuity.maxExtensionSeconds+1e-7);
+   const next=raw.shapeSchedule.find(s=>s[0]>w.observedEnd+1e-6)?.[0]??d.duration;
+   assert(w.end<=next+1e-7,'lifetime extension may not exceed stage shape transition');
+  }
  }
  for(let frame=30;frame<1800;frame++){
-  const time=frame/30,game=new Game(level,d);
-  game.time=time;game.sampleWalls();
-  const obstacles=game.walls.filter(w=>w.r<100&&w.r+w.thickness>50);
-  if(obstacles.length<4)continue;
+  const t=frame/30,g=new Game(level,d);
+  g.time=t;g.sampleWalls();
+  const near=g.walls.filter(w=>w.r<100&&w.r+w.thickness>50);
+  if(near.length<4)continue;
   let open=false;
-  for(let k=0;k<144;k++){
-   const player=playerPoly(k*2*Math.PI/144);
-   if(!obstacles.some(w=>intersect(player,wallPoly(w.r,w.sector,w.thickness,w.sides)))){open=true;break}
+  for(let i=0;i<144;i++){
+   const p=playerPoly(i*Math.PI*2/144);
+   if(!near.some(w=>intersect(p,wallPoly(w.r,w.sector,w.thickness,w.sides)))){open=true;break;}
   }
-  assert(open,'stage '+(level+1)+' must have a sampled angular escape route at '+time.toFixed(3));
+  assert(open,'sampled passage must stay open in stage '+(level+1)+' at '+t.toFixed(3));
  }
- console.log('PASS stage '+(level+1)+': measured actor order, outside births, geometry, shape timing, and clear passage');
+ assert.deepEqual(buildObservedWaves(raw,level),d,'checked-in waves must match deterministic generator');
+ console.log('PASS stage '+(level+1)+': stage-one grouped rigid walls, births, speed, transitions and passage');
 }
-console.log('PASS: stage one remains unchanged, all subsequent stages use batched observed walls');
+console.log('PASS stage one preserved and all other stages use the same generation method');
