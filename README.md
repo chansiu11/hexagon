@@ -36,6 +36,7 @@ node waves.test.cjs
 node wall-continuity.test.cjs
 node player-speed.test.cjs
 node observed-waves.test.cjs
+node seventeen-second.test.cjs
 ```
 
 The tests check geometry, collision, shared wave movement, offscreen births, entrance survival, and sampled open passages. They do not establish exact original-game fidelity or prove a continuous solution for every recorded sequence.
@@ -52,6 +53,8 @@ node build_observed_waves.cjs
 ```
 
 Stages two through six are generated only from the checked-in observed rigid-stage timelines using the same algorithm as stage one; rebuild these with `node build_observed_waves.cjs`. You can rebuild just a single higher stage by passing its zero-based level index, e.g. `node build_observed_waves.cjs 2` for stage three. Do not regenerate stage one for stage-two-through-six adjustments. Recorded source videos and local analysis caches are not included.
+
+A separate, measured-trace continuity correction in the 15.5–19 second window reduces premature visible wall despawns in stages 2–6. It keeps the same sector, inward speed and thickness, never extends a wave more than two extra seconds, stops at the next recorded shape transition, and retracts extensions that seal the sampled passages. Negative-radius polygons are clipped at the origin to avoid inverted/self-crossing walls. Stage-one wave data and movement speeds are unchanged.
 
 The observation fitting remains imperfect. Stage 2 has three video fragments that cannot be placed offscreen with constant-speed entry; stage 5 has one. Stage 6 has one contradictory fragment excluded, plus two speculative lifetime extensions clipped. These exceptions are preserved in each timeline's `repair.discardedSourceActors` and `repair.clippedExtensions` metadata. No special curved or accelerated entrance animation is used. Tests audit all stages at 30 samples per second for fully sealed angular passages; this does not prove a complete playable path or exact visual fidelity.
 
