@@ -1,6 +1,9 @@
 (function(root){
 'use strict';
-const TAU=Math.PI*2,STEP=TAU/6,PLAYER_SPEED=6;const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
+const TAU=Math.PI*2,STEP=TAU/6,PLAYER_SPEED=8.5;
+// Per-level orbit speed: the first two stages match; higher stages respond faster.
+// These values are gameplay estimates, not authenticated original-engine constants.
+const PLAYER_SPEED_BY_LEVEL=Object.freeze([8.5,8.5,10.5,9.5,9.5,11.5]);const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
 const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGONEST','HARDEST',285,290],['HEXAGON','HARDESTER',190,300],['HEXAGONER','HARDESTEST',225,335],['HEXAGONEST','HARDESTESTEST',0,370]];
 const wrap=a=>(a%TAU+TAU)%TAU;
 function intersect(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],axis=[p[i][1]-q[1],q[0]-p[i][0]];const aa=a.map(v=>v[0]*axis[0]+v[1]*axis[1]),bb=b.map(v=>v[0]*axis[0]+v[1]*axis[1]);if(Math.max(...aa)<Math.min(...bb)||Math.max(...bb)<Math.min(...aa))return false}return true}
@@ -20,6 +23,7 @@ function polygonOverlap(a,b,holes=[]){
 
 class Game{
  constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?timeline:null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false}
+ get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
  get targetSides(){if(this.profile&&this.time<60){const schedule=this.profile.shapeSchedule;for(let i=schedule.length-1;i>=0;i--)if(this.time>=schedule[i][0])return schedule[i][1]}const phase=Math.floor((this.time%60)/10);return [[6,6,5,6,4,6],[6,5,6,4,6,5],[6,6,4,6,5,6]][this.level%3][phase]}
@@ -41,7 +45,7 @@ class Game{
  this.walls=frame.walls.map(([id,points,holes=[]])=>({id,points,holes}));
  }
 
- update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;this.angle=wrap(this.angle+input*PLAYER_SPEED*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;const target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
+ update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;const target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
 this.shapeWait=this.pendingSides!==this.sides;
 if(this.shapeWait&&(this.profile&&this.time<60||this.walls.length===0)){this.fromSides=this.sides;this.sides=this.pendingSides;this.morph=0;this.lastGap=Math.floor(wrap(this.angle)/TAU*this.sides);this.shapeWait=false}
 this.morph=Math.min(1,this.morph+h/0.45);
@@ -52,6 +56,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallPoly(w.r,w.sector,w.thickness||30,w.sides||6)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,levels,wallPoly,playerPoly,intersect,wrap};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,levels,wallPoly,playerPoly,intersect,wrap};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
