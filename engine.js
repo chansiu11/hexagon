@@ -1,9 +1,9 @@
 (function(root){
 'use strict';
-const TAU=Math.PI*2,STEP=TAU/6,PLAYER_SPEED=8.5;
+const TAU=Math.PI*2,STEP=TAU/6,PLAYER_SPEED=8.2;
 // Per-level orbit speed: the first two stages match; higher stages respond faster.
 // These values are gameplay estimates, not authenticated original-engine constants.
-const PLAYER_SPEED_BY_LEVEL=Object.freeze([8.5,8.5,10.5,9.5,9.5,11.5]);const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
+const PLAYER_SPEED_BY_LEVEL=Object.freeze([8.2,8.2,10.2,9.2,9.2,11.2]);const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
 const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGONEST','HARDEST',285,290],['HEXAGON','HARDESTER',190,300],['HEXAGONER','HARDESTEST',225,335],['HEXAGONEST','HARDESTESTEST',0,370]];
 const wrap=a=>(a%TAU+TAU)%TAU;
 function intersect(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],axis=[p[i][1]-q[1],q[0]-p[i][0]];const aa=a.map(v=>v[0]*axis[0]+v[1]*axis[1]),bb=b.map(v=>v[0]*axis[0]+v[1]*axis[1]);if(Math.max(...aa)<Math.min(...bb)||Math.max(...bb)<Math.min(...aa))return false}return true}
