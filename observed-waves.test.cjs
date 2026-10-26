@@ -53,9 +53,18 @@ for(let level=1;level<=5;level++){
     'stage-one linear movement applies to every wave');
   }
   if(w.continuityExtension){
-   assert(w.end-w.observedEnd<=first.continuity.maxExtensionSeconds+1e-7);
+   const normalEnd=w.glitchCorrection?.baselineEnd??w.end;
+   assert(normalEnd-w.observedEnd<=first.continuity.maxExtensionSeconds+1e-7,
+    'stage-one normal wall continuation remains bounded');
    const next=raw.shapeSchedule.find(s=>s[0]>w.observedEnd+1e-6)?.[0]??d.duration;
    assert(w.end<=next+1e-7,'lifetime extension may not exceed stage shape transition');
+  }
+  if(w.glitchCorrection){
+   assert(w.glitchCorrection.baselineEnd>=15.5&&w.glitchCorrection.baselineEnd<=19,
+    'special continuity only applies to the reported 17-second interval');
+   assert(w.glitchCorrection.extendedSeconds>0&&w.glitchCorrection.extendedSeconds<=2+1e-7);
+   assert(Math.abs(w.end-w.glitchCorrection.baselineEnd-w.glitchCorrection.extendedSeconds)<1e-7);
+   assert(w.samples>=12,'only reliable tracking samples receive extra continuation');
   }
  }
  for(let frame=30;frame<1800;frame++){
@@ -70,6 +79,7 @@ for(let level=1;level<=5;level++){
   }
   assert(open,'sampled passage must stay open in stage '+(level+1)+' at '+t.toFixed(3));
  }
+ assert.equal(d.repair.glitchLifetimeExtensions,d.waves.filter(w=>w.glitchCorrection).length);
  assert.deepEqual(buildObservedWaves(raw,level),d,'checked-in waves must match deterministic generator');
  console.log('PASS stage '+(level+1)+': stage-one grouped rigid walls, births, speed, transitions and passage');
 }
