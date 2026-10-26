@@ -18,7 +18,7 @@ Arrow keys or A/D rotate. Space/Enter selects or retries. Escape pauses/returns.
 
 - Six stages with measured camera and shape schedules covering their first 60 seconds.
 - Stage one uses deterministic wall-wave actors. Members share position, speed, thickness and lifecycle. All waves use one measured speed estimate.
-- The stage-one timeline and its wall geometry are preserved. Stages two through six now use stage-specific batched recorded wall waves with linked sectors, continuous movement, early offscreen entrances, bounded wall lifetime, and recorded shape transitions. Overlapping wall polygons use one union fill to avoid separate antialiasing seams.
+- The entire stage-one wall timeline is unchanged (`waves-stage-0.json`). **Stages 2-6 use the same stage-one wall-generation rules**: the same strict sector grouping (0.15 s / 10 px / 8 px), median speed from sufficiently observed tracks, constant-speed linear inbound movement, offscreen back-projected births, and the same 0.75-second maximum continuation. The stage-specific recorded order, shapes, sectors and thicknesses remain sourced from their respective recordings. Overlapping walls render as one union fill.
 - Runtime uses uniform camera rotation/zoom, polygon collision, music transport and local records.
 - The three supplied recordings are in assets/music. Sound effects are synthesized.
 
@@ -51,9 +51,9 @@ node build_stage_one_waves.cjs
 node build_observed_waves.cjs
 ```
 
-Stages two through six are generated only from the checked-in observed rigid-stage timelines; rebuild these with `node build_observed_waves.cjs`. Do not regenerate stage one for stage-two-through-six adjustments. Recorded source videos and local analysis caches are not included.
+Stages two through six are generated only from the checked-in observed rigid-stage timelines using the same algorithm as stage one; rebuild these with `node build_observed_waves.cjs`. You can rebuild just a single higher stage by passing its zero-based level index, e.g. `node build_observed_waves.cjs 2` for stage three. Do not regenerate stage one for stage-two-through-six adjustments. Recorded source videos and local analysis caches are not included.
 
-The observation fitting remains imperfect, so the higher-stage generator extends only well-supported walls and audits angular escape passages every 1/30 second. It clips extensions that close all sampled passages, and removes two short, conflicting observed fragments in stage six. The generated JSON records any removed source track IDs in `repair.discardedSuspectTracks`.
+The observation fitting remains imperfect. Stage 2 has three video fragments that cannot be placed offscreen with constant-speed entry; stage 5 has one. Stage 6 has one contradictory fragment excluded, plus two speculative lifetime extensions clipped. These exceptions are preserved in each timeline's `repair.discardedSourceActors` and `repair.clippedExtensions` metadata. No special curved or accelerated entrance animation is used. Tests audit all stages at 30 samples per second for fully sealed angular passages; this does not prove a complete playable path or exact visual fidelity.
 
 ## Fidelity limits
 
