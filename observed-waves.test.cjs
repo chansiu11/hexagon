@@ -67,6 +67,18 @@ for(let level=1;level<=5;level++){
    assert(w.samples>=12,'only reliable tracking samples receive extra continuation');
   }
  }
+ // Regression: walls used to blink out visibly around 17 seconds because
+ // 6-11-frame source observations were not extended by the old repair.
+ // During the affected window all walls must finish behind the center core,
+ // never at a still-visible radius (stage one is separately left untouched).
+ for(const w of d.waves){
+  if(w.end<16||w.end>=18.75)continue;
+  const visibleOuterAtDeath=w.r-w.speed*(w.end-w.start)+w.thickness;
+  assert(visibleOuterAtDeath<=50+1e-7,
+   'stage '+(level+1)+' wave '+w.id+' pops out onscreen at '+w.end.toFixed(3)+'s (r='+visibleOuterAtDeath.toFixed(1)+')');
+ }
+ assert(d.repair.glitchLifetimeExtensions>0,
+  '17-second continuation must be generated for this stage');
  for(let frame=30;frame<1800;frame++){
   const t=frame/30,g=new Game(level,d);
   g.time=t;g.sampleWalls();
