@@ -23,3 +23,4 @@ jobs:
           node player-speed.test.cjs
           node observed-waves.test.cjs
           node seventeen-second.test.cjs
+          node stage-two-lifecycle.test.cjs

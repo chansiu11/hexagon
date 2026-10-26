@@ -156,6 +156,45 @@ for(let attempt=0;attempt<256;attempt++){
 }
 if(firstClosed())throw Error('Open passage invariant failed after wave continuation');
 
+ // Stage two has many video tracking cutoffs far from the core.
+ // Retain its measured sector order and thickness, but use stage one's
+ // rigid, constant-speed movement and physical center exit for each wall.
+ let stageTwoRepair=null;
+ if(level===1){
+  const core=continuity.physicalExitRadius;
+  const visibleCutoff=w=>w.end<data.duration-1/60&&
+   w.r-w.speed*(w.end-w.start)+w.thickness>50;
+  const prematureBefore=waves.filter(visibleCutoff).length;
+  let continued=0,discarded=0;
+  for(const w of waves){
+   const nextShape=data.shapeSchedule.find(s=>s[0]>w.end+1e-6)?.[0]??data.duration;
+   const coreExit=w.start+(w.r+w.thickness-core)/w.speed;
+   const targetEnd=Math.max(w.end,Math.min(coreExit,nextShape,data.duration));
+   if(targetEnd-w.end>1e-8){
+    w.stageTwoLifecycle={baselineEnd:w.end,extendedSeconds:targetEnd-w.end};
+    w.end=targetEnd;
+    continued++;
+   }
+  }
+  // Never solve closed passages by cutting still-visible real walls short.
+  // Only discard the least-reliable (6-12 frame) conflicting source tracks.
+  for(let attempt=0;attempt<48;attempt++){
+   const failure=firstClosed();
+   if(!failure)break;
+   const weak=failure.actors.slice().sort(lessReliable)[0];
+   if(weak.samples>12)throw Error('Cannot resolve stage-two passage at '+failure.t+' without discarding a well observed wall');
+   excluded.push({id:weak.id,sourceTrackIds:weak.sourceTrackIds,
+    reason:'short video tracking fragment conflicts with uninterrupted stage-two wall at '+failure.t.toFixed(3)+'s'});
+   waves=waves.filter(w=>w!==weak);
+   discarded++;
+  }
+  if(firstClosed())throw Error('Unresolved stage-two passage after full-lifetime correction');
+  const prematureAfter=waves.filter(visibleCutoff).length;
+  if(prematureAfter)throw Error('Stage-two wall still despawns visibly: '+prematureAfter);
+  stageTwoRepair={version:1,coreExitRadius:core,prematureBefore,prematureAfter,
+   extendedWaves:continued,conflictingShortFragments:discarded,passageAuditHz:30};
+ }
+
  if(waves.some(w=>w.approach||!Number.isFinite(w.r)||w.end<=w.start))throw Error('Invalid actor at '+level);
  return {version:8,mode:'batched-wall-waves',offscreenBirth:true,generator:'stage-one-rigid-v7',
   continuity,sharedSpeed,speedSampleCount:reliable.length,source:data.source,
@@ -164,7 +203,7 @@ if(firstClosed())throw Error('Open passage invariant failed after wave continuat
   repair:{observedTracks:data.walls.length,groupCount:groups.length,
    multiPieceWaves:groups.filter(g=>g.length>1).length,
    discardedSourceActors:excluded,clippedExtensions:clipped,
-   extendedWaves:waves.filter(w=>w.continuityExtension).length,glitchWindow:[15.5,19],glitchLifetimeExtensions:corrected-reverted,glitchLifetimeRejected:reverted,glitchConflictsRemoved:excludedConflict,checkedPassagesAtHz:30}};
+   extendedWaves:waves.filter(w=>w.continuityExtension).length,glitchWindow:[15.5,19],glitchLifetimeExtensions:corrected-reverted,glitchLifetimeRejected:reverted,glitchConflictsRemoved:excludedConflict,checkedPassagesAtHz:30,...(stageTwoRepair?{stageTwoRepair}:{})}};
 }
 if(require.main===module){
  for(let level=1;level<=5;level++){

@@ -6,9 +6,9 @@ assert.deepEqual(ORIGINAL_ARROW_DEGREES_PER_TICK,expectedPerTick);
 assert(Math.abs(PLAYER_SPEED-7*Math.PI/3)<1e-12);
 assert.equal(PLAYER_SPEED_BY_LEVEL.length,6);
 for(let level=0;level<6;level++){
- assert(Math.abs(PLAYER_SPEED_BY_LEVEL[level]-expectedPerTick[level]*Math.PI/3)<1e-12);
+ assert(Math.abs(PLAYER_SPEED_BY_LEVEL[level]-expectedPerTick[0]*Math.PI/3)<1e-12);
  const originalDegreesForOneFrame=PLAYER_SPEED_BY_LEVEL[level]/ORIGINAL_TICK_RATE*180/Math.PI;
- assert(Math.abs(originalDegreesForOneFrame-expectedPerTick[level])<1e-10,'1/60 second must match original units');
+ assert(Math.abs(originalDegreesForOneFrame-expectedPerTick[0])<1e-10,'all six maps use stage one speed');
 }
 
 const initial=-Math.PI/2;
@@ -24,5 +24,5 @@ for(let level=0;level<6;level++){
  assert(Math.abs(fine.angle-right.angle)<1e-9,'frame-rate independence, stage '+level);
  assert(Math.abs(still.angle-wrap(initial))<1e-9,'neutral input must not move player');
 }
-assert(PLAYER_SPEED_BY_LEVEL[2]>PLAYER_SPEED_BY_LEVEL[0]);
-console.log('PASS original 7/9 degree-per-tick movement, symmetry, stage mapping and frame independence');
+assert(PLAYER_SPEED_BY_LEVEL.every(speed=>speed===PLAYER_SPEED));
+console.log('PASS stage-one 7-degree/tick movement on all stages, symmetric and frame-independent');

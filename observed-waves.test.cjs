@@ -53,7 +53,7 @@ for(let level=1;level<=5;level++){
     'stage-one linear movement applies to every wave');
   }
   if(w.continuityExtension){
-   const normalEnd=w.glitchCorrection?.baselineEnd??w.end;
+   const normalEnd=w.stageTwoLifecycle?.baselineEnd??w.glitchCorrection?.baselineEnd??w.end;
    assert(normalEnd-w.observedEnd<=first.continuity.maxExtensionSeconds+1e-7,
     'stage-one normal wall continuation remains bounded');
    const next=raw.shapeSchedule.find(s=>s[0]>w.observedEnd+1e-6)?.[0]??d.duration;
@@ -90,6 +90,13 @@ for(let level=1;level<=5;level++){
    if(!near.some(w=>intersect(p,wallPoly(w.r,w.sector,w.thickness,w.sides)))){open=true;break;}
   }
   assert(open,'sampled passage must stay open in stage '+(level+1)+' at '+t.toFixed(3));
+ }
+ if(level===1){
+  assert(d.repair.stageTwoRepair,'stage two uses complete stage-one wave lifecycle');
+  assert.equal(d.repair.stageTwoRepair.prematureAfter,0);
+  for(const w of d.waves)if(w.end<d.duration-1/60)
+   assert(w.r-w.speed*(w.end-w.start)+w.thickness<=50+1e-7,
+    'stage-two wall cannot vanish before passing the center');
  }
  assert.equal(d.repair.glitchLifetimeExtensions,d.waves.filter(w=>w.glitchCorrection).length);
  assert.deepEqual(buildObservedWaves(raw,level),d,'checked-in waves must match deterministic generator');

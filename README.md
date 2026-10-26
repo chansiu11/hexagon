@@ -23,7 +23,7 @@ Arrow keys or A/D rotate. Space/Enter selects or retries. Escape pauses/returns.
 - The three supplied recordings are in assets/music. Sound effects are synthesized.
 
 
-- Left/right orbit movement uses symmetric controls with the original 60-Hz game's reported `arrow_speed` of **7 degrees/tick** in Hexagon, Hexagoner and their Hyper stages, and **9 degrees/tick** in Hexagonest and Hyper Hexagonest. The browser converts these to **7.330383** and **9.424778 rad/s** respectively, independent of display frame rate. Source: [SuperHexagonRE reverse-engineering notes](https://github.com/sumguytho/SuperHexagonRE#arrow_speed). This is an implementation-based calibration; a frame-by-frame video measurement has not been independently completed.
+- Player rotation is **7 degrees per 60-Hz tick on all six stages**, deliberately matching stage one's movement. The original reverse-engineering notes describe a faster 9-degree rate for Hexagonest and Hyper Hexagonest, but this recreation intentionally uses the same speed on every map as requested. The browser converts these to **7.330383** and **9.424778 rad/s** respectively, independent of display frame rate. Source: [SuperHexagonRE reverse-engineering notes](https://github.com/sumguytho/SuperHexagonRE#arrow_speed). This is an implementation-based calibration; a frame-by-frame video measurement has not been independently completed.
 - In stage one, 165 sufficiently well-tracked walls now persist up to 0.75 seconds longer toward the center, without crossing the next recorded shape transition. An angular passage audit detects no fully sealed frames in the first 60 seconds.
 
 ## Validation
@@ -63,3 +63,9 @@ A separate, measured-trace continuity correction in the 15.5–19 second window 
 Reference gameplay: https://www.youtube.com/watch?v=5mDjFdetU28
 
 Patterns, order, speed, thickness and shape changes for all six stages are fitted from recorded footage, not authenticated original-engine constants; source-tracking errors can produce pattern mismatches. Stage-one continuity repairs cover observations starting before 10 seconds; later tracking errors remain possible. The current camera omits original perspective tilt. Palette timing, UI, voice, effects and exact music cue points are not fully matched. A run stops at its 60-second recorded coverage boundary; original post-60-second progression is not implemented. No claim of pixel-identical reproduction is made.
+
+## Stage-two wall continuity and uniform player orbit
+
+Stage two (Hexagoner) retains its video-fitted wall sector order, position, width, speed and camera. Its rigid wave actors now follow stage one's constant inward movement until their outer edge passes behind the core, rather than disappearing at prematurely short video-tracking cutoffs. This corrects 477 such cutoffs. Seven contradictory short source fragments are documented and excluded after auditing open passages at 30 Hz. The stage-one wall timeline is unchanged. The video transcription is still approximate and should not be described as a pixel-identical recreation.
+
+Run `node stage-two-lifecycle.test.cjs` to check the stage-two lifecycle, measured source integrity and uniform player rotation.

@@ -7,8 +7,10 @@ const TAU=Math.PI*2,STEP=TAU/6;
 // Convert to radians/second so browser movement stays frame independent.
 const ORIGINAL_TICK_RATE=60;
 const ORIGINAL_ARROW_DEGREES_PER_TICK=Object.freeze([7,7,9,7,7,9]);
-const PLAYER_SPEED_BY_LEVEL=Object.freeze(ORIGINAL_ARROW_DEGREES_PER_TICK.map(deg=>deg*TAU/360*ORIGINAL_TICK_RATE));
-const PLAYER_SPEED=PLAYER_SPEED_BY_LEVEL[0];const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
+// Preserve the original game's documented stage differences as reference,
+// but intentionally use the first stage's orbit rate on every map.
+const PLAYER_SPEED=ORIGINAL_ARROW_DEGREES_PER_TICK[0]*TAU/360*ORIGINAL_TICK_RATE;
+const PLAYER_SPEED_BY_LEVEL=Object.freeze(ORIGINAL_ARROW_DEGREES_PER_TICK.map(()=>PLAYER_SPEED));const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
 const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGONEST','HARDEST',285,290],['HEXAGON','HARDESTER',190,300],['HEXAGONER','HARDESTEST',225,335],['HEXAGONEST','HARDESTESTEST',0,370]];
 const wrap=a=>(a%TAU+TAU)%TAU;
 function intersect(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],axis=[p[i][1]-q[1],q[0]-p[i][0]];const aa=a.map(v=>v[0]*axis[0]+v[1]*axis[1]),bb=b.map(v=>v[0]*axis[0]+v[1]*axis[1]);if(Math.max(...aa)<Math.min(...bb)||Math.max(...bb)<Math.min(...aa))return false}return true}
