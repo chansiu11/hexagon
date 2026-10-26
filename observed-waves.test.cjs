@@ -98,7 +98,11 @@ for(let level=1;level<=5;level++){
    assert(w.r-w.speed*(w.end-w.start)+w.thickness<=50+1e-7,
     'stage-two wall cannot vanish before passing the center');
  }
- assert.equal(d.repair.glitchLifetimeExtensions,d.waves.filter(w=>w.glitchCorrection).length);
+ // The generator counts applied repairs before rejecting contradictory
+ // video fragments; retained corrected actors can be fewer.
+ const keptCorrections=d.waves.filter(w=>w.glitchCorrection).length;
+ assert(d.repair.glitchLifetimeExtensions>=keptCorrections);
+ assert(d.repair.glitchLifetimeExtensions-keptCorrections<=d.repair.discardedSourceActors.length);
  assert.deepEqual(buildObservedWaves(raw,level),d,'checked-in waves must match deterministic generator');
  console.log('PASS stage '+(level+1)+': stage-one grouped rigid walls, births, speed, transitions and passage');
 }
