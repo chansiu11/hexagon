@@ -38,6 +38,25 @@ for(const w of waves){
  const birthZoom=w.start===0?Math.min(1,Math.hypot(data.camera[0][0],data.camera[0][1])):minZoom;
  if(w.r*Math.cos(Math.PI/w.sides)*birthZoom<=viewportRadius)throw Error('Wall would be visible at birth: '+w.id);
 }
-const result={version:6,mode:'batched-wall-waves',offscreenBirth:true,sharedSpeed,speedSampleCount:reliable.length,source:data.source,duration:data.duration,sampleRate:data.sampleRate,camera:data.camera,shapeSchedule:data.shapeSchedule,waves};
+
+// Source video can temporarily lose a wall before it reaches the core.
+// Extend well-observed actors for a bounded interval without inventing a
+// new trajectory; never carry a wall through the next shape transition.
+const continuity={version:1,minObservedSeconds:0.4,maxExtensionSeconds:0.75,physicalExitRadius:42};
+let extended=0;
+for(const w of waves){
+ const observedSeconds=w.end-w.observedStart;
+ const nextShape=data.shapeSchedule.find(s=>s[0]>w.end+1e-6)?.[0]??data.duration;
+ const physicalExit=w.start+(w.r+w.thickness-continuity.physicalExitRadius)/w.speed;
+ const end=observedSeconds>=continuity.minObservedSeconds&&w.end<data.duration
+  ?Math.max(w.end,Math.min(physicalExit,w.end+continuity.maxExtensionSeconds,nextShape,data.duration)):w.end;
+ if(end>w.end+.03){
+  w.observedEnd=w.end;
+  w.continuityExtension=end-w.end;
+  w.end=end;
+  extended++;
+ }
+}
+const result={version:7,continuity,mode:'batched-wall-waves',offscreenBirth:true,sharedSpeed,speedSampleCount:reliable.length,source:data.source,duration:data.duration,sampleRate:data.sampleRate,camera:data.camera,shapeSchedule:data.shapeSchedule,waves};
 fs.writeFileSync(`${__dirname}/assets/timelines/waves-stage-0.json`,JSON.stringify(result));
-console.log({observedPieces:data.walls.length,waveActors:waves.length,multiPieceWaves:waves.filter(w=>w.sectors.length>1).length});
+console.log({observedPieces:data.walls.length,waveActors:waves.length,multiPieceWaves:waves.filter(w=>w.sectors.length>1).length,extendedWaves:extended});
