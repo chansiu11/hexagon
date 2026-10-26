@@ -36,7 +36,15 @@ const generate = function generate(data,level){
   }
   const shapeIndex=data.shapeSchedule.reduce((idx,[t],i)=>t<=observedStart+1e-7?i:idx,0);
   const shapeFrom=data.shapeSchedule[shapeIndex][0],shapeUntil=data.shapeSchedule[shapeIndex+1]?.[0]??data.duration;
-  if(start<shapeFrom){const dt=shapeFrom-start;start=shapeFrom;if(!approach)r-=speed*dt;}
+  if(start<shapeFrom){
+   // A shape transition may invalidate an earlier entry time. Preserve the
+   // recorded in-stage location, but never introduce the new shape mid-screen.
+   start=shapeFrom;
+   if(!approach){
+    r=intercept-speed*start;
+    if(r<outside){r=outside+32;approach={end:observedStart,observedR};}
+   }
+  }
   const physicalEnd=observedStart+(observedR+thickness-42)/speed;
   let finalEnd=Math.min(data.duration,end,shapeUntil);
   if(finalEnd<observedStart)finalEnd=observedStart;
