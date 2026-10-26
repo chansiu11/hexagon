@@ -1,22 +1,52 @@
 # Hexagon web recreation
 
-Open index.html directly, or run `node server.cjs` and visit http://127.0.0.1:4173.
+Unofficial browser recreation of Super Hexagon. Original game: Terry Cavanagh; soundtrack: Chipzel. This is not the original game or its source code.
 
-Controls: left/right arrows or A/D rotate; Space/Enter selects or retries; Escape pauses/returns; Tab opens records from level selection. Touch the left/right half of the gameplay canvas to rotate.
+## Run
 
-Includes title/options/credits/level selection/records/gameplay/pause/game over/unlock screens, six difficulty configurations, fixed-substep polygon collision, rotating background, original synthesized effect tones, local records, and 60-second Hyper unlocks. Hidden tabs pause automatically. No dependencies or external requests.
+Use Node.js 18 or newer:
+
+```sh
+node server.cjs
+```
+
+Open http://127.0.0.1:4173/. A web server is required because music and wall timelines are loaded with fetch; opening index.html as a file is not supported. The same files can be served by a static host.
+
+Arrow keys or A/D rotate. Space/Enter selects or retries. Escape pauses/returns. Touch either half of the game to rotate. Click or press a key to enable browser audio.
+
+## Current implementation
+
+- Six stages with measured camera and shape schedules covering their first 60 seconds.
+- Stage one uses deterministic wall-wave actors. Members share position, speed, thickness and lifecycle. All waves use one measured speed estimate.
+- Stage-one actors are created outside the viewport along their existing trajectories. Overlapping wall polygons use one union fill to avoid separate antialiasing seams.
+- Runtime uses uniform camera rotation/zoom, polygon collision, music transport and local records.
+- The three supplied recordings are in assets/music. Sound effects are synthesized.
+
+## Validation
+
+```sh
+node engine.test.cjs
+node rigid-walls.test.cjs
+node stage-one-continuity.test.cjs
+node waves.test.cjs
+```
+
+The tests check geometry, collision, shared wave movement, offscreen births, entrance survival, and sampled open passages. They do not establish exact original-game fidelity or prove a continuous solution for every recorded sequence.
+
+## Rebuild recorded geometry
+
+The measured outline data is included in assets/timelines/stage-N.json. Build the fitted timelines in this order:
+
+```sh
+node build_rigid_walls.cjs
+node stabilize_stage_one.cjs --opening
+node build_stage_one_waves.cjs
+```
+
+The source video and local analysis caches are not included.
 
 ## Fidelity limits
-This is an unofficial reconstruction, not the original game. Reference: official https://superhexagon.com/ trailer https://www.youtube.com/watch?v=2sz0mI_6tLQ and user-provided PC video https://www.youtube.com/watch?v=5mDjFdetU28 . The title layout follows the PC video. Geometry and lettering are redrawn. Movement/speed, generated patterns, palette timing and sound effects are approximations, not extracted original values. Original music, voice, exact typeface, all original patterns, full post-60-second progression, online leaderboards, achievements and original ending are not included. A basic speed increase after 60 seconds is implemented instead of the full original progression. No claim of pixel-identical reproduction is made.
 
-Original game: Terry Cavanagh. Original soundtrack: Chipzel (not bundled).
+Reference gameplay: https://www.youtube.com/watch?v=5mDjFdetU28
 
-Test: `node engine.test.cjs`.
-
-## Motion and geometry revision
-- Audio-clock transport with synthesized substitute music, smooth angular acceleration, beat-quantized wall scheduling.
-- Shared camera shear/compression, roll and zoom for background, walls and player; HUD remains fixed.
-- 4/5/6-sided wall geometry and polygon collision. Existing walls drain before a side-count transition; core morph lasts 450 ms.
-- Revised geometric vector lettering, menu transitions and corrected stage-start hit target.
-- Speed values, shape schedules and camera amplitudes are tuned approximations. They have not been extracted or frame-matched to the original game. The original full pattern set and ending are still absent.
-
+Patterns and speed are fitted observations, not authenticated original engine constants. Stage-one continuity repairs cover observations starting before 10 seconds; later tracking errors remain possible. The current camera omits original perspective tilt. Palette timing, UI, voice, effects and exact music cue points are not fully matched. A run stops at its 60-second recorded coverage boundary; original post-60-second progression is not implemented. No claim of pixel-identical reproduction is made.

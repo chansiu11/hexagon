@@ -1,19 +1,40 @@
-const assert=require('node:assert/strict');const {Game,intersect,wallPoly,playerPoly}=require('./engine');
-assert(intersect(playerPoly(.5),wallPoly(60,0)));assert(!intersect(playerPoly(.5),wallPoly(150,0)));
-let g=new Game(0,()=>.5);g.walls=[{r:80,sector:0}];g.next=999;g.angle=.5;g.update(.15);assert(g.dead,'wall must kill');
-g=new Game();g.next=999;g.update(.1,1);assert(!g.dead);assert(Math.abs(g.angle-((Math.PI*1.5)+.51))<.0001);
-let a=new Game(0,()=>.5),b=new Game(0,()=>.5);a.next=b.next=999;for(let i=0;i<60;i++)a.update(1/60,1);for(let i=0;i<120;i++)b.update(1/120,1);assert(Math.abs(a.angle-b.angle)<1e-9);assert(Math.abs(a.time-b.time)<1e-9);
-g=new Game();g.next=999;for(let i=0;i<3601;i++)g.update(1/60);assert(g.completed);assert(!g.dead);
-for(let i=0;i<6;i++){g=new Game(i,()=>.5);for(let n=0;n<3000&&!g.dead;n++)g.update(1/120);assert(g.dead,'stationary player eventually hits a wall');assert(g.walls.every(w=>Number.isFinite(w.r)))}
-console.log('PASS collision, movement, frame-rate independence, completion, all six levels');
-for(const sides of [4,5,6]){
- const a=Math.PI/sides;
- assert(intersect(playerPoly(a),wallPoly(66/Math.cos(a)-15,0,30,sides)),`${sides}-sided wall collision`);
- assert(!intersect(playerPoly(a+Math.PI),wallPoly(66/Math.cos(a)-15,0,30,sides)),`${sides}-sided opposite gap`);
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const {Game,polygonOverlap,intersect,wallPoly,playerPoly}=require('./engine');
+assert(intersect(playerPoly(.5),wallPoly(60,0)));
+assert(!intersect(playerPoly(.5),wallPoly(150,0)));
+const square=(x,y,r)=>[[x-r,y-r],[x+r,y-r],[x+r,y+r],[x-r,y+r]];
+assert(polygonOverlap(square(0,0,1),square(0,0,10)));
+assert(!polygonOverlap(square(0,0,1),square(0,0,10),[square(0,0,5)]),'hole is safe');
+assert(polygonOverlap(square(5,0,1),square(0,0,10),[square(0,0,5)]),'hole edge collides');
+const concave=[[0,0],[10,0],[10,3],[3,3],[3,10],[0,10]];
+assert(!polygonOverlap(square(7,7,1),concave),'concave gap remains open');
+assert(polygonOverlap(square(2,7,1),concave));
+let a=new Game(),b=new Game();
+for(let i=0;i<60;i++)a.update(1/60,1);
+for(let i=0;i<120;i++)b.update(1/120,1);
+assert(Math.abs(a.angle-b.angle)<1e-9);
+const oldRandom=Math.random;Math.random=()=>{throw new Error('random wall generation is forbidden');};
+for(let level=0;level<6;level++){
+ const d=JSON.parse(fs.readFileSync(`${__dirname}/assets/timelines/stage-${level}.json`));
+ assert.equal(d.frames.length,3600);assert.equal(d.sampleRate,60);
+ for(let angle=0;angle<24;angle++){
+  const start=new Game(level,d);start.angle=angle*Math.PI/12;
+  for(let i=0;i<60;i++)start.update(1/60);
+  assert(!start.dead,'entrance core must never be a wall: '+level+' angle '+angle);
+ }
+ for(const f of d.frames){assert.equal(f.camera.length,6);assert(f.camera.every(Number.isFinite));
+  for(const [id,points,holes] of f.walls){assert(Number.isInteger(id));for(const ring of [points,...holes]){assert(ring.length>=3);assert(ring.flat().every(Number.isFinite));}}
+ }
+ for(const time of [1,4,10,20,27,45,59]){
+  a=new Game(level,d);b=new Game(level,d);a.time=b.time=time;a.angle=0;b.angle=2;
+  a.sampleWalls();b.sampleWalls();assert.deepEqual(a.walls,b.walls,'walls cannot depend on input');
+  assert.deepEqual(a.walls.map(w=>[w.id,w.points,w.holes]),d.frames[time*60].walls);
+ }
+ a=new Game(level,d);a.time=59.999;a.update(.01);assert(a.timelineEnded);assert.equal(a.time,60);
+ a.update(5);assert.equal(a.time,60,'never synthesize walls after coverage');
+ a=new Game(level,d);for(let i=0;i<600&&!a.dead;i++)a.update(1/60);
+ assert(a.dead,'stationary player must meet recorded walls');
+ console.log('PASS stage',level,'3600 frames, input-independent walls, collision and bounded coverage');
 }
-g=new Game();g.time=19.99;g.next=999;g.walls=[{r:1000,sector:0,sides:6}];g.update(.02);assert.equal(g.sides,6,'never change shape through existing walls');assert.equal(g.shapeWait,true);g.walls=[];g.update(.02);assert.equal(g.sides,5);assert(g.morph<1);g.time=40;g.update(.02);assert.equal(g.sides,4);g.time=50;g.update(.02);assert.equal(g.sides,6);
-for(let l=0;l<6;l++){g=new Game(l,()=>.3);g.next=999;for(let n=0;n<7200;n++)g.update(1/120);assert(Number.isFinite(g.zoom)&&Number.isFinite(g.tilt));assert(g.zoom>.85&&g.zoom<1.2);assert(Math.abs(g.tilt)<.25)}
-console.log('PASS 4/5/6-sided collisions, safe transitions, bounded camera transforms');
-
-for(let level=0;level<6;level++)for(let angle=0;angle<72;angle++)for(const seed of [.1,.4,.7,.99]){const fixed=new Game(level,()=>seed);fixed.angle=angle*Math.PI*2/72;for(let n=0;n<1200&&!fixed.dead;n++)fixed.update(1/120);assert(fixed.dead,'stationary safe spot: level '+level+' angle '+angle+' seed '+seed)}
-console.log('PASS 1728 stationary trajectories: no persistent safe spot within 10 seconds');
+Math.random=oldRandom;
+console.log('PASS concave and hole collision, frame-rate independence, no random calls');
