@@ -15,6 +15,10 @@ jobs:
           node-version: '22'
       - name: Validate engine and source timelines
         run: |
+          node --check play.js
+          node --check engine.js
+          node --check audio.js
+          node --check wall-lifecycle-patches.js
           node engine.test.cjs
           node rigid-walls.test.cjs
           node stage-one-continuity.test.cjs
