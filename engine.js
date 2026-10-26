@@ -26,15 +26,9 @@ function polygonOverlap(a,b,holes=[]){
  return false;
 }
 
-/** Measured wall position. The existing stage-one trajectory is unchanged. */
+/** All six stages use the stage-one rigid, constant-speed wall trajectory. */
 function observedWaveRadius(w,time){
- if(!w.approach)return w.r-w.speed*(time-w.start);
- const duration=w.observedStart-w.start;
- if(time>=w.observedStart||duration<=0)return w.approach.observedR-w.speed*(time-w.observedStart);
- // Enter from outside the viewport, then meet the recorded position and
- // speed with no visual jump at the first observed timestamp.
- const u=Math.max(0,Math.min(1,(time-w.start)/duration)),u2=u*u,u3=u2*u,m=-w.speed*duration;
- return (2*u3-3*u2+1)*w.r+(u3-2*u2+u)*m+(-2*u3+3*u2)*w.approach.observedR+(u3-u2)*m;
+ return w.r-w.speed*(time-w.start);
 }
 
 class Game{
