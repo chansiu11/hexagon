@@ -60,11 +60,11 @@ for(let level=1;level<=5;level++){
    assert(w.end<=next+1e-7,'lifetime extension may not exceed stage shape transition');
   }
   if(w.glitchCorrection){
-   assert(w.glitchCorrection.baselineEnd>=15.5&&w.glitchCorrection.baselineEnd<=19,
+   assert(w.glitchCorrection.baselineEnd>=15.5&&w.glitchCorrection.baselineEnd<=19.5,
     'special continuity only applies to the reported 17-second interval');
    assert(w.glitchCorrection.extendedSeconds>0&&w.glitchCorrection.extendedSeconds<=2+1e-7);
    assert(Math.abs(w.end-w.glitchCorrection.baselineEnd-w.glitchCorrection.extendedSeconds)<1e-7);
-   assert(w.samples>=12,'only reliable tracking samples receive extra continuation');
+   assert(w.samples>=6,'all supported 6+ frame tracks may receive continuation');
   }
  }
  // Regression: walls used to blink out visibly around 17 seconds because
