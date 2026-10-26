@@ -12,7 +12,13 @@ const PLAYER_SPEED=PLAYER_SPEED_BY_LEVEL[0];const profiles=typeof module!=='unde
 const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGONEST','HARDEST',285,290],['HEXAGON','HARDESTER',190,300],['HEXAGONER','HARDESTEST',225,335],['HEXAGONEST','HARDESTESTEST',0,370]];
 const wrap=a=>(a%TAU+TAU)%TAU;
 function intersect(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],axis=[p[i][1]-q[1],q[0]-p[i][0]];const aa=a.map(v=>v[0]*axis[0]+v[1]*axis[1]),bb=b.map(v=>v[0]*axis[0]+v[1]*axis[1]);if(Math.max(...aa)<Math.min(...bb)||Math.max(...bb)<Math.min(...aa))return false}return true}
-function wallPoly(r,sector,thickness=30,sides=6){const step=TAU/sides,a=sector*step,b=a+step;return [[Math.cos(a)*r,Math.sin(a)*r],[Math.cos(b)*r,Math.sin(b)*r],[Math.cos(b)*(r+thickness),Math.sin(b)*(r+thickness)],[Math.cos(a)*(r+thickness),Math.sin(a)*(r+thickness)]]}
+function wallPoly(r,sector,thickness=30,sides=6){
+ // A wave can travel past the center before its recorded lifetime expires.
+ // Negative radii used to fold sectors across the origin, causing twisted
+ // wall polygons and collision ghosts. Clip the radial interval to zero.
+ const inner=Math.max(0,r),outer=Math.max(inner,r+thickness),step=TAU/sides,a=sector*step,b=a+step;
+ return [[Math.cos(a)*inner,Math.sin(a)*inner],[Math.cos(b)*inner,Math.sin(b)*inner],[Math.cos(b)*outer,Math.sin(b)*outer],[Math.cos(a)*outer,Math.sin(a)*outer]];
+}
 function playerPoly(angle,lean=0){const a=angle+lean,c=Math.cos(a),s=Math.sin(a),x=Math.cos(angle)*66,y=Math.sin(angle)*66;return [[7,0],[-3.5,-6.0621778265],[-3.5,6.0621778265]].map(([u,v])=>[x+u*c-v*s,y+u*s+v*c])}
 
 // Recorded connected walls may be concave. SAT is only valid for the old convex sectors.
