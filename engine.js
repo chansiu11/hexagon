@@ -21,6 +21,17 @@ function polygonOverlap(a,b,holes=[]){
  return false;
 }
 
+/** Measured wall position. The existing stage-one trajectory is unchanged. */
+function observedWaveRadius(w,time){
+ if(!w.approach)return w.r-w.speed*(time-w.start);
+ const duration=w.observedStart-w.start;
+ if(time>=w.observedStart||duration<=0)return w.approach.observedR-w.speed*(time-w.observedStart);
+ // Enter from outside the viewport, then meet the recorded position and
+ // speed with no visual jump at the first observed timestamp.
+ const u=Math.max(0,Math.min(1,(time-w.start)/duration)),u2=u*u,u3=u2*u,m=-w.speed*duration;
+ return (2*u3-3*u2+1)*w.r+(u3-2*u2+u)*m+(-2*u3+3*u2)*w.approach.observedR+(u3-u2)*m;
+}
+
 class Game{
  constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?timeline:null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
@@ -34,7 +45,7 @@ class Game{
   const a=data.camera[index],b=data.camera[Math.min(index+1,data.camera.length-1)];
   this.wallFrame=index;this.recordedCamera=a.map((v,k)=>v+(b[k]-v)*u);
   if(data.mode==='batched-wall-waves'){
-   this.waves=data.waves.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
+   this.waves=data.waves.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:observedWaveRadius(w,this.time)}));
    this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness})));
   }else this.walls=data.walls.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
   return;
@@ -56,6 +67,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallPoly(w.r,w.sector,w.thickness||30,w.sides||6)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,levels,wallPoly,playerPoly,intersect,wrap};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
