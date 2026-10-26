@@ -22,3 +22,4 @@ jobs:
           node wall-continuity.test.cjs
           node player-speed.test.cjs
           node observed-waves.test.cjs
+          node seventeen-second.test.cjs
