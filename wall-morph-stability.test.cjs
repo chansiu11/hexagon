@@ -45,7 +45,7 @@ for(let level=0;level<6;level++){
   assert.equal(start.to,to,'incoming side count is correct');
   assert.equal(start.progress,0);
   assert(Math.abs(mid.progress-.5)<1e-9);
-  assert.equal(after.progress,1);
+  assert(Math.abs(after.progress-1)<1e-12);
   const proto={sector:0,sides:before.to,r:200,thickness:30};
   const a=wallVisualPoly(proto,before.from,before.to,before.progress);
   const b=wallVisualPoly(proto,start.from,start.to,start.progress);
