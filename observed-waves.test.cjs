@@ -57,7 +57,11 @@ for(let level=1;level<=5;level++){
    assert(normalEnd-w.observedEnd<=first.continuity.maxExtensionSeconds+1e-7,
     'stage-one normal wall continuation remains bounded');
    const next=raw.shapeSchedule.find(s=>s[0]>w.observedEnd+1e-6)?.[0]??d.duration;
-   assert(w.end<=next+1e-7,'lifetime extension may not exceed stage shape transition');
+   // The bounded 0.75-second stage-one-style extension stops at this shape
+   // transition. A distinct 17-second repair may extend the actor later.
+   const normalLifetimeEnd=w.glitchCorrection?.baselineEnd??w.end;
+   assert(normalLifetimeEnd<=next+1e-7,
+    'normal lifetime extension may not exceed stage shape transition');
   }
   if(w.glitchCorrection){
    assert(w.glitchCorrection.baselineEnd>=15.5&&w.glitchCorrection.baselineEnd<=19.5,
