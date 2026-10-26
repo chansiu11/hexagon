@@ -1,0 +1,24 @@
+name: Hexagon wall and input regressions
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate engine and source timelines
+        run: |
+          node engine.test.cjs
+          node rigid-walls.test.cjs
+          node stage-one-continuity.test.cjs
+          node waves.test.cjs
+          node wall-continuity.test.cjs
+          node player-speed.test.cjs
+          node observed-waves.test.cjs
