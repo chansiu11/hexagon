@@ -131,14 +131,28 @@ class Game{
    // two open sixths (1 and 3). As its six-sided geometry morphs to five,
    // those become one open fifth (sector 1). Keep wave IDs/lifetimes/radii
    // untouched; this is only the recorded first-transition sector layout.
-   const firstFiveTransition=this.level===0&&this.time>=17.65&&this.time<22;
-   const transitionSectors=new Map([[144,0],[145,2],[146,4],[147,5]]);
+   // First 6->5 wall: ONE actor per occupied direction. The two adjacent
+   // hexagonal openings (1,2) become one pentagonal opening (sector 1).
+   // Keep the destination passage clear throughout this incoming ring, not
+   // merely for its first four actors, otherwise extra tracks seal all 5 sides.
+   const firstFiveTransition=this.level===0&&this.time>=17.65&&this.time<22.5;
+   const ringSectors=new Map([[144,0],[145,3],[146,4],[147,5]]);
    this.walls=this.waves.flatMap(w=>{
-    const mapped=firstFiveTransition&&w.id>=144&&w.id<=149
-     ?(transitionSectors.has(w.id)?[transitionSectors.get(w.id)]:[])
-     :w.sectors;
-    const sourceSides=firstFiveTransition&&w.id>=144&&w.id<=149?6:w.sides;
-    return mapped.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:sourceSides,r:w.r,thickness:w.thickness}));
+    if(firstFiveTransition){
+     if(w.id>=144&&w.id<=149){
+      if(!ringSectors.has(w.id))return []; // duplicate observed ring sectors
+      const sector=ringSectors.get(w.id);
+      return [{id:w.id+':'+sector,waveId:w.id,sector,sides:6,r:w.r,thickness:w.thickness}];
+     }
+     // Measured overlapping video fragments must not close the same opening.
+     // Preserve the rest of each original source wall without re-timing it.
+     const gap=1;
+     return w.sectors.filter(sector=>{
+      const pentagonSector=Math.floor((sector+.5)*5/w.sides);
+      return pentagonSector!==gap;
+     }).map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness}));
+    }
+    return w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness}));
    });
   }else this.walls=data.walls.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
   return;
