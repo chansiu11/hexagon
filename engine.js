@@ -135,11 +135,11 @@ class Game{
    // hexagonal openings (1,2) become one pentagonal opening (sector 1).
    // Keep the destination passage clear throughout this incoming ring, not
    // merely for its first four actors, otherwise extra tracks seal all 5 sides.
-   const firstFiveTransition=this.level===0&&this.time>=17.65&&this.time<22.5;
+   const firstFiveTransition=this.level===0;
    const ringSectors=new Map([[144,0],[145,3],[146,4],[147,5]]);
    this.walls=this.waves.flatMap(w=>{
-    if(firstFiveTransition){
-     if(w.id>=144&&w.id<=149){
+    if(firstFiveTransition&&w.id>=144&&w.id<=190){
+     if(w.id<=149){
       if(!ringSectors.has(w.id))return []; // duplicate observed ring sectors
       const sector=ringSectors.get(w.id);
       return [{id:w.id+':'+sector,waveId:w.id,sector,sides:6,r:w.r,thickness:w.thickness}];
