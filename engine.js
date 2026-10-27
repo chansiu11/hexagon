@@ -127,33 +127,26 @@ class Game{
    const wallTime=wallTimelineTime(this.time,data.shapeSchedule);
    this.wallMotionTime=wallTime;
    this.waves=data.waves.filter(w=>wallTime>=w.start&&wallTime<w.end).map(w=>({...w,r:observedWaveRadius(w,wallTime)}));
-   // First HEXAGON 6->5 transition: an approaching ring deliberately has
-   // two open sixths (1 and 3). As its six-sided geometry morphs to five,
-   // those become one open fifth (sector 1). Keep wave IDs/lifetimes/radii
-   // untouched; this is only the recorded first-transition sector layout.
-   // First 6->5 wall: ONE actor per occupied direction. The two adjacent
-   // hexagonal openings (1,2) become one pentagonal opening (sector 1).
-   // Keep the destination passage clear throughout this incoming ring, not
-   // merely for its first four actors, otherwise extra tracks seal all 5 sides.
-   const firstFiveTransition=this.level===0;
-   const ringSectors=new Map([[144,0],[145,3],[146,4],[147,5]]);
+   // The first measured 6->5 mode-change ring uses four distinct walls.
+   // Its adjacent hexagonal openings (directions 1 and 2) merge into the
+   // single pentagonal opening 1. This assignment is permanent for those
+   // actor IDs: NEVER switch wall sectors as a function of frame time.
+   // Other source-video walls use their own recorded sectors unchanged.
+   // In particular, the entire first 18 seconds is bit-for-bit unchanged.
+   const firstMorphRing=this.level===0
+    ?new Map([[144,0],[145,3],[146,4],[147,5]])
+    :null;
    this.walls=this.waves.flatMap(w=>{
-    if(firstFiveTransition&&w.id>=144&&w.id<=190){
-     if(w.id<=149){
-      if(!ringSectors.has(w.id))return []; // duplicate observed ring sectors
-      const sector=ringSectors.get(w.id);
-      return [{id:w.id+':'+sector,waveId:w.id,sector,sides:6,r:w.r,thickness:w.thickness}];
-     }
-     // Measured overlapping video fragments must not close the same opening.
-     // Preserve the rest of each original source wall without re-timing it.
-     const gap=1;
-     return w.sectors.filter(sector=>{
-      const pentagonSector=Math.floor((sector+.5)*5/w.sides);
-      // In the outgoing hexagon, both sectors 1 and 2 must remain open.
-      return pentagonSector!==gap&&!(w.sides===6&&(sector===1||sector===2));
-     }).map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness}));
+    if(firstMorphRing&&w.id>=144&&w.id<=149){
+     const sector=firstMorphRing.get(w.id);
+     if(sector===undefined)return []; // duplicated observed tracks
+     return [{id:w.id+':'+sector,waveId:w.id,sector,sides:6,
+      r:w.r,thickness:w.thickness}];
     }
-    return w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness}));
+    return w.sectors.map(sector=>({
+     id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
+     r:w.r,thickness:w.thickness
+    }));
    });
   }else this.walls=data.walls.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
   return;
