@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Game,wallPoly,playerPoly,intersect}=require('./engine');
+const {Game,wallPoly,playerPoly,intersect,wallTimelineTime}=require('./engine');
 
 // A wall that passes the center must not flip its sector to the opposite side.
 for(const radius of [-150,-80,-40,-20,-1,0,10]){
@@ -34,7 +34,8 @@ for(let level=1;level<=5;level++){
   after.time=moment+dt;after.sampleWalls();
   const p=before.walls.find(x=>x.waveId===w.id),q=after.walls.find(x=>x.waveId===w.id);
   assert(p&&q,'corrected wall must not disappear at its previous cutoff');
-  assert(Math.abs((p.r-q.r)-w.speed*2*dt)<1e-7,'corrected wall must not teleport');
+  const advanced=wallTimelineTime(moment+dt,d.shapeSchedule)-wallTimelineTime(moment-dt,d.shapeSchedule);
+  assert(Math.abs((p.r-q.r)-w.speed*advanced)<1e-7,'corrected wall must not teleport');
   assert.equal(p.thickness,q.thickness,'wall must not suddenly change thickness');
   assert.equal(p.sides,q.sides,'wall sector geometry must not suddenly change');
  }
