@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Game,intersect,playerPoly,wallVisualPoly,shapeStateAt,stabilizeTimeline,HIDDEN_WALL_OUTER_RADIUS,hiddenWallEnd}=require('./engine');
+const {Game,intersect,playerPoly,wallVisualPoly,shapeStateAt,stabilizeTimeline,HIDDEN_WALL_OUTER_RADIUS,hiddenWallEnd,wallTimelineTime}=require('./engine');
 const TAU=Math.PI*2;
 assert.equal(HIDDEN_WALL_OUTER_RADIUS,26);
 assert(HIDDEN_WALL_OUTER_RADIUS<45.8807*Math.cos(Math.PI/4)-4,'must be hidden even by a four-sided core');
@@ -32,13 +32,24 @@ for(let level=0;level<6;level++){
    protectedEdges++;
    // At the old cutoff, the actor remains and travels smoothly inwards.
    const eps=Math.min(1/240,(wave.end-originalEnd)/4);
-   if(originalEnd-eps>0){
-    g.time=originalEnd-eps;g.sampleWalls();
+   // Find the render time at which the morph-aware motion clock crosses
+   // the original observed cutoff (pauses must not count as wall motion).
+   let low=0,high=raw.duration;
+   for(let n=0;n<40;n++){
+    const mid=(low+high)/2;
+    if(wallTimelineTime(mid,raw.shapeSchedule)<originalEnd)low=mid;
+    else high=mid;
+   }
+   const cutoff=(low+high)/2;
+   if(cutoff-eps>0&&cutoff+eps<raw.duration){
+    g.time=cutoff-eps;g.sampleWalls();
     const before=g.walls.find(w=>w.waveId===original.id);
-    g.time=originalEnd+eps;g.sampleWalls();
+    g.time=cutoff+eps;g.sampleWalls();
     const after=g.walls.find(w=>w.waveId===original.id);
     assert(before&&after,'wall must continue beyond the old blinking cutoff');
-    assert(Math.abs(before.r-after.r-original.speed*eps*2)<1e-5,
+    const motion=wallTimelineTime(cutoff+eps,raw.shapeSchedule)-
+      wallTimelineTime(cutoff-eps,raw.shapeSchedule);
+    assert(Math.abs(before.r-after.r-original.speed*motion)<1e-5,
      'wall must not teleport at original cutoff');
    }
   }
