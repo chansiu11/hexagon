@@ -96,7 +96,8 @@ fs.mkdirSync(output,{recursive:true});
    // diagnostic world-space pixels check geometry, reference camera screenshots
    // are the frames to align with the original footage during visual review.
    const times=new Set(keyTimes);
-   for(const [t] of game.timeline.shapeSchedule.slice(1))
+   const transitions=await page.evaluate(()=>game.timeline.shapeSchedule.slice(1));
+   for(const [t] of transitions)
     for(const delta of [-.05,0,.10,.28,.45,.63,.90])
      if(t+delta>=0&&t+delta<60)times.add(+(t+delta).toFixed(3));
    for(const time of [...times].sort((a,b)=>a-b)){
