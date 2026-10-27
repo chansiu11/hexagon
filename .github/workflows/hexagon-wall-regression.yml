@@ -24,6 +24,8 @@ jobs:
         run: node wall-renderer.test.cjs
       - name: Preserve first eighteen seconds and first five-sided transition
         run: node first-pentagon-reference.test.cjs
+      - name: Ensure all six maps use only the selected original gameplay video
+        run: node single-video-wall-source.test.cjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock playwright
       - name: Install Chromium for screenshot verification
@@ -42,7 +44,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'first-pentagon-verified-v3'; then exit 0; fi
+              grep -q 'single-video-reference-v4'; then exit 0; fi
             sleep 10
           done
           exit 1
