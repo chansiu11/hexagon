@@ -149,7 +149,8 @@ class Game{
      const gap=1;
      return w.sectors.filter(sector=>{
       const pentagonSector=Math.floor((sector+.5)*5/w.sides);
-      return pentagonSector!==gap;
+      // In the outgoing hexagon, both sectors 1 and 2 must remain open.
+      return pentagonSector!==gap&&!(w.sides===6&&(sector===1||sector===2));
      }).map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness}));
     }
     return w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness}));
