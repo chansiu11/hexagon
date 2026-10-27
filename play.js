@@ -105,10 +105,7 @@ if(screen==='play'){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touc
  let elapsed=dt;
  if(music.active&&music.context?.state==='running'&&Math.abs(music.position-game.time)>.22)
   music.play(selected,game.time);
-game.update(elapsed,Number(right)-Number(left));game.zoom=music.visualZoom(dt);const measuredCamera=gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);
-// Stabilize only the video-fitted camera's sudden zoom pulses. Never modify
-// wall position, pattern, lifecycle, collision, music timing or rotation.
-game.referenceCamera=HexCameraStability.stabilizeCameraScale(game.referenceCamera,measuredCamera,dt);if(music.error)status.textContent=music.error;if(game.time>=60&&records[selected]<60){records[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){records[selected]=Math.max(records[selected],game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
+game.update(elapsed,Number(right)-Number(left));game.zoom=music.visualZoom(dt);game.referenceCamera=gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&records[selected]<60){records[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){records[selected]=Math.max(records[selected],game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
 draw();
 if(transition){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=(1-transition.age/.24)**2;ctx.drawImage(transition.snapshot,0,-transition.age*canvas.height*.04);ctx.restore()}
 if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected%3];canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
@@ -138,14 +135,26 @@ function gentleStartCamera(m,time){if(!m||time>=2)return m;const angle=Math.atan
 // A single nonzero fill forms the union: overlapping sectors do not produce
 // internal seams or transparent cracks from separate antialiased draw calls.
 function drawWallField(walls,color,game){
- ctx.beginPath();
+ // Paint each wall actor independently instead of asking the GPU to rasterize
+ // every overlapping sector as one huge nonzero-winding compound path. An
+ // unstable compound fill can leave whole wall sectors blank for one frame,
+ // while the actor's position and collision remain correct.
+ // Every frame is repainted from the complete timeline: no wall is cached,
+ // hidden, moved or resurrected by the renderer.
+ ctx.fillStyle=color;
  for(const w of walls){
-  if(w.points)continue;
-  const points=wallVisualPoly(w,game.fromSides,game.sides,game.morph);
-  points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();
- }
- ctx.fillStyle=color;ctx.fill('nonzero');
- for(const w of walls)if(w.points){
-  ctx.beginPath();for(const ring of [w.points,...w.holes]){ring.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();}ctx.fillStyle=color;ctx.fill('evenodd');
+  ctx.beginPath();
+  if(w.points){
+   for(const ring of [w.points,...(w.holes||[])]){
+    ring.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+    ctx.closePath();
+   }
+   ctx.fill('evenodd');
+  }else{
+   const points=wallVisualPoly(w,game.fromSides,game.sides,game.morph);
+   points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+   ctx.closePath();
+   ctx.fill();
+  }
  }
 }
