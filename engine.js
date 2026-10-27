@@ -44,19 +44,28 @@ function stabilizeTimeline(level,data){
 // One global polygon transition applies to the core, walls and collision
 // alike, regardless of each video fragment's old recorded side count.
 const MORPH_SECONDS=.45;
-// On a polygon-side change, hold the incoming walls in place briefly while
-// their geometry reforms. The shared wall clock stays continuous and strictly
-// nondecreasing: unlike per-frame toggles, this cannot pop/recreate actors.
+// Hold wall movement for the first 0.28 seconds of each side transition.
+// Video-derived wall start times and radii are expressed in ABSOLUTE video
+// seconds. Never subtract earlier morph holds forever: doing so made stage 1
+// drift ~550 px and stage 4 drift >1000 px by the end of their recordings.
+// Briefly catch up after the hold, without teleporting any actor or changing
+// its source sector, thickness, ID, or measured radius at later video times.
 const WALL_MORPH_HOLD_SECONDS=.28;
+const WALL_MORPH_RECOVERY_SECONDS=.35;
 function wallTimelineTime(t,schedule){
  if(!Array.isArray(schedule))return t;
- let held=0;
+ let lag=0;
  for(const event of schedule){
   const boundary=event[0];
   if(boundary<=0||t<=boundary)continue;
-  held+=Math.min(WALL_MORPH_HOLD_SECONDS,t-boundary);
+  const elapsed=t-boundary;
+  if(elapsed<=WALL_MORPH_HOLD_SECONDS)lag=elapsed;
+  else if(elapsed<WALL_MORPH_HOLD_SECONDS+WALL_MORPH_RECOVERY_SECONDS){
+   const fraction=(elapsed-WALL_MORPH_HOLD_SECONDS)/WALL_MORPH_RECOVERY_SECONDS;
+   lag=WALL_MORPH_HOLD_SECONDS*(1-fraction);
+  }else lag=0;
  }
- return Math.max(0,t-held);
+ return Math.max(0,t-lag);
 }
 function shapeStateAt(t,schedule){
  if(!Array.isArray(schedule)||!schedule.length)return {from:6,to:6,progress:1};
@@ -185,6 +194,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
