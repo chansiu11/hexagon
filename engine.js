@@ -127,7 +127,19 @@ class Game{
    const wallTime=wallTimelineTime(this.time,data.shapeSchedule);
    this.wallMotionTime=wallTime;
    this.waves=data.waves.filter(w=>wallTime>=w.start&&wallTime<w.end).map(w=>({...w,r:observedWaveRadius(w,wallTime)}));
-   this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness})));
+   // First HEXAGON 6->5 transition: an approaching ring deliberately has
+   // two open sixths (1 and 3). As its six-sided geometry morphs to five,
+   // those become one open fifth (sector 1). Keep wave IDs/lifetimes/radii
+   // untouched; this is only the recorded first-transition sector layout.
+   const firstFiveTransition=this.level===0&&this.time>=17.65&&this.time<22;
+   const transitionSectors=new Map([[144,0],[145,2],[146,4],[147,5]]);
+   this.walls=this.waves.flatMap(w=>{
+    const mapped=firstFiveTransition&&w.id>=144&&w.id<=149
+     ?(transitionSectors.has(w.id)?[transitionSectors.get(w.id)]:[])
+     :w.sectors;
+    const sourceSides=firstFiveTransition&&w.id>=144&&w.id<=149?6:w.sides;
+    return mapped.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:sourceSides,r:w.r,thickness:w.thickness}));
+   });
   }else this.walls=data.walls.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
   return;
  }
