@@ -109,8 +109,8 @@ function observedWaveRadius(w,time){
  return w.r-w.speed*(time-w.start);
 }
 
-// Video-fitted first 6->5 mode-change ring. Stable IDs ensure that source
-// fragments overlap consistently; do not reassign sectors during animation.
+// Previously accepted first-ring sectors, retained only until game time 18s.
+// Their identifiers remain stable when the observed video sectors take over.
 const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
 class Game{
  constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0}
@@ -130,19 +130,19 @@ class Game{
    const wallTime=wallTimelineTime(this.time,data.shapeSchedule);
    this.wallMotionTime=wallTime;
    this.waves=data.waves.filter(w=>wallTime>=w.start&&wallTime<w.end).map(w=>({...w,r:observedWaveRadius(w,wallTime)}));
-   // The first measured 6->5 mode-change ring uses four distinct walls.
-   // Its adjacent hexagonal openings (directions 1 and 2) merge into the
-   // single pentagonal opening 1. This assignment is permanent for those
-   // actor IDs: NEVER switch wall sectors as a function of frame time.
-   // Other source-video walls use their own recorded sectors unchanged.
-   // In particular, the entire first 18 seconds is bit-for-bit unchanged.
-   const firstMorphRing=this.level===0?FIRST_PENTAGON_RING_SECTORS:null;
+   // Follow reference video 5mDjFdetU28's measured first-morph sectors.
+   // Preserve the accepted first 18 seconds exactly, then hand over the
+   // four ring actors to their video-observed sectors while still offscreen.
+   // Stable IDs, radii, lifetimes and source order prevent any wall popping.
+   const firstRing=this.level===0?FIRST_PENTAGON_RING_SECTORS:null;
    this.walls=this.waves.flatMap(w=>{
-    if(firstMorphRing&&w.id>=144&&w.id<=149){
-     const sector=firstMorphRing[w.id];
-     if(sector===undefined)return []; // duplicated observed tracks
-     return [{id:w.id+':'+sector,waveId:w.id,sector,sides:6,
-      r:w.r,thickness:w.thickness}];
+    if(firstRing&&w.id>=144&&w.id<=149){
+     const baselineSector=firstRing[w.id];
+     if(baselineSector===undefined)return []; // duplicate video observations
+     const observed=this.time>=18;
+     return [{id:w.id+':'+baselineSector,waveId:w.id,
+      sector:observed?w.sectors[0]:baselineSector,
+      sides:observed?w.sides:6,r:w.r,thickness:w.thickness}];
     }
     return w.sectors.map(sector=>({
      id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
