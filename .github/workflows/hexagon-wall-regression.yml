@@ -1,0 +1,22 @@
+name: Hexagon wall continuity
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  wall-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit 0-60 second wall actors and camera for all six stages
+        run: node camera-wall-continuity.test.cjs
+      - name: Audit polygon morph and escape passages
+        run: node wall-morph-stability.test.cjs
