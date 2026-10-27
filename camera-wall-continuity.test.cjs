@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {Game,wallVisualPoly,PLAYER_SPEED_BY_LEVEL}=require('./engine');
+const {Game,wallVisualPoly,PLAYER_SPEED_BY_LEVEL,wallTimelineTime}=require('./engine');
 const {cameraScale,stabilizeCameraScale,MAX_CAMERA_SCALE_RATE}=require('./camera-stability');
 
 const fps=60,dt=1/fps,eps=1e-6;
@@ -41,7 +41,8 @@ for(let level=0;level<6;level++){
     'invalid wall polygon map '+level+' '+time);
    if(prior.has(w.id)){
     const old=prior.get(w.id);
-    assert(Math.abs((old.r-w.r)-speedById.get(w.waveId)*dt)<1e-4,
+    const motionDelta=frame?wallTimelineTime(time,source.shapeSchedule)-wallTimelineTime(time-dt,source.shapeSchedule):0;
+    assert(Math.abs((old.r-w.r)-speedById.get(w.waveId)*motionDelta)<1e-4,
      'wall teleported '+w.id+' map '+level+' '+time);
    }else if(frame>0){
     assert(w.r>700,'wall appeared near player '+w.id+' map '+level+' '+time);
