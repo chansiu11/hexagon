@@ -44,6 +44,20 @@ function stabilizeTimeline(level,data){
 // One global polygon transition applies to the core, walls and collision
 // alike, regardless of each video fragment's old recorded side count.
 const MORPH_SECONDS=.45;
+// On a polygon-side change, hold the incoming walls in place briefly while
+// their geometry reforms. The shared wall clock stays continuous and strictly
+// nondecreasing: unlike per-frame toggles, this cannot pop/recreate actors.
+const WALL_MORPH_HOLD_SECONDS=.28;
+function wallTimelineTime(t,schedule){
+ if(!Array.isArray(schedule))return t;
+ let held=0;
+ for(const event of schedule){
+  const boundary=event[0];
+  if(boundary<=0||t<=boundary)continue;
+  held+=Math.min(WALL_MORPH_HOLD_SECONDS,t-boundary);
+ }
+ return Math.max(0,t-held);
+}
 function shapeStateAt(t,schedule){
  if(!Array.isArray(schedule)||!schedule.length)return {from:6,to:6,progress:1};
  let index=0;
@@ -110,7 +124,9 @@ class Game{
   if(data.mode==='batched-wall-waves'){
    const shape=shapeStateAt(this.time,data.shapeSchedule);
    this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
-   this.waves=data.waves.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:observedWaveRadius(w,this.time)}));
+   const wallTime=wallTimelineTime(this.time,data.shapeSchedule);
+   this.wallMotionTime=wallTime;
+   this.waves=data.waves.filter(w=>wallTime>=w.start&&wallTime<w.end).map(w=>({...w,r:observedWaveRadius(w,wallTime)}));
    this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness})));
   }else this.walls=data.walls.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
   return;
@@ -148,6 +164,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
