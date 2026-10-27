@@ -24,6 +24,8 @@ jobs:
         run: node wall-renderer.test.cjs
       - name: Preserve first eighteen seconds and first five-sided transition
         run: node first-pentagon-reference.test.cjs
+      - name: Compare video-measured wall radii and morph timing across six stages
+        run: node reference-wall-timing.test.cjs
       - name: Ensure all six maps use only the selected original gameplay video
         run: node single-video-wall-source.test.cjs
       - name: Install browser test dependency
