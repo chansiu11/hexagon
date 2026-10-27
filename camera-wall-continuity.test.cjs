@@ -13,6 +13,7 @@ assert.deepEqual(stabilizeCameraScale(null,jump,dt),jump);
 for(let level=0;level<6;level++){
  const source=require('./assets/timelines/waves-stage-'+level+'.json');
  const g=new Game(level,source);
+ const speedById=new Map(g.timeline.waves.map(w=>[w.id,w.speed]));
  let prior=new Map(),priorCamera=null,actors=0,exits=0,zoomCorrections=0;
  for(let frame=0;frame<source.duration*fps;frame++){
   const time=frame/fps;
@@ -40,7 +41,7 @@ for(let level=0;level<6;level++){
     'invalid wall polygon map '+level+' '+time);
    if(prior.has(w.id)){
     const old=prior.get(w.id);
-    assert(Math.abs((old.r-w.r)-w.speed*dt)<1e-4,
+    assert(Math.abs((old.r-w.r)-speedById.get(w.waveId)*dt)<1e-4,
      'wall teleported '+w.id+' map '+level+' '+time);
    }else if(frame>0){
     assert(w.r>700,'wall appeared near player '+w.id+' map '+level+' '+time);
@@ -50,7 +51,7 @@ for(let level=0;level<6;level++){
   if(frame>0)for(const [id,w] of prior){
    if(next.has(id))continue;
    // The vanished wave must already be completely behind the center.
-   assert(w.r+w.thickness<=26+w.speed*dt+eps,
+   assert(w.r+w.thickness<=26+speedById.get(w.waveId)*dt+eps,
     'visible wall vanished '+id+' map '+level+' '+time);
    exits++;
   }
