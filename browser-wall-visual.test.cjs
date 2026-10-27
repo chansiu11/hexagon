@@ -6,7 +6,8 @@ const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
 const root=process.env.HEXAGON_URL||'http://127.0.0.1:4173/';
 const output=path.join(process.cwd(),'wall-browser-screenshots');
-const times=[0,5,8,9,10,11,12,15,17,18,19,20,25,30,40,45,50,55,59];
+const keyTimes=[0,5,8,9,10,11,12,15,17,17.99,18,18.01,19,19.99,20,
+  20.10,20.28,20.45,20.63,21,21.5,25,26.733,30,40,45,50,55,59];
 fs.mkdirSync(output,{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
@@ -46,10 +47,16 @@ fs.mkdirSync(output,{recursive:true});
      const t=l?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l)):0;
      return Math.hypot(p[0]-a[0]-dx*t,p[1]-a[1]-dy*t);
     };
-    // Simulate all 720 consecutive 60-Hz frames on map one, and 30 Hz on
-    // the remaining maps. This catches a one-frame-only missing-wall paint.
+    // Include every recorded side transition and its pause/recovery frames,
+    // not just the opening 8-20s period. Map one is audited at 60fps and
+    // the other five at 30fps to keep CI bounded.
     const step=level===0?1:2;
-    for(let f=8*60;f<=20*60;f+=step){
+    const scan=[[8,20],...game.timeline.shapeSchedule.slice(1)
+      .map(([t])=>[Math.max(0,t-.20),Math.min(60,t+1)])];
+    const frameSet=new Set();
+    for(const [a,b] of scan)for(let f=Math.ceil(a*60);f<=Math.floor(b*60);f+=step)
+      frameSet.add(f);
+    for(const f of [...frameSet].sort((a,b)=>a-b)){
      game.time=f/60;game.sampleWalls();
      game.referenceCamera=[1,0,0,1,0,0]; // geometry-only camera: independent of pulses
      updatePalette(step/60);draw();
@@ -84,14 +91,27 @@ fs.mkdirSync(output,{recursive:true});
     'wall pixels not painted correctly: '+JSON.stringify(frameAudit));
    console.log('PASS map '+(level+1)+' '+frameAudit.checkedFrames+
     ' rapid frames and '+frameAudit.pixels+' wall pixel checks');
-   // Capture full-coverage 0-60s snapshots; empty end segments are valid
-   // when the original recorded timeline contains no walls at that instant.
-   for(const time of times){
+   // Capture both world-space diagnostic pixels and the genuine recorded
+   // reference camera projection. The two views have different purposes:
+   // diagnostic world-space pixels check geometry, reference camera screenshots
+   // are the frames to align with the original footage during visual review.
+   const times=new Set(keyTimes);
+   for(const [t] of game.timeline.shapeSchedule.slice(1))
+    for(const delta of [-.05,0,.10,.28,.45,.63,.90])
+     if(t+delta>=0&&t+delta<60)times.add(+(t+delta).toFixed(3));
+   for(const time of [...times].sort((a,b)=>a-b)){
     await page.evaluate(t=>{
      game.time=t;game.sampleWalls();game.referenceCamera=[1,0,0,1,0,0];
+     game.cameraWasActive=false;game.lastDrawCamera=null;
      updatePalette(1/60);draw();
     },time);
     await page.screenshot({path:path.join(output,'stage-'+(level+1)+'-'+time+'s.png')});
+    await page.evaluate(()=>{
+     game.referenceCamera=game.recordedCamera;
+     game.cameraWasActive=false;game.lastDrawCamera=null;
+     draw();
+    });
+    await page.screenshot({path:path.join(output,'stage-'+(level+1)+'-'+time+'s-reference-camera.png')});
    }
   }
   assert.deepEqual(errors,[],'browser JavaScript errors');
