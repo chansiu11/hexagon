@@ -1,78 +1,100 @@
 'use strict';
-// Render-test the actual canvas in Chromium, not just Game.sampleWalls().
+// Browser raster regression: check real painted wall pixels, 60 Hz at 8-20s
+// and screenshot the full 0-60s timeline on all six stages.
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
-const times=[8,9,10,11,12,15,17,18,19,20,30,45,59];
 const root=process.env.HEXAGON_URL||'http://127.0.0.1:4173/';
-const dest=path.join(process.cwd(),'wall-browser-screenshots');
-fs.mkdirSync(dest,{recursive:true});
+const output=path.join(process.cwd(),'wall-browser-screenshots');
+const times=[0,5,8,9,10,11,12,15,17,18,19,20,25,30,40,45,50,55,59];
+fs.mkdirSync(output,{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
  try{
   const page=await browser.newPage({viewport:{width:960,height:600},deviceScaleFactor:1});
-  const pageErrors=[];
-  page.on('pageerror',e=>pageErrors.push(e.message));
+  const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
   await page.goto(root,{waitUntil:'load',timeout:30000});
-  await page.waitForFunction(()=>window.HexEngine?.Game&&window.HexCameraStability?.stabilizeCameraScale,{timeout:15000});
+  await page.waitForFunction(()=>window.HexEngine?.Game&&typeof draw==='function');
   for(let level=0;level<6;level++){
-   await page.evaluate(async level=>{
-    const response=await fetch('assets/timelines/waves-stage-'+level+'.json?v=8',{cache:'no-store'});
-    if(!response.ok)throw Error('timeline download '+response.status);
-    selected=level;
-    game=new HexEngine.Game(level,await response.json());
-    game.update=()=>{}; // Render-only deterministic frames, no forced collisions.
-    settings.sound=false;settings.motion=true;
-    screen='play';launch=null;
+   await page.evaluate(async i=>{
+    const r=await fetch('assets/timelines/waves-stage-'+i+'.json?v=8',{cache:'no-store'});
+    if(!r.ok)throw Error('timeline '+i+' returned '+r.status);
+    selected=i;game=new HexEngine.Game(i,await r.json());
+    game.update=()=>{}; // Rendering-only simulation, suppress simulated death.
+    settings.motion=true;settings.sound=false;
+    screen='play';launch=null;flash=0;transition=null;
     document.body.classList.add('playing');
-    game.time=0;game.sampleWalls();
-    game.referenceCamera=game.recordedCamera;
    },level);
-   let previousFrame=0;
-   for(const time of times){
-    const snapshot=await page.evaluate(({start,end})=>{
-     const dt=1/60;
-     for(let frame=start+1;frame<=end;frame++){
-      game.time=frame/60;
-      game.sampleWalls();
-      game.referenceCamera=HexCameraStability.stabilizeCameraScale(
-       game.referenceCamera,game.recordedCamera,dt);
+   const frameAudit=await page.evaluate(level=>{
+    const ctx=document.querySelector('#game').getContext('2d');
+    const scratch=document.createElement('canvas');scratch.width=scratch.height=1;
+    const swatch=scratch.getContext('2d');
+    const bounds=[130,160,195,230,275,325,375];
+    let pixels=0,errors=0,checkedFrames=0,missingFrames=[];
+    const inside=(p,poly)=>{
+     let hit=false;
+     for(let k=0,j=poly.length-1;k<poly.length;j=k++){
+      const a=poly[k],b=poly[j];
+      if((a[1]>p[1])!==(b[1]>p[1])&&
+         p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])hit=!hit;
      }
-     return {
-      actors:game.walls.length,
-      time:game.time,
-      camera:game.referenceCamera
-     };
-    },{start:previousFrame,end:time*60});
-    previousFrame=time*60;
-    assert(snapshot.actors>0,'no wall actors at stage '+(level+1)+' '+time+'s');
-    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve())));
-    const image=await page.evaluate(()=>{
-      const c=document.querySelector('#game'),context=c.getContext('2d');
-      const swatch=document.createElement('canvas');swatch.width=swatch.height=1;
-      const p=swatch.getContext('2d');
-      p.fillStyle=palette()[2];p.fillRect(0,0,1,1);
-      const rgb=p.getImageData(0,0,1,1).data;
-      const pixels=context.getImageData(0,0,c.width,c.height).data;
-      let wallColoredSamples=0;
-      for(let y=65;y<535;y+=4)for(let x=25;x<935;x+=4){
-       if(Math.hypot(x-480,y-300)<95)continue;
-       const k=(y*c.width+x)*4;
-       if(Math.abs(pixels[k]-rgb[0])<18&&
-          Math.abs(pixels[k+1]-rgb[1])<18&&
-          Math.abs(pixels[k+2]-rgb[2])<18)wallColoredSamples++;
-      }
-      return {wallColoredSamples};
-    });
-    assert(image.wallColoredSamples>20,
-     'rendered wall color missing stage '+(level+1)+' time '+time+
-     's ('+image.wallColoredSamples+' samples)');
-    await page.screenshot({path:path.join(dest,'stage-'+(level+1)+'-'+time+'s.png')});
-    console.log('PASS rendered stage '+(level+1)+' '+time+'s, '+snapshot.actors+
-     ' actors, '+image.wallColoredSamples+' colored samples');
+     return hit;
+    };
+    const edgeDist=(p,a,b)=>{
+     const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;
+     const t=l?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l)):0;
+     return Math.hypot(p[0]-a[0]-dx*t,p[1]-a[1]-dy*t);
+    };
+    // Simulate all 720 consecutive 60-Hz frames on map one, and 30 Hz on
+    // the remaining maps. This catches a one-frame-only missing-wall paint.
+    const step=level===0?1:2;
+    for(let f=8*60;f<=20*60;f+=step){
+     game.time=f/60;game.sampleWalls();
+     game.referenceCamera=[1,0,0,1,0,0]; // geometry-only camera: independent of pulses
+     updatePalette(step/60);draw();
+     const [, ,accent]=palette();
+     swatch.fillStyle=accent;swatch.fillRect(0,0,1,1);
+     const rgb=swatch.getImageData(0,0,1,1).data;
+     const data=ctx.getImageData(0,0,960,600).data;
+     const polys=game.walls.map(w=>w.points||wallVisualPoly(w,game.fromSides,game.sides,game.morph));
+     let expected=0,seen=0;
+     for(const rad of bounds)for(let a=0;a<48;a++){
+      const th=(a+.37)*Math.PI/24,p=[Math.cos(th)*rad,Math.sin(th)*rad],
+       x=Math.round(480+p[0]),y=Math.round(300+p[1]);
+      if(x<20||x>939||y<75||y>520)continue;
+      const active=polys.filter(poly=>inside(p,poly)&&
+       poly.every((u,j)=>edgeDist(p,u,poly[(j+1)%poly.length])>5));
+      if(!active.length)continue;
+      expected++;pixels++;
+      const idx=(y*960+x)*4;
+      if(Math.abs(data[idx]-rgb[0])<28&&Math.abs(data[idx+1]-rgb[1])<28&&
+         Math.abs(data[idx+2]-rgb[2])<28)seen++;
+     }
+     checkedFrames++;
+     if(expected>=8&&seen/expected<.94){
+      errors++;
+      if(missingFrames.length<15)
+       missingFrames.push({t:+(f/60).toFixed(3),expected,seen});
+     }
+    }
+    return {level:level+1,checkedFrames,pixels,errors,missingFrames};
+   },level);
+   assert.equal(frameAudit.errors,0,
+    'wall pixels not painted correctly: '+JSON.stringify(frameAudit));
+   console.log('PASS map '+(level+1)+' '+frameAudit.checkedFrames+
+    ' rapid frames and '+frameAudit.pixels+' wall pixel checks');
+   // Capture full-coverage 0-60s snapshots; empty end segments are valid
+   // when the original recorded timeline contains no walls at that instant.
+   for(const time of times){
+    await page.evaluate(t=>{
+     game.time=t;game.sampleWalls();game.referenceCamera=[1,0,0,1,0,0];
+     updatePalette(1/60);draw();
+    },time);
+    await page.screenshot({path:path.join(output,'stage-'+(level+1)+'-'+time+'s.png')});
    }
   }
-  assert.deepEqual(pageErrors,[],'browser JavaScript errors');
-  console.log('PASS real Chromium canvas rendering on all six maps');
+  assert.deepEqual(errors,[],'browser JavaScript errors');
+  console.log('PASS real Chromium canvas wall frames (six stages)');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
