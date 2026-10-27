@@ -28,6 +28,8 @@ jobs:
         run: node reference-wall-timing.test.cjs
       - name: Ensure all six maps use only the selected original gameplay video
         run: node single-video-wall-source.test.cjs
+      - name: Build 0-60s time-matched source-video-trace geometry comparisons
+        run: node source-geometry-compare.cjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock playwright
       - name: Install Chromium for screenshot verification
@@ -46,7 +48,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'single-video-reference-v4'; then exit 0; fi
+              grep -q 'morph-clock-reference-aligned-v5'; then exit 0; fi
             sleep 10
           done
           exit 1
@@ -59,5 +61,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hexagon-wall-screenshots
-          path: wall-browser-screenshots/
+          path: |
+            wall-browser-screenshots/
+            wall-source-comparisons/
           if-no-files-found: ignore
