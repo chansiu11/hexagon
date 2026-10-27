@@ -109,6 +109,9 @@ function observedWaveRadius(w,time){
  return w.r-w.speed*(time-w.start);
 }
 
+// Video-fitted first 6->5 mode-change ring. Stable IDs ensure that source
+// fragments overlap consistently; do not reassign sectors during animation.
+const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
 class Game{
  constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
@@ -133,12 +136,10 @@ class Game{
    // actor IDs: NEVER switch wall sectors as a function of frame time.
    // Other source-video walls use their own recorded sectors unchanged.
    // In particular, the entire first 18 seconds is bit-for-bit unchanged.
-   const firstMorphRing=this.level===0
-    ?new Map([[144,0],[145,3],[146,4],[147,5]])
-    :null;
+   const firstMorphRing=this.level===0?FIRST_PENTAGON_RING_SECTORS:null;
    this.walls=this.waves.flatMap(w=>{
     if(firstMorphRing&&w.id>=144&&w.id<=149){
-     const sector=firstMorphRing.get(w.id);
+     const sector=firstMorphRing[w.id];
      if(sector===undefined)return []; // duplicated observed tracks
      return [{id:w.id+':'+sector,waveId:w.id,sector,sides:6,
       r:w.r,thickness:w.thickness}];
