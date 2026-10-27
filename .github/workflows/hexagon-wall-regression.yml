@@ -20,3 +20,36 @@ jobs:
         run: node camera-wall-continuity.test.cjs
       - name: Audit polygon morph and escape passages
         run: node wall-morph-stability.test.cjs
+      - name: Install browser test dependency
+        run: npm install --no-save --no-package-lock playwright
+      - name: Install Chromium for screenshot verification
+        run: npx playwright install --with-deps chromium
+      - name: Start local browser test server
+        run: |
+          node server.cjs >/tmp/hexagon-web.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Validate rendered wall pixels on every map
+        run: node browser-wall-visual.test.cjs
+      - name: Wait for updated GitHub Pages content
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS https://chansiu11.github.io/hexagon/ |
+              grep -q 'zoom-stability-v1'; then exit 0; fi
+            sleep 10
+          done
+          exit 1
+      - name: Check the deployed GitHub Pages canvas
+        run: node browser-wall-visual.test.cjs
+        env:
+          HEXAGON_URL: https://chansiu11.github.io/hexagon/
+      - name: Archive browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hexagon-wall-screenshots
+          path: wall-browser-screenshots/
+          if-no-files-found: ignore
