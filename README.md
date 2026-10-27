@@ -58,6 +58,26 @@ A separate, measured-trace continuity correction in the 15.5–19 second window 
 
 **17-second wall-disappearance fix:** The previous timeline repair skipped source tracks shorter than 12 samples, causing visible sectors to blink out. All measured wall actors in the 15.5–19.5 s repair window now keep moving at the existing constant inward speed until they pass behind the center (or the next recorded shape transition). The 16–18.75 s regression verifies that no higher-stage wall expires with an outer radius above 50. Two conflicting short-lived source fragments were excluded during open-passage verification. This preserves the original first-stage timeline and the player rotation speeds. The observation fitting remains imperfect. Stage 2 has three video fragments that cannot be placed offscreen with constant-speed entry; stage 5 has one. Stage 6 has one contradictory fragment excluded, plus two speculative lifetime extensions clipped. These exceptions are preserved in each timeline's `repair.discardedSourceActors` and `repair.clippedExtensions` metadata. No special curved or accelerated entrance animation is used. Tests audit all stages at 30 samples per second for fully sealed angular passages; this does not prove a complete playable path or exact visual fidelity.
 
+## 2026-10-27 video-aligned wall timing repair
+
+The earlier wall movement clock accumulated a permanent 0.28-second subtraction
+after every shape change. This made walls steadily lag behind the already
+video-timestamped tracks: the measured median absolute position error was
+approximately 293px on stage 1 and 548px on stage 4 (18–60s).
+
+The new timeline clock preserves the requested 0.28-second stationary interval
+during each polygon morph, catches up over the following 0.35 seconds, then
+returns to the absolute recording time. It does not modify the video-derived
+sector order, actor IDs, wave thicknesses, collision polygons, local storage,
+music, or player rotation. Stage one's 0–18s wave clock is unchanged.
+
+Run `node reference-wall-timing.test.cjs` to compare current wall radii against
+the checked-in `rigid-stage-N.json` traces on all six stages. The browser
+regression additionally captures detailed shape-transition timestamps with
+the recorded camera as well as geometry-only views. These are fitted source
+traces, not independent access to the original video frames; video-exact
+matching is not asserted.
+
 ## Fidelity limits
 
 Reference gameplay: https://www.youtube.com/watch?v=5mDjFdetU28
