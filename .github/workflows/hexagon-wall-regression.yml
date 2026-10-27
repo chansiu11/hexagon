@@ -20,6 +20,8 @@ jobs:
         run: node camera-wall-continuity.test.cjs
       - name: Audit polygon morph and escape passages
         run: node wall-morph-stability.test.cjs
+      - name: Audit individual canvas fills on each simulated frame
+        run: node wall-renderer.test.cjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock playwright
       - name: Install Chromium for screenshot verification
