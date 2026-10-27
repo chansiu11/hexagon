@@ -41,7 +41,7 @@ for(let level=0;level<6;level++){
     else high=mid;
    }
    const cutoff=(low+high)/2;
-   if(level===0&&original.id>=144&&original.id<=190)continue; // first morph uses fixed source-wave sector remapping, some measured sectors intentionally omitted
+   if(level===0&&original.id>=144&&original.id<=149)continue; // source waves 148-149 are duplicate first-transition sectors
    if(cutoff-eps>0&&cutoff+eps<raw.duration){
     g.time=cutoff-eps;g.sampleWalls();
     const before=g.walls.find(w=>w.waveId===original.id);
