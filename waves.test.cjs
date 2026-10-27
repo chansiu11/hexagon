@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Game,wallVisualPoly,playerPoly,intersect}=require('./engine');
+const {Game,wallVisualPoly,playerPoly,intersect,wallTimelineTime}=require('./engine');
 const data=require('./assets/timelines/waves-stage-0.json');
 assert.equal(data.mode,'batched-wall-waves');
 assert(data.waves.some(w=>w.sectors.length>1));
@@ -14,9 +14,23 @@ for(const w of data.waves){
  const g=new Game(0,data);
  const repaired=g.timeline.waves.find(v=>v.id===w.id);
  if(!repaired)continue; // rejected contradictory recording, original asset preserved
- for(const time of [w.start-.000001,w.start,(w.start+w.end)/2,repaired.end-.000001,repaired.end]){
+ // Wave births and cutoffs are recorded in wall-motion time, not display
+ // time: polygon morphs briefly pause and then catch up that clock.
+ const motionToDisplay=target=>{
+  if(target<=0)return target;
+  let low=0,high=data.duration;
+  for(let n=0;n<46;n++){
+   const mid=(low+high)/2;
+   if(wallTimelineTime(mid,data.shapeSchedule)<target)low=mid;
+   else high=mid;
+  }
+  return high;
+ };
+ for(const target of [w.start-.000001,w.start,(w.start+w.end)/2,repaired.end-.000001,repaired.end]){
+  const time=motionToDisplay(target)+(target>=0?1e-9:0);
   g.time=time;g.sampleWalls();const pieces=g.walls.filter(p=>p.waveId===w.id);
-  assert.equal(pieces.length,time>=w.start&&time<repaired.end?w.sectors.length:0,'atomic spawn/despawn');
+  const motion=wallTimelineTime(time,data.shapeSchedule);
+  assert.equal(pieces.length,motion>=w.start&&motion<repaired.end?w.sectors.length:0,'atomic spawn/despawn');
   for(const piece of pieces){assert.equal(piece.r,pieces[0].r);assert.equal(piece.thickness,pieces[0].thickness);}
  }
 }
