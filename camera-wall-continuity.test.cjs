@@ -52,7 +52,10 @@ for(let level=0;level<6;level++){
   if(frame>0)for(const [id,w] of prior){
    if(next.has(id))continue;
    // The vanished wave must already be completely behind the center.
-   assert(w.r+w.thickness<=26+speedById.get(w.waveId)*dt+eps,
+   const clockStep=wallTimelineTime(time,source.shapeSchedule)-
+     wallTimelineTime(time-dt,source.shapeSchedule);
+   // The 0.35s catch-up can advance the physical wave by more than dt.
+   assert(w.r+w.thickness<=26+speedById.get(w.waveId)*clockStep+eps,
     'visible wall vanished '+id+' map '+level+' '+time);
    exits++;
   }
