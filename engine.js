@@ -12,6 +12,16 @@ const ORIGINAL_ARROW_DEGREES_PER_TICK=Object.freeze([7,7,9,7,7,9]);
 const PLAYER_SPEED=ORIGINAL_ARROW_DEGREES_PER_TICK[0]*TAU/360*ORIGINAL_TICK_RATE;
 const PLAYER_SPEED_BY_LEVEL=Object.freeze(ORIGINAL_ARROW_DEGREES_PER_TICK.map(()=>PLAYER_SPEED));
 const LIFECYCLE=typeof module!=='undefined'?require('./wall-lifecycle-patches.js'):(root.HexWallLifecyclePatches||[]);
+// The previous 42px cutoff lies OUTSIDE the inscribed area of the square
+// core (45.8807 * cos(PI/4) ~= 32.4px). Those last visible slivers popped
+// offscreen at the tracker end, which looks like repeated wall blinking.
+// Finish every wave behind the inner core across all side transitions.
+const HIDDEN_WALL_OUTER_RADIUS=26;
+function hiddenWallEnd(w,existingEnd,duration){
+ if(!Number.isFinite(w.speed)||w.speed<=0)return existingEnd;
+ const physicalEnd=w.start+(w.r+w.thickness-HIDDEN_WALL_OUTER_RADIUS)/w.speed;
+ return Math.max(existingEnd,Math.min(duration,physicalEnd));
+}
 const repairedTimelines=new WeakMap();
 function stabilizeTimeline(level,data){
  if(!data||data.mode!=='batched-wall-waves')return data;
@@ -23,8 +33,9 @@ function stabilizeTimeline(level,data){
  const discarded=new Set(patch.omit);
  const overrides=new Map(patch.extend);
  const waves=data.waves.filter(w=>!discarded.has(w.id)).map(w=>{
-  const end=overrides.get(w.id);
-  return end===undefined?w:{...w,end};
+  const baseEnd=overrides.get(w.id)??w.end;
+  const end=hiddenWallEnd(w,baseEnd,data.duration);
+  return Math.abs(end-w.end)<1e-10?w:{...w,end};
  });
  const copy={...data,waves,stability:{sourceWaves:data.waves.length,continued:overrides.size,excluded:discarded.size}};
  cache.set(level,copy);
@@ -137,6 +148,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
