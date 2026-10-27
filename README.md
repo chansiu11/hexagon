@@ -18,7 +18,7 @@ Arrow keys or A/D rotate. Space/Enter selects or retries. Escape pauses/returns.
 
 - Six stages with measured camera and shape schedules covering their first 60 seconds.
 - Stage one uses deterministic wall-wave actors. Members share position, speed, thickness and lifecycle. All waves use one measured speed estimate.
-- The entire stage-one wall timeline is unchanged (`waves-stage-0.json`). **Stages 2-6 use the same stage-one wall-generation rules**: the same strict sector grouping (0.15 s / 10 px / 8 px), median speed from sufficiently observed tracks, constant-speed linear inbound movement, offscreen back-projected births, and the same 0.75-second maximum continuation. The stage-specific recorded order, shapes, sectors and thicknesses remain sourced from their respective recordings. Overlapping walls render as one union fill.
+- The entire stage-one wall timeline is unchanged (`waves-stage-0.json`). **Stages 2-6 use the same stage-one wall-generation rules**: the same strict sector grouping (0.15 s / 10 px / 8 px), median speed from sufficiently observed tracks, constant-speed linear inbound movement, offscreen back-projected births, and the same 0.75-second maximum continuation. The stage-specific recorded order, shapes, sectors and thicknesses remain sourced from their respective recordings. Walls are painted individually to avoid intermittent compound-path flicker.
 - Runtime uses uniform camera rotation/zoom, polygon collision, music transport and local records.
 - The three supplied recordings are in assets/music. Sound effects are synthesized.
 
@@ -87,3 +87,27 @@ Wall positions now use a steady frame-time clock independent of audio playback l
 ## Core-edge flicker follow-up
 
 The former wall exit threshold of **42 world px** was too large for the center polygon: the drawn core radius is approximately 45.88 px, and its minimum inscribed radius at four sides is only 32.44 px. Consequently a piece of a wall could still be visible beyond the core edge when its actor was removed, producing repeated tiny wall flashes even though previous lifecycle tests passed. All six stages now compute the physical lifecycle end using a shared **26px outer-radius threshold**, below the smallest core inradius. The source timelines are not rewritten; actor sectors, speed, thickness, offscreen birth and prior open-passage exclusions are unchanged. The added lifetime is only inside the previously invisible/safe center (well inside the player orbit); no additional route-blocking wall segments are introduced.
+
+## One-video reference playback and 0–18-second preservation
+
+All six checked-in `assets/timelines/waves-stage-N.json` timelines identify a
+single source gameplay video, `5mDjFdetU28`. The game uses those measured
+wall tracks deterministically; it does **not** select a fresh random wall pattern
+during a replay. These files are video-derived approximations, not the original
+game's proprietary data or a frame-perfect reconstruction.
+
+Stage one's first 18.000 seconds are protected by a frame-by-frame regression
+against the previously accepted version (1,080 frames and 28,776 rendered
+wall-sector samples). The first 6-to-5 transition uses four distinct actors,
+while two duplicate tracked fragments are omitted. At 18.000 seconds,
+**while the entire ring is still offscreen**, the actors retain their IDs and
+inward trajectories but take the sector identities measured in the video:
+0, 2, 4, 3 on the incoming five-sided ring. On the outgoing hexagon they
+leave two neighboring open sectors, which merge into one open pentagon sector.
+Other recorded wall patterns and stages retain their source-data sectors.
+
+Run `node first-pentagon-reference.test.cjs` to verify the protected opening,
+safe transition and ring geometry. Run `node single-video-wall-source.test.cjs`
+to validate that every generated wall belongs to the same source recording,
+without unexpected directions or motion paths. These tests do not replace
+side-by-side visual comparison against the actual footage.
