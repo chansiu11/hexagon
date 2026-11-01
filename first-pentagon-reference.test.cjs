@@ -72,6 +72,24 @@ assert(wallTimelineTime(20.7,recorded.shapeSchedule)>20.45,
 assert(Math.abs(wallTimelineTime(21,recorded.shapeSchedule)-21)<1e-9,
  'first morph pause must not cause permanent wall clock drift');
 
+// The actual rendered wall objects (not just the abstract clock) must remain
+// in exactly the same place throughout the requested completed-pentagon stop.
+const frozen=new Map();
+for(const time of [20.45,20.50,20.55,20.60,20.65]){
+ game.time=time;game.sampleWalls();
+ assert.equal(game.sides,5);
+ assert.equal(game.morph,1,'pentagon must be fully formed before pausing');
+ const ring=game.walls.filter(w=>w.waveId>=144&&w.waveId<=147);
+ assert.equal(ring.length,4,'ring must remain intact throughout the pause');
+ for(const w of ring){
+  if(!frozen.has(w.id))frozen.set(w.id,w.r);
+  assert(Math.abs(w.r-frozen.get(w.id))<1e-7,'wall moved during 0.2s pause at '+time);
+ }
+}
+game.time=20.70;game.sampleWalls();
+for(const w of game.walls.filter(w=>frozen.has(w.id)))
+ assert(w.r<frozen.get(w.id)-1,'pentagon walls must descend after the pause');
+
 let tested=0,minFree=144;
 for(let frame=18*60;frame<=Math.floor(26.6*60);frame++){
  const time=frame/60;game.time=time;game.sampleWalls();
