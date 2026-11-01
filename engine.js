@@ -44,22 +44,35 @@ function stabilizeTimeline(level,data){
 // One global polygon transition applies to the core, walls and collision
 // alike, regardless of each video fragment's old recorded side count.
 const MORPH_SECONDS=.45;
-// Hold wall movement for the first 0.28 seconds of each side transition.
-// Video-derived wall start times and radii are expressed in ABSOLUTE video
-// seconds. Never subtract earlier morph holds forever: doing so made stage 1
-// drift ~550 px and stage 4 drift >1000 px by the end of their recordings.
-// Briefly catch up after the hold, without teleporting any actor or changing
-// its source sector, thickness, ID, or measured radius at later video times.
+// Most shape transitions preserve their prior 0.28s pause at the start.
+// Only stage 1's FIRST 6->5 change (20.000s) pauses AFTER the morph has
+// COMPLETED: morph 20.00-20.45s, hold 20.45-20.65s, then descend again.
+// Keep all recorded wall actors, sector mappings and collision geometry.
+// Catch up smoothly after each hold so no delay accumulates against the
+// absolute timestamps of the video-extracted wall tracks.
 const WALL_MORPH_HOLD_SECONDS=.28;
 const WALL_MORPH_RECOVERY_SECONDS=.35;
+const FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS=.20;
 function wallTimelineTime(t,schedule){
  if(!Array.isArray(schedule))return t;
  let lag=0;
- for(const event of schedule){
-  const boundary=event[0];
+ for(let i=0;i<schedule.length;i++){
+  const event=schedule[i],boundary=event[0];
   if(boundary<=0||t<=boundary)continue;
   const elapsed=t-boundary;
-  if(elapsed<=WALL_MORPH_HOLD_SECONDS)lag=elapsed;
+  // Explicitly scope this change to stage 1's first hexagon -> pentagon.
+  const firstPentagon=i===1&&schedule[0][0]===0&&
+   schedule[0][1]===6&&boundary===20&&event[1]===5;
+  if(firstPentagon){
+   const holdStart=MORPH_SECONDS;
+   const holdEnd=holdStart+FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS;
+   if(elapsed<=holdStart)lag=0;
+   else if(elapsed<=holdEnd)lag=elapsed-holdStart;
+   else if(elapsed<holdEnd+WALL_MORPH_RECOVERY_SECONDS){
+    const fraction=(elapsed-holdEnd)/WALL_MORPH_RECOVERY_SECONDS;
+    lag=FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS*(1-fraction);
+   }else lag=0;
+  }else if(elapsed<=WALL_MORPH_HOLD_SECONDS)lag=elapsed;
   else if(elapsed<WALL_MORPH_HOLD_SECONDS+WALL_MORPH_RECOVERY_SECONDS){
    const fraction=(elapsed-WALL_MORPH_HOLD_SECONDS)/WALL_MORPH_RECOVERY_SECONDS;
    lag=WALL_MORPH_HOLD_SECONDS*(1-fraction);
@@ -204,6 +217,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
