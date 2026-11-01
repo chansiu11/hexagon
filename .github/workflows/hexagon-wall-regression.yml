@@ -47,6 +47,7 @@ jobs:
       - name: Validate rendered wall pixels on every map
         run: node browser-wall-visual.test.cjs
       - name: Wait for updated GitHub Pages content
+        if: github.event_name == 'push'
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
@@ -55,6 +56,7 @@ jobs:
           done
           exit 1
       - name: Check the deployed GitHub Pages canvas
+        if: github.event_name == 'push'
         run: node browser-wall-visual.test.cjs
         env:
           HEXAGON_URL: https://chansiu11.github.io/hexagon/
