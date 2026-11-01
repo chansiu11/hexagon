@@ -62,8 +62,15 @@ assert.deepEqual(passage,[0,1,2,3],
  'four walls leave adjacent hex sides 4+5 free before the morph');
 assert.deepEqual([...passage].sort(),[0,1,2,3],
  'four pentagon sides must leave exactly side 4 free');
-assert.equal(wallTimelineTime(20.1,recorded.shapeSchedule),20,
- 'moving walls must hold their distance during first shape change');
+assert(Math.abs(wallTimelineTime(20.1,recorded.shapeSchedule)-20.1)<1e-9,
+ 'first morph must be moving until the pentagon is complete');
+for(const t of [20.45,20.5,20.6,20.65])
+ assert(Math.abs(wallTimelineTime(t,recorded.shapeSchedule)-20.45)<1e-9,
+  'first pentagon must remain stationary for 0.2s after morph at '+t);
+assert(wallTimelineTime(20.7,recorded.shapeSchedule)>20.45,
+ 'pentagon must descend again after the post-morph pause');
+assert(Math.abs(wallTimelineTime(21,recorded.shapeSchedule)-21)<1e-9,
+ 'first morph pause must not cause permanent wall clock drift');
 
 let tested=0,minFree=144;
 for(let frame=18*60;frame<=Math.floor(26.6*60);frame++){
