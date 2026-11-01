@@ -22,12 +22,23 @@ for(let level=0;level<6;level++){
   assert(clock+1e-8>=last,'wall moved backward during morph at '+t+' map '+(level+1));
   last=clock;
  }
- for(const [time] of recorded.shapeSchedule.slice(1)){
+ for(const [time,to] of recorded.shapeSchedule.slice(1)){
   const eps=1e-7;
-  assert(Math.abs(wallTimelineTime(time+.1,recorded.shapeSchedule)-time)<eps);
-  assert(Math.abs(wallTimelineTime(time+hold,recorded.shapeSchedule)-time)<eps);
-  assert(Math.abs(wallTimelineTime(time+hold+recovery,recorded.shapeSchedule)-(time+hold+recovery))<eps,
-   'cumulative shape holds caused drift on stage '+(level+1));
+  if(level===0&&time===20&&to===5){
+   const morphEnd=time+.45,holdEnd=morphEnd+.20;
+   assert(Math.abs(wallTimelineTime(time+.1,recorded.shapeSchedule)-(time+.1))<eps,
+    'first pentagon moves while its sides transform');
+   for(const t of [morphEnd,morphEnd+.05,morphEnd+.1,holdEnd])
+    assert(Math.abs(wallTimelineTime(t,recorded.shapeSchedule)-morphEnd)<eps,
+     'first pentagon must hold still after the completed morph');
+   assert(Math.abs(wallTimelineTime(holdEnd+recovery,recorded.shapeSchedule)-(holdEnd+recovery))<eps,
+    'first pentagon movement must recover without accumulated lag');
+  }else{
+   assert(Math.abs(wallTimelineTime(time+.1,recorded.shapeSchedule)-time)<eps);
+   assert(Math.abs(wallTimelineTime(time+hold,recorded.shapeSchedule)-time)<eps);
+   assert(Math.abs(wallTimelineTime(time+hold+recovery,recorded.shapeSchedule)-(time+hold+recovery))<eps,
+    'cumulative shape holds caused drift on stage '+(level+1));
+  }
  }
  let abs=[],later=[];
  for(const wave of recorded.waves)for(const trackId of wave.sourceTrackIds){
