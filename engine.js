@@ -76,8 +76,12 @@ function shapeStateAt(t,schedule){
 }
 function wallVisualPoly(w,fromSides=w.sides||6,toSides=fromSides,progress=1){
  const src=w.sides||6,from=fromSides||src,to=toSides||from;
- const oldSector=Math.max(0,Math.min(from-1,Math.floor((w.sector+.5)*from/src)));
- const newSector=Math.max(0,Math.min(to-1,Math.floor((w.sector+.5)*to/src)));
+ // The four actors at the first 6->5 passage use consistent side indices
+ // throughout the morph; all other waves use the original sector mapping.
+ const oldSector=Number.isInteger(w.fromSector)?w.fromSector:
+  Math.max(0,Math.min(from-1,Math.floor((w.sector+.5)*from/src)));
+ const newSector=Number.isInteger(w.toSector)?w.toSector:
+  Math.max(0,Math.min(to-1,Math.floor((w.sector+.5)*to/src)));
  const blend=Math.max(0,Math.min(1,progress));
  const u=blend*blend*(3-2*blend);
  const inside=Math.max(0,w.r),outside=Math.max(inside,w.r+(w.thickness||30));
@@ -121,6 +125,11 @@ function observedWaveRadius(w,time){
 // Previously accepted first-ring sectors, retained only until game time 18s.
 // Their identifiers remain stable when the observed video sectors take over.
 const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
+// Measured sector-1 gap was unreachable at 20.88s: previously-survivable
+// headings were 222..359deg, while the new hole jumped to 6..139deg.
+// Correct only the first ring after its offscreen 18s handoff: adjacent
+// outgoing hexagon openings 4+5 merge into pentagon opening 4.
+const FIRST_PENTAGON_REACHABLE_SECTORS=Object.freeze({144:0,145:1,146:2,147:3});
 class Game{
  constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
@@ -139,19 +148,20 @@ class Game{
    const wallTime=wallTimelineTime(this.time,data.shapeSchedule);
    this.wallMotionTime=wallTime;
    this.waves=data.waves.filter(w=>wallTime>=w.start&&wallTime<w.end).map(w=>({...w,r:observedWaveRadius(w,wallTime)}));
-   // Follow reference video 5mDjFdetU28's measured first-morph sectors.
-   // Preserve the accepted first 18 seconds exactly, then hand over the
-   // four ring actors to their video-observed sectors while still offscreen.
-   // Stable IDs, radii, lifetimes and source order prevent any wall popping.
+   // Protect the exact 0-18s timeline. After the four first-ring actors
+   // have traveled wholly offscreen, map their sides to a reachable opening.
+   // Their IDs, positions, thickness and lifetime never change.
    const firstRing=this.level===0?FIRST_PENTAGON_RING_SECTORS:null;
    this.walls=this.waves.flatMap(w=>{
     if(firstRing&&w.id>=144&&w.id<=149){
      const baselineSector=firstRing[w.id];
      if(baselineSector===undefined)return []; // duplicate video observations
-     const observed=this.time>=18;
+     const handedOff=this.time>=18;
+     const passageSector=FIRST_PENTAGON_REACHABLE_SECTORS[w.id];
      return [{id:w.id+':'+baselineSector,waveId:w.id,
-      sector:observed?w.sectors[0]:baselineSector,
-      sides:observed?w.sides:6,r:w.r,thickness:w.thickness}];
+      sector:handedOff?passageSector:baselineSector,
+      sides:handedOff?w.sides:6,r:w.r,thickness:w.thickness,
+      ...(handedOff?{fromSector:passageSector,toSector:passageSector}:{})}];
     }
     return w.sectors.map(sector=>({
      id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,

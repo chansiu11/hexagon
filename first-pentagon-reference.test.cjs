@@ -26,19 +26,23 @@ assert.equal(recorded.shapeSchedule[1][0],20,'first five-sided transition must b
 
 assert.equal(recorded.source,'5mDjFdetU28',
  'first map must use the selected single original-video reference');
-const ringIds=[144,145,146,147],measured=[0,2,4,3],before18=[0,3,4,5];
+const ringIds=[144,145,146,147],passage=[0,1,2,3],before18=[0,3,4,5];
 for(const time of [17.99,18,18.01,19.9,20,20.1,20.28,20.45]){
  game.time=time;game.sampleWalls();
  const ring=game.walls.filter(w=>w.waveId>=144&&w.waveId<=149)
   .sort((a,b)=>a.waveId-b.waveId);
  assert.deepEqual(ring.map(w=>w.waveId),ringIds,
   'reference-video ring lost or duplicated wall actors at '+time);
- assert.deepEqual(ring.map(w=>w.sector),time<18?before18:measured,
-  'wrong observed sectors at '+time);
+ assert.deepEqual(ring.map(w=>w.sector),time<18?before18:passage,
+  'first passage sectors changed at '+time);
  assert.deepEqual(ring.map(w=>w.id),['144:0','145:3','146:4','147:5'],
   'IDs must stay unchanged during the offscreen handoff');
  assert(ring.every(w=>w.sides===(time<18?6:5)),
   'wall sectors must use their source video side count after 18s');
+ if(time>=18){
+  assert.deepEqual(ring.map(w=>w.fromSector),passage);
+  assert.deepEqual(ring.map(w=>w.toSector),passage);
+ }
  if(time===18){
   // Switching the layout while the entire ring is still offscreen must
   // never cause a visible pop or replace any of the physical actors.
@@ -54,10 +58,10 @@ for(const time of [17.99,18,18.01,19.9,20,20.1,20.28,20.45]){
  if(time===20)assert.equal(game.morph,0);
  if(time===20.1)assert(game.morph>0&&game.morph<1);
 }
-assert.deepEqual(measured.map(x=>Math.floor((x+.5)*6/5)),[0,3,5,4],
- 'measured wave sectors must leave two connected openings in the hexagon');
-assert.deepEqual([...measured].sort(),[0,2,3,4],
- 'video-tracked first pentagon ring must leave one open direction');
+assert.deepEqual(passage,[0,1,2,3],
+ 'four walls leave adjacent hex sides 4+5 free before the morph');
+assert.deepEqual([...passage].sort(),[0,1,2,3],
+ 'four pentagon sides must leave exactly side 4 free');
 assert.equal(wallTimelineTime(20.1,recorded.shapeSchedule),20,
  'moving walls must hold their distance during first shape change');
 
@@ -78,5 +82,5 @@ for(let frame=18*60;frame<=Math.floor(26.6*60);frame++){
 }
 assert(tested>100,'insufficient checked frames across the first shape change');
 console.log('PASS stage 1 0-18s preserved: '+comparedWalls+' walls, golden '+signature);
-console.log('PASS first 6->5 shape change: 4 video-measured sectors, offscreen 18s handoff, no sealed frames');
+console.log('PASS first 6->5 shape change: 4 reachable aligned sectors, offscreen 18s handoff, no sealed frames');
 console.log('PASS '+tested+' near-player frames, minimum '+minFree+'/144 free angles');

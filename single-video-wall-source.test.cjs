@@ -23,7 +23,15 @@ for(let level=0;level<6;level++){
   for(const w of g.walls){
    const original=ids.get(w.waveId);
    assert(original,'wall lacks an original video observation');
-   if(level!==0||t>=18||w.waveId<144||w.waveId>149){
+   if(level===0&&t>=18&&w.waveId>=144&&w.waveId<=147){
+    // The source transcript's sector-1 opening was geometrically free but
+    // unreachable at 20.88s. This explicit gameplay correction applies
+    // ONLY to the first four actors, while preserving all source files.
+    assert.equal(w.sector,w.waveId-144,'reachable first-ring passage');
+    assert.equal(w.fromSector,w.sector);
+    assert.equal(w.toSector,w.sector);
+    assert.equal(w.sides,5);
+   }else if(level!==0||t>=18||w.waveId<144||w.waveId>149){
     assert(original.sectors.includes(w.sector),
      'invented wall sector on stage '+(level+1)+' at '+t+' source ID '+w.waveId);
     assert.equal(w.sides,original.sides,

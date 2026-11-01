@@ -120,13 +120,21 @@ Stage one's first 18.000 seconds are protected by a frame-by-frame regression
 against the previously accepted version (1,080 frames and 28,776 rendered
 wall-sector samples). The first 6-to-5 transition uses four distinct actors,
 while two duplicate tracked fragments are omitted. At 18.000 seconds,
-**while the entire ring is still offscreen**, the actors retain their IDs and
-inward trajectories but take the sector identities measured in the video:
-0, 2, 4, 3 on the incoming five-sided ring. On the outgoing hexagon they
-leave two neighboring open sectors, which merge into one open pentagon sector.
+**while the entire ring is still offscreen**, the actors retain their IDs,
+radii, thickness, and inward trajectories. A prior fit used sectors 0, 2, 4, 3,
+leaving a visible gap on the first pentagon that could not actually be reached
+from the outgoing hexagon. At 20.883s no headings remained reachable at the
+specified player movement speed, despite still seeing a static open sector.
+
+The first ring's four actors now map to 0, 1, 2, 3 after the offscreen handoff:
+the old hexagon leaves adjacent open sectors 4 and 5, merging into the
+pentagon's one open sector 4. The ring explicitly morphs corresponding
+edges, avoiding a passage teleport and keeping the same collision and
+render polygons. This is a **deliberate playability correction** to an
+imperfect source transcription, not a claim of exact video fidelity.
 Other recorded wall patterns and stages retain their source-data sectors.
 
-Run `node first-pentagon-reference.test.cjs` to verify the protected opening,
+Run `node first-pentagon-playable.test.cjs` to verify a continuous escape path from 18–21.2s under the 7-degree-per-frame player limit.\nRun `node first-pentagon-reference.test.cjs` to verify the protected opening,
 safe transition and ring geometry. Run `node single-video-wall-source.test.cjs`
 to validate that every generated wall belongs to the same source recording,
 without unexpected directions or motion paths. These tests do not replace
