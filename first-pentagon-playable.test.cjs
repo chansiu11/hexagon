@@ -9,7 +9,8 @@ const data=require('./assets/timelines/waves-stage-0.json');
 const game=new Game(0,data),SIZE=360,TAU=Math.PI*2;
 const playerPolygons=Array.from({length:SIZE},(_,a)=>playerPoly(a*TAU/SIZE));
 assert(Math.abs(PLAYER_SPEED*180/Math.PI/60-7)<1e-9);
-const checked=[18,19.9,20,20.1,20.28,20.45,20.75,20.85,20.883333,20.9,21];
+// An actor naturally expires after crossing the core; test IDs before that point.
+const checked=[18,19.9,20,20.1,20.28,20.45,20.75,20.85,20.883333,20.9];
 for(const t of checked){
  game.time=t;game.sampleWalls();
  const ring=game.walls.filter(w=>w.waveId>=144&&w.waveId<=149)
