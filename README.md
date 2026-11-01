@@ -58,6 +58,21 @@ A separate, measured-trace continuity correction in the 15.5–19 second window 
 
 **17-second wall-disappearance fix:** The previous timeline repair skipped source tracks shorter than 12 samples, causing visible sectors to blink out. All measured wall actors in the 15.5–19.5 s repair window now keep moving at the existing constant inward speed until they pass behind the center (or the next recorded shape transition). The 16–18.75 s regression verifies that no higher-stage wall expires with an outer radius above 50. Two conflicting short-lived source fragments were excluded during open-passage verification. This preserves the original first-stage timeline and the player rotation speeds. The observation fitting remains imperfect. Stage 2 has three video fragments that cannot be placed offscreen with constant-speed entry; stage 5 has one. Stage 6 has one contradictory fragment excluded, plus two speculative lifetime extensions clipped. These exceptions are preserved in each timeline's `repair.discardedSourceActors` and `repair.clippedExtensions` metadata. No special curved or accelerated entrance animation is used. Tests audit all stages at 30 samples per second for fully sealed angular passages; this does not prove a complete playable path or exact visual fidelity.
 
+## First pentagon completed-shape pause (20.45-20.65 seconds)
+
+At stage 1's first 6->5 transition (20.00s), walls now move during the
+0.45-second polygon change, **stop after the pentagon is fully formed**
+for exactly **0.20 seconds**, then descend again from 20.65s. The wall
+clock catches up smoothly over 0.35s and returns to absolute source time
+by 21.00s. Other shape transitions retain their earlier 0.28-second hold
+behavior. The first 0-18s golden frames, reachable pentagon gap, wall IDs,
+collision geometry, controls, UI, sound, and recorded wave data are unchanged.
+
+`first-pentagon-reference.test.cjs` verifies all four ring wall coordinates
+remain stationary through the hold and that they move again afterward.
+`first-pentagon-playable.test.cjs` checks the player still has a
+continuous reachable corridor at the actual rotation speed.
+
 ## 2026-10-27 video-aligned wall timing repair
 
 The earlier wall movement clock accumulated a permanent 0.28-second subtraction
