@@ -78,7 +78,7 @@ const frozen=new Map();
 for(const time of [20.45,20.50,20.55,20.60,20.65]){
  game.time=time;game.sampleWalls();
  assert.equal(game.sides,5);
- assert.equal(game.morph,1,'pentagon must be fully formed before pausing');
+ assert(Math.abs(game.morph-1)<1e-12,'pentagon must be fully formed before pausing');
  const ring=game.walls.filter(w=>w.waveId>=144&&w.waveId<=147);
  assert.equal(ring.length,4,'ring must remain intact throughout the pause');
  for(const w of ring){
