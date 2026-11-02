@@ -7,7 +7,7 @@ const {chromium}=require('playwright');
 const root=process.env.HEXAGON_URL||'http://127.0.0.1:4173/';
 const output=path.join(process.cwd(),'wall-browser-screenshots');
 const keyTimes=[0,5,8,9,10,11,12,15,17,17.99,18,18.01,19,19.99,20,
-  20.10,20.28,20.45,20.50,20.55,20.60,20.65,20.70,20.75,20.85,20.883,20.90,21,21.5,25,26.733,30,40,45,50,55,59];
+  20.10,20.28,20.45,20.50,20.55,20.60,20.65,20.70,20.75,20.85,20.95,21,21.2,21.5,21.8,22.5,20.883,20.90,21,21.5,25,26.733,30,40,45,50,55,59];
 fs.mkdirSync(output,{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
