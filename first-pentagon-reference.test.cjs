@@ -69,8 +69,20 @@ for(const t of [20.45,20.5,20.6,20.65])
   'first pentagon must remain stationary for 0.2s after morph at '+t);
 assert(wallTimelineTime(20.7,recorded.shapeSchedule)>20.45,
  'pentagon must descend again after the post-morph pause');
-assert(Math.abs(wallTimelineTime(21,recorded.shapeSchedule)-21)<1e-9,
- 'first morph pause must not cause permanent wall clock drift');
+assert(Math.abs(wallTimelineTime(21,recorded.shapeSchedule)-20.8)<1e-9,
+ 'the first pentagon must descend at the ORIGINAL speed after unfreezing');
+assert(Math.abs(wallTimelineTime(21.5,recorded.shapeSchedule)-21.3)<1e-9,
+ 'the first pentagon must keep ordinary wall speed through 21.50s');
+assert(Math.abs(wallTimelineTime(22.5,recorded.shapeSchedule)-22.5)<1e-9,
+ 'delayed recovery must restore source-video time before the next wave');
+for(let frame=0;frame<200;frame++){
+ const t=20.65+frame/240;
+ if(t+1/240>21.5)break;
+ const traveled=wallTimelineTime(t+1/240,recorded.shapeSchedule)-
+  wallTimelineTime(t,recorded.shapeSchedule);
+ assert(Math.abs(traveled-1/240)<1e-8,
+  'walls must not accelerate above ordinary speed near the pentagon at '+t);
+}
 
 // The actual rendered wall objects (not just the abstract clock) must remain
 // in exactly the same place throughout the requested completed-pentagon stop.
