@@ -41,7 +41,7 @@ for(let level=0;level<6;level++){
     else high=mid;
    }
    const cutoff=(low+high)/2;
-   if(level===0&&original.id>=144&&original.id<=149)continue; // source waves 148-149 are duplicate first-transition sectors
+   if(level===0&&((original.id>=144&&original.id<=149)||original.id===173||original.id===178))continue; // intentionally corrected stage-1 wall fragments
    if(cutoff-eps>0&&cutoff+eps<raw.duration){
     g.time=cutoff-eps;g.sampleWalls();
     const before=g.walls.find(w=>w.waveId===original.id);

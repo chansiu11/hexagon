@@ -14,7 +14,7 @@ for(const w of data.waves){
  const g=new Game(0,data);
  const repaired=g.timeline.waves.find(v=>v.id===w.id);
  if(!repaired)continue; // rejected contradictory recording, original asset preserved
- if(w.id===148||w.id===149)continue; // intentionally suppressed duplicate reference fragments
+ if([148,149,173,178].includes(w.id))continue; // deliberately suppressed conflicting duplicate fragments
  // Wave births and cutoffs are recorded in wall-motion time, not display
  // time: polygon morphs briefly pause and then catch up that clock.
  const motionAt=t=>w.id>=144&&w.id<=147?
