@@ -53,6 +53,13 @@ const MORPH_SECONDS=.45;
 const WALL_MORPH_HOLD_SECONDS=.28;
 const WALL_MORPH_RECOVERY_SECONDS=.35;
 const FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS=.20;
+// Do not accelerate the incoming pentagon walls as soon as they unfreeze:
+// 0.20s of lag recovered in 0.35s made them rush at 1.57x normal speed
+// exactly while they approached the player's 66px orbit. Keep normal speed
+// until 21.50s, then make up time smoothly between 21.50s and 22.50s,
+// when the first ring has already passed behind the center.
+const FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS=1.50; // since 20.00s morph boundary
+const FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS=1.00;
 function wallTimelineTime(t,schedule){
  if(!Array.isArray(schedule))return t;
  let lag=0;
@@ -68,8 +75,10 @@ function wallTimelineTime(t,schedule){
    const holdEnd=holdStart+FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS;
    if(elapsed<=holdStart)lag=0;
    else if(elapsed<=holdEnd)lag=elapsed-holdStart;
-   else if(elapsed<holdEnd+WALL_MORPH_RECOVERY_SECONDS){
-    const fraction=(elapsed-holdEnd)/WALL_MORPH_RECOVERY_SECONDS;
+   else if(elapsed<=FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS)
+    lag=FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS;
+   else if(elapsed<FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS+FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS){
+    const fraction=(elapsed-FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS)/FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS;
     lag=FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS*(1-fraction);
    }else lag=0;
   }else if(elapsed<=WALL_MORPH_HOLD_SECONDS)lag=elapsed;
@@ -217,6 +226,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
