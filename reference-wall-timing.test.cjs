@@ -31,8 +31,16 @@ for(let level=0;level<6;level++){
    for(const t of [morphEnd,morphEnd+.05,morphEnd+.1,holdEnd])
     assert(Math.abs(wallTimelineTime(t,recorded.shapeSchedule)-morphEnd)<eps,
      'first pentagon must hold still after the completed morph');
-   assert(Math.abs(wallTimelineTime(holdEnd+recovery,recorded.shapeSchedule)-(holdEnd+recovery))<eps,
-    'first pentagon movement must recover without accumulated lag');
+   assert(Math.abs(wallTimelineTime(time+1.5,recorded.shapeSchedule)-(time+1.3))<eps,
+    'first pentagon must descend at natural speed through 21.5s');
+   assert(Math.abs(wallTimelineTime(time+2.5,recorded.shapeSchedule)-(time+2.5))<eps,
+    'pentagon clock must recover only after the ring moves behind the core');
+   for(let t=holdEnd+1/120;t<time+1.5;t+=1/120){
+    const distance=wallTimelineTime(t,recorded.shapeSchedule)-
+     wallTimelineTime(t-1/120,recorded.shapeSchedule);
+    assert(Math.abs(distance-1/120)<eps,
+     'first pentagon must not speed up immediately after 0.2s pause');
+   }
   }else{
    assert(Math.abs(wallTimelineTime(time+.1,recorded.shapeSchedule)-time)<eps);
    assert(Math.abs(wallTimelineTime(time+hold,recorded.shapeSchedule)-time)<eps);
