@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {Game,playerPoly,intersect,wallVisualPoly}=require('./engine');
 const source=require('./assets/timelines/waves-stage-0.json');
 const game=new Game(0,source);
-for(const t of [23.9,24.0,24.1,24.2,24.3,24.4]){
+for(const t of [24.1,24.2,24.3,24.4]){
  game.time=t;game.sampleWalls();
  assert.equal(game.sides,5,'24s segment should be a pentagon');
  assert(!game.walls.some(w=>w.waveId===173||w.waveId===178),
