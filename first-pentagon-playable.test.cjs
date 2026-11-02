@@ -23,7 +23,7 @@ for(const t of checked){
  assert.deepEqual(ring.map(w=>w.toSector),[0,1,2,3]);
 }
 let reachable=Array(SIZE).fill(true),minReach=SIZE;
-for(let frame=18*60;frame<=Math.ceil(21.2*60);frame++){
+for(let frame=18*60;frame<=Math.ceil(26.5*60);frame++){
  const t=frame/60;game.time=t;game.sampleWalls();
  const near=game.walls.filter(w=>w.r<110&&w.r+w.thickness>50)
   .map(w=>wallVisualPoly(w,game.fromSides,game.sides,game.morph));
@@ -49,4 +49,34 @@ for(let frame=18*60;frame<=Math.ceil(21.2*60);frame++){
  assert(count>0,'first pentagon has no reachable escape at '+t.toFixed(3)+'s');
  minReach=Math.min(count,minReach);
 }
-console.log('PASS reachable first pentagon corridor across 18.000-21.200s at 60Hz, min '+minReach+' angles');
+// Stronger than "some heading exists": from the standard bottom-facing
+// player position (270deg) at the exact completed pentagon frame, allow
+// NO movement during the 0.2s stop, then up to 7deg/frame to dodge. The
+// player must still be able to survive the entire first ring.
+let afterMorph=new Uint8Array(SIZE);
+afterMorph[270]=1;
+for(let frame=Math.round(20.45*60);frame<=Math.ceil(21.5*60);frame++){
+ const t=frame/60;game.time=t;game.sampleWalls();
+ const near=game.walls.filter(w=>w.r<110&&w.r+w.thickness>50)
+  .map(w=>wallVisualPoly(w,game.fromSides,game.sides,game.morph));
+ const free=playerPolygons.map(p=>near.every(poly=>!intersect(p,poly)));
+ const next=new Uint8Array(SIZE);
+ const maxTurn=t<=20.65+1e-9?0:7;
+ for(let angle=0;angle<SIZE;angle++){
+  if(!free[angle])continue;
+  for(let delta=-maxTurn;delta<=maxTurn;delta++){
+   const prior=(angle-delta+SIZE)%SIZE;
+   if(!afterMorph[prior])continue;
+   let clear=true;
+   for(let k=0;k<=Math.abs(delta);k++){
+    if(!free[(prior+Math.sign(delta)*k+SIZE)%SIZE]){clear=false;break;}
+   }
+   if(clear){next[angle]=1;break}
+  }
+ }
+ afterMorph=next;
+ assert(afterMorph.some(Boolean),
+  'player starting at 270deg cannot survive 0.2s pentagon stop and resumed walls at '+t.toFixed(3));
+}
+console.log('PASS first-pentagon reachable through 26.5s, minimum '+minReach+'/360 headings');
+console.log('PASS 270deg player can stay still through the full 0.2s pause then escape at 7deg/frame');

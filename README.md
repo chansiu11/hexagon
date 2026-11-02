@@ -62,9 +62,12 @@ A separate, measured-trace continuity correction in the 15.5–19 second window 
 
 At stage 1's first 6->5 transition (20.00s), walls now move during the
 0.45-second polygon change, **stop after the pentagon is fully formed**
-for exactly **0.20 seconds**, then descend again from 20.65s. The wall
-clock catches up smoothly over 0.35s and returns to absolute source time
-by 21.00s. Other shape transitions retain their earlier 0.28-second hold
+for exactly **0.20 seconds**, then descend again from 20.65s **at the normal recorded speed**.
+Previously the 0.20s delay was recovered in just 0.35s, so approaching
+pentagon walls raced toward the player at 1.57x their normal speed.
+The new wall clock resumes at 1.00x speed from 20.65-21.50s, then
+recovers the small delay from 21.50-22.50s (after the first ring clears
+the player's orbit). Other transitions retain their earlier 0.28-second hold
 behavior. The first 0-18s golden frames, reachable pentagon gap, wall IDs,
 collision geometry, controls, UI, sound, and recorded wave data are unchanged.
 
