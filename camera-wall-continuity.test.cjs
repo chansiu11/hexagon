@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {Game,wallVisualPoly,PLAYER_SPEED_BY_LEVEL,wallTimelineTime}=require('./engine');
+const {Game,wallVisualPoly,PLAYER_SPEED_BY_LEVEL,wallTimelineTime,firstPentagonRingWallTime}=require('./engine');
 const {cameraScale,stabilizeCameraScale,MAX_CAMERA_SCALE_RATE}=require('./camera-stability');
 
 const fps=60,dt=1/fps,eps=1e-6;
@@ -41,7 +41,9 @@ for(let level=0;level<6;level++){
     'invalid wall polygon map '+level+' '+time);
    if(prior.has(w.id)){
     const old=prior.get(w.id);
-    const motionDelta=frame?wallTimelineTime(time,source.shapeSchedule)-wallTimelineTime(time-dt,source.shapeSchedule):0;
+    const actorTime=t=>level===0&&w.waveId>=144&&w.waveId<=147?
+     firstPentagonRingWallTime(t,source.shapeSchedule):wallTimelineTime(t,source.shapeSchedule);
+    const motionDelta=frame?actorTime(time)-actorTime(time-dt):0;
     assert(Math.abs((old.r-w.r)-speedById.get(w.waveId)*motionDelta)<1e-4,
      'wall teleported '+w.id+' map '+level+' '+time);
    }else if(frame>0){
@@ -52,8 +54,9 @@ for(let level=0;level<6;level++){
   if(frame>0)for(const [id,w] of prior){
    if(next.has(id))continue;
    // The vanished wave must already be completely behind the center.
-   const clockStep=wallTimelineTime(time,source.shapeSchedule)-
-     wallTimelineTime(time-dt,source.shapeSchedule);
+   const actorTime=t=>level===0&&w.waveId>=144&&w.waveId<=147?
+    firstPentagonRingWallTime(t,source.shapeSchedule):wallTimelineTime(t,source.shapeSchedule);
+   const clockStep=actorTime(time)-actorTime(time-dt);
    // The 0.35s catch-up can advance the physical wave by more than dt.
    assert(w.r+w.thickness<=26+speedById.get(w.waveId)*clockStep+eps,
     'visible wall vanished '+id+' map '+level+' '+time);
