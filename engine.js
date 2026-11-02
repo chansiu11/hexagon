@@ -89,6 +89,23 @@ function wallTimelineTime(t,schedule){
  }
  return Math.max(0,t-lag);
 }
+// Player-facing accessibility adjustment for the FOUR actors making the
+// first stage's initial five-sided ring. After its requested 0.20-second
+// freeze, that ring used to reach the 66px player orbit in ~0.4 seconds.
+// Slowing only these actors to 45% of their former speed provides time to
+// recognize and enter the one available pentagon opening. Other wall actors,
+// the world clock and every later ring retain their original trajectories.
+const FIRST_PENTAGON_RING_APPROACH_SPEED=.45;
+const FIRST_PENTAGON_RING_RESUME_TIME=20+MORPH_SECONDS+FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS;
+function firstPentagonRingWallTime(t,schedule){
+ const original=wallTimelineTime(t,schedule);
+ const first=Array.isArray(schedule)&&schedule.length>=2&&
+  schedule[0][0]===0&&schedule[0][1]===6&&
+  schedule[1][0]===20&&schedule[1][1]===5;
+ if(!first||t<=FIRST_PENTAGON_RING_RESUME_TIME)return original;
+ const resumed=wallTimelineTime(FIRST_PENTAGON_RING_RESUME_TIME,schedule);
+ return resumed+(t-FIRST_PENTAGON_RING_RESUME_TIME)*FIRST_PENTAGON_RING_APPROACH_SPEED;
+}
 function shapeStateAt(t,schedule){
  if(!Array.isArray(schedule)||!schedule.length)return {from:6,to:6,progress:1};
  let index=0;
@@ -169,7 +186,13 @@ class Game{
    this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
    const wallTime=wallTimelineTime(this.time,data.shapeSchedule);
    this.wallMotionTime=wallTime;
-   this.waves=data.waves.filter(w=>wallTime>=w.start&&wallTime<w.end).map(w=>({...w,r:observedWaveRadius(w,wallTime)}));
+   const ringTime=this.level===0?firstPentagonRingWallTime(this.time,data.shapeSchedule):wallTime;
+   const actorClock=w=>this.level===0&&w.id>=144&&w.id<=147?ringTime:wallTime;
+   // Recompute each actor's lifetime from the SAME clock as its radius:
+   // slowing the first ring without this would make it disappear mid-screen.
+   this.waves=data.waves.filter(w=>{
+    const t=actorClock(w);return t>=w.start&&t<w.end;
+   }).map(w=>({...w,r:observedWaveRadius(w,actorClock(w))}));
    // Protect the exact 0-18s timeline. After the four first-ring actors
    // have traveled wholly offscreen, map their sides to a reachable opening.
    // Their IDs, positions, thickness and lifetime never change.
@@ -226,6 +249,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 

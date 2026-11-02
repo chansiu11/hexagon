@@ -2,7 +2,7 @@
 // Check that all six maps replay the SAME measured gameplay video rather
 // than mixing guessed patterns or unrelated random stage generators.
 const assert=require('node:assert/strict');
-const {Game,wallTimelineTime}=require('./engine');
+const {Game,wallTimelineTime,firstPentagonRingWallTime}=require('./engine');
 const VIDEO='5mDjFdetU28';
 let total=0;
 for(let level=0;level<6;level++){
@@ -37,8 +37,10 @@ for(let level=0;level<6;level++){
     assert.equal(w.sides,original.sides,
      'wrong measured polygon sector count on stage '+(level+1));
    }
-   assert(Math.abs(w.r-(original.r-original.speed*(motion-original.start)))<1e-5,
-    'invented wall trajectory on stage '+(level+1)+' at '+t);
+   const actorTime=level===0&&w.waveId>=144&&w.waveId<=147?
+    firstPentagonRingWallTime(t,raw.shapeSchedule):motion;
+   assert(Math.abs(w.r-(original.r-original.speed*(actorTime-original.start)))<1e-5,
+    'wall radius does not match its recorded actor clock on stage '+(level+1)+' at '+t);
    observed++;
   }
   frames++;

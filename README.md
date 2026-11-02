@@ -58,6 +58,23 @@ A separate, measured-trace continuity correction in the 15.5–19 second window 
 
 **17-second wall-disappearance fix:** The previous timeline repair skipped source tracks shorter than 12 samples, causing visible sectors to blink out. All measured wall actors in the 15.5–19.5 s repair window now keep moving at the existing constant inward speed until they pass behind the center (or the next recorded shape transition). The 16–18.75 s regression verifies that no higher-stage wall expires with an outer radius above 50. Two conflicting short-lived source fragments were excluded during open-passage verification. This preserves the original first-stage timeline and the player rotation speeds. The observation fitting remains imperfect. Stage 2 has three video fragments that cannot be placed offscreen with constant-speed entry; stage 5 has one. Stage 6 has one contradictory fragment excluded, plus two speculative lifetime extensions clipped. These exceptions are preserved in each timeline's `repair.discardedSourceActors` and `repair.clippedExtensions` metadata. No special curved or accelerated entrance animation is used. Tests audit all stages at 30 samples per second for fully sealed angular passages; this does not prove a complete playable path or exact visual fidelity.
 
+## First pentagon reaction-time accessibility adjustment (2026-11-02)
+
+The original four first-pentagon actors (IDs 144-147) still complete the
+0.45-second side morph, freeze for exactly 0.20 seconds, and keep the same
+single sector-4 exit. However, the next wall reached the player's 66px orbit
+roughly 0.4 seconds after that hold, requiring a near-instant response.
+
+Those **four walls only** now descend at **45% of the previous approach
+speed after the freeze**. Their radii and lifetimes use the same slowed
+per-actor motion clock, preventing premature popping or teleportation.
+All earlier walls, later waves, stage 1 from 0-18 seconds, all other stages,
+UI, input, player rotation rate, and original wave JSON are unchanged.
+
+The `first-pentagon-playable.test.cjs` regression additionally uses
+`Game.update` with real hitboxes and player lean, testing a player who waits
+0.60 seconds after the freeze before starting to turn into the opening.
+
 ## First pentagon completed-shape pause (20.45-20.65 seconds)
 
 At stage 1's first 6->5 transition (20.00s), walls now move during the
