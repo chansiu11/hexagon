@@ -78,5 +78,34 @@ for(let frame=Math.round(20.45*60);frame<=Math.ceil(21.5*60);frame++){
  assert(afterMorph.some(Boolean),
   'player starting at 270deg cannot survive 0.2s pentagon stop and resumed walls at '+t.toFixed(3));
 }
+// Human-paced integration test, using the real Game.update collision,
+// player lean and 240Hz substep logic, NOT only free static angles.
+// Begin at the normal bottom-facing heading and do not touch the controls
+// until 0.60 seconds AFTER the requested 0.2s wall freeze ends.
+const human=new Game(0,data);
+human.time=20.45;
+human.angle=TAU*270/360;
+human.sampleWalls();
+assert(!human.dead,'player should be safe at the completed first morph');
+const aim=TAU*330/360;
+let sawFirstRing=false,previousRing=new Map();
+for(let f=0;f<Math.ceil((22.55-20.45)*60);f++){
+ const nextTime=20.45+(f+1)/60;
+ const input=nextTime<=21.25?0:human.angle<aim-.03?1:0;
+ human.update(1/60,input);
+ assert(!human.dead,'real 0.6-second reaction path died at '+human.time.toFixed(3)+'s');
+ const visible=human.walls.filter(w=>w.waveId>=144&&w.waveId<=147);
+ for(const w of visible){
+  sawFirstRing=true;
+  const old=previousRing.get(w.id);
+  if(old&&nextTime>20.65&&nextTime<21.5){
+   assert(w.r<old.r,'first pentagon wall must descend after freezing');
+  }
+ }
+ previousRing=new Map(visible.map(w=>[w.id,{r:w.r}]));
+}
+assert(sawFirstRing,'first pentagon was never rendered');
+assert(human.angle>aim-.12,'player did not reach the safe sector');
+console.log('PASS real Game.update player survives a 0.60s late reaction and reaches pentagon gap');
 console.log('PASS first-pentagon reachable through 26.5s, minimum '+minReach+'/360 headings');
 console.log('PASS 270deg player can stay still through the full 0.2s pause then escape at 7deg/frame');
