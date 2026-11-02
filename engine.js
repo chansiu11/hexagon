@@ -203,7 +203,7 @@ class Game{
     // Suppress JUST these duplicate side-2 fragments, preserving side 1+2
     // as one wide connected passage. Draw and collision use this same list.
     // The wall tracks are still present in the unmodified source JSON.
-    if(this.level===0&&(w.id===173||w.id===178))return [];
+    if(this.level===0&&[168,173,175,178].includes(w.id))return [];
     if(firstRing&&w.id>=144&&w.id<=149){
      const baselineSector=firstRing[w.id];
      if(baselineSector===undefined)return []; // duplicate video observations
