@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Game,wallVisualPoly,playerPoly,intersect,wallTimelineTime}=require('./engine');
+const {Game,wallVisualPoly,playerPoly,intersect,wallTimelineTime,firstPentagonRingWallTime}=require('./engine');
 const data=require('./assets/timelines/waves-stage-0.json');
 assert.equal(data.mode,'batched-wall-waves');
 assert(data.waves.some(w=>w.sectors.length>1));
@@ -17,12 +17,14 @@ for(const w of data.waves){
  if(w.id===148||w.id===149)continue; // intentionally suppressed duplicate reference fragments
  // Wave births and cutoffs are recorded in wall-motion time, not display
  // time: polygon morphs briefly pause and then catch up that clock.
+ const motionAt=t=>w.id>=144&&w.id<=147?
+  firstPentagonRingWallTime(t,data.shapeSchedule):wallTimelineTime(t,data.shapeSchedule);
  const motionToDisplay=target=>{
   if(target<=0)return target;
   let low=0,high=data.duration;
   for(let n=0;n<46;n++){
    const mid=(low+high)/2;
-   if(wallTimelineTime(mid,data.shapeSchedule)<target)low=mid;
+   if(motionAt(mid)<target)low=mid;
    else high=mid;
   }
   return high;
@@ -30,7 +32,7 @@ for(const w of data.waves){
  for(const target of [w.start-.000001,w.start,(w.start+w.end)/2,repaired.end-.000001,repaired.end]){
   const time=motionToDisplay(target)+(target>=0?1e-9:0);
   g.time=time;g.sampleWalls();const pieces=g.walls.filter(p=>p.waveId===w.id);
-  const motion=wallTimelineTime(time,data.shapeSchedule);
+  const motion=motionAt(time);
   assert.equal(pieces.length,motion>=w.start&&motion<repaired.end?w.sectors.length:0,'atomic spawn/despawn wave '+w.id+' time '+time+' motion '+motion);
   for(const piece of pieces){assert.equal(piece.r,pieces[0].r);assert.equal(piece.thickness,pieces[0].thickness);}
  }
