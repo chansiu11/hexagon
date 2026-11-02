@@ -109,7 +109,16 @@ game.update(elapsed,Number(right)-Number(left));game.zoom=music.visualZoom(dt);g
 draw();
 if(transition){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=(1-transition.age/.24)**2;ctx.drawImage(transition.snapshot,0,-transition.age*canvas.height*.04);ctx.restore()}
 if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected%3];canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
+async function toggleFullscreen(){
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+  else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();
+  else status.textContent='이 브라우저에서는 전체 화면을 사용할 수 없습니다.';
+ }catch(error){status.textContent='전체 화면 전환을 사용할 수 없습니다.'}
+}
 addEventListener('keydown',e=>{if(e.ctrlKey||e.altKey||e.metaKey)return;
+ // Physical backquote (~) toggles fullscreen regardless of keyboard layout.
+ if(e.code==='Backquote'){e.preventDefault();if(!e.repeat)toggleFullscreen();return;}
  if(['KeyW','KeyS','ArrowUp','ArrowDown'].includes(e.code)&&screen==='play'){
   e.preventDefault();
   if(e.repeat||keys.has(e.code))return;
