@@ -17,4 +17,4 @@ for(const t of [24.1,24.2,24.3,24.4]){
  assert(lane.filter(Boolean).length>=3,
   '24s passage too narrow for a player at '+t+': '+lane);
 }
-console.log('PASS wide first-stage 24s pentagon passage, duplicate wall IDs 173/178 never block the lane');
+console.log('PASS wide first-stage 24s pentagon passage, duplicate wall IDs 168/173/175/178 never block the lane');
