@@ -21,6 +21,12 @@ for(let level=0;level<6;level++){
   assert.equal(new Set(g.walls.map(w=>w.id)).size,g.walls.length,
    'duplicate render ID '+(level+1)+' at '+t);
   for(const w of g.walls){
+   if(level===4&&w.waveId==='stage5-bonus-early'){
+    assert.equal(w.sector,4,'bonus obstacle must leave five directions free');
+    assert.equal(w.sides,6);
+    assert(Math.abs(w.r-(760-320*(t-6.05)))<1e-6);
+    continue; // One explicitly additional, not video-derived, optional obstacle.
+   }
    const original=ids.get(w.waveId);
    assert(original,'wall lacks an original video observation');
    if(level===0&&t>=18&&w.waveId>=144&&w.waveId<=147){

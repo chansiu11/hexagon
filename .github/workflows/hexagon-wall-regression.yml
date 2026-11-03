@@ -30,6 +30,8 @@ jobs:
         run: node pentagon-24s-passage.test.cjs
       - name: Verify open square gap at 32 seconds and reachable player path
         run: node square-32s-passage.test.cjs
+      - name: Verify one simple dodge in the start of stage five
+        run: node stage-five-bonus-early.test.cjs
       - name: Compare video-measured wall radii and morph timing across six stages
         run: node reference-wall-timing.test.cjs
       - name: Ensure all six maps use only the selected original gameplay video
@@ -55,7 +57,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'square-32s-connected-gap-v12'; then exit 0; fi
+              grep -q 'stage5-single-early-dodge-v13'; then exit 0; fi
             sleep 10
           done
           exit 1
