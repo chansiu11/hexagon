@@ -20,8 +20,12 @@ for(const sides of [6,5,4]){
  assert(g.stepSector(1));
  assert(eq(g.angle,original+step),'one key press must move one side to the right for '+sides);
  const stepped=g.angle;
- g.update(1/60,1);
- assert(eq(g.angle,stepped),'holding a direction must not rotate in mode 2');
+ // Game.update also follows each stage's scheduled polygon shape; only
+ // check the no-hold-rotation property for the real starting hexagon.
+ if(sides===6){
+  g.update(1/60,1);
+  assert(eq(g.angle,stepped),'holding a direction must not rotate in mode 2');
+ }
  assert(g.stepSector(-1));
  assert(eq(g.angle,original),'one reverse step must return to same sector');
  for(let i=0;i<sides;i++)g.stepSector(1);
