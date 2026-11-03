@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify free rotation and one-sector-per-keypress modes
+        run: node control-modes.test.cjs
       - name: Audit 0-60 second wall actors and camera for all six stages
         run: node camera-wall-continuity.test.cjs
       - name: Audit polygon morph and escape passages
@@ -56,12 +58,14 @@ jobs:
           exit 1
       - name: Validate rendered wall pixels on every map
         run: node browser-wall-visual.test.cjs
+      - name: Verify control-mode UI, hotkeys and separate records in Chromium
+        run: node browser-control-modes.test.cjs
       - name: Wait for updated GitHub Pages content
         if: github.event_name == 'push'
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'stage5-remove-30s-side-pair-v15'; then exit 0; fi
+              grep -q 'two-control-modes-v16'; then exit 0; fi
             sleep 10
           done
           exit 1
