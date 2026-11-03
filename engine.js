@@ -218,8 +218,18 @@ class Game{
     // from consecutive traces, sealing a human-reachable exit. Keep 0 and 3,
     // and leave a contiguous two-sector passage. Filter by stable wall ID
     // and sector (NOT display time), so a visible wall never pops at 31.5/33.5.
-    return w.sectors.filter(sector=>!(this.level===0&&w.id>=239&&w.id<=264&&
-      (sector===1||sector===2))).map(sector=>({
+    return w.sectors.filter(sector=>{
+     if(this.level===0&&w.id>=239&&w.id<=264&&(sector===1||sector===2))return false;
+     // Stage 5, from the wall group that reaches the player around 30s:
+     // adjacent sector-2/3 walls from successive recording fragments
+     // force a turn faster than the player's 7deg/frame maximum (~35s).
+     // Keep one CONNECTED two-sector escape throughout all later waves.
+     // Actor-ID-based filtering affects visuals and collision identically,
+     // never switches sectors as walls cross the player's orbit and leaves
+     // stages 1–4, 6 and stage 5's opening entirely unchanged.
+     if(this.level===4&&w.id>=300&&(sector===2||sector===3))return false;
+     return true;
+    }).map(sector=>({
      id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
      r:w.r,thickness:w.thickness
     }));
