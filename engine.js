@@ -214,7 +214,12 @@ class Game{
       sides:handedOff?w.sides:6,r:w.r,thickness:w.thickness,
       ...(handedOff?{fromSector:passageSector,toSector:passageSector}:{})}];
     }
-    return w.sectors.map(sector=>({
+    // The 32s square-ring recording (IDs 239–264) overlays sectors 1 and 2
+    // from consecutive traces, sealing a human-reachable exit. Keep 0 and 3,
+    // and leave a contiguous two-sector passage. Filter by stable wall ID
+    // and sector (NOT display time), so a visible wall never pops at 31.5/33.5.
+    return w.sectors.filter(sector=>!(this.level===0&&w.id>=239&&w.id<=264&&
+      (sector===1||sector===2))).map(sector=>({
      id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
      r:w.r,thickness:w.thickness
     }));
