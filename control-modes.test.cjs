@@ -7,7 +7,7 @@ const eq=(a,b)=>Math.abs((((a-b+Math.PI)%TAU)+TAU)%TAU-Math.PI)<1e-9;
 const old=new Game();
 assert.equal(old.controlMode,1,'default movement must remain original mode 1');
 old.update(1/60,1);
-assert(Math.abs(old.angle-(-Math.PI/2+PLAYER_SPEED/60))<1e-8,
+assert(eq(old.angle,-Math.PI/2+PLAYER_SPEED/60),
  'mode 1 continuous turn must remain unchanged');
 
 for(const sides of [6,5,4]){
