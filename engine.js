@@ -272,7 +272,10 @@ class Game{
  stepSector(direction){
   if(this.controlMode!==2||this.dead||this.timelineEnded||!direction)return false;
   const sides=Math.max(3,this.sides||6),step=TAU/sides;
-  const current=Math.round(wrap(this.angle)/step-.5);
+  // After snapping, derive the containing sector rather than rounding a
+  // half-integer: floating-point ties at pentagon/square centers can jump
+  // by TWO cells when changing direction.
+  const current=Math.floor(wrap(this.angle)/step+1e-9);
   this.angle=wrap((current+.5+Math.sign(direction))*step);
   this.playerLean=0;
   // Collision is still evaluated by the shared Game.update substep,
