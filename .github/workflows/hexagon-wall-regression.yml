@@ -61,7 +61,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'stage5-30s-reachable-v14'; then exit 0; fi
+              grep -q 'stage5-remove-30s-side-pair-v15'; then exit 0; fi
             sleep 10
           done
           exit 1
