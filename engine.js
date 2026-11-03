@@ -224,6 +224,16 @@ class Game{
      r:w.r,thickness:w.thickness
     }));
    });
+   // One simple bonus dodge in stage 5's early quiet section. One sector
+   // only; the other five directions remain open. Born beyond the viewport,
+   // moving continuously into the hidden core, without modifying video data.
+   if(this.level===4&&this.time>=6.05){
+    const r=760-320*(this.time-6.05),thickness=36;
+    if(r+thickness>26)this.walls.push({
+     id:'stage5-bonus-early:4',waveId:'stage5-bonus-early',
+     sector:4,sides:6,r,thickness
+    });
+   }
   }else this.walls=data.walls.filter(w=>this.time>=w.start&&this.time<w.end).map(w=>({...w,r:w.r-w.speed*(this.time-w.start)}));
   return;
  }
