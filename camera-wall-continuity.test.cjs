@@ -14,6 +14,7 @@ for(let level=0;level<6;level++){
  const source=require('./assets/timelines/waves-stage-'+level+'.json');
  const g=new Game(level,source);
  const speedById=new Map(g.timeline.waves.map(w=>[w.id,w.speed]));
+ if(level===4)speedById.set('stage5-bonus-early',320);
  let prior=new Map(),priorCamera=null,actors=0,exits=0,zoomCorrections=0;
  for(let frame=0;frame<source.duration*fps;frame++){
   const time=frame/fps;
