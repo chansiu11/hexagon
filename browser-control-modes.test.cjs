@@ -47,9 +47,13 @@ const {chromium}=require('playwright');
   // Pressing 1 in the middle of play must reset run and isolate scores.
   await page.evaluate(()=>{game.time=8;recordsMode2[0]=19.5;records[0]=12.34;save()});
   await page.keyboard.press('Digit1');
-  assert.deepEqual(await page.evaluate(()=>({
+  const switched=await page.evaluate(()=>({
    mode:settings.controlMode,time:game.time,old:records[0],second:recordsMode2[0]
-  })),{mode:1,time:0,old:12.34,second:19.5});
+  }));
+  assert.equal(switched.mode,1);
+  assert(switched.time<.2,'switch must restart the active run without transferring time');
+  assert.equal(switched.old,12.34);
+  assert.equal(switched.second,19.5);
   await page.reload();
   await page.waitForFunction(()=>window.HexEngine?.Game&&typeof setControlMode==='function');
   assert.deepEqual(await page.evaluate(()=>({mode:settings.controlMode,old:records[0],second:recordsMode2[0]})),
