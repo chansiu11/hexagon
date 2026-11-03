@@ -204,6 +204,10 @@ class Game{
     // as one wide connected passage. Draw and collision use this same list.
     // The wall tracks are still present in the unmodified source JSON.
     if(this.level===0&&[168,173,175,178].includes(w.id))return [];
+    // Stage 5 around 30.5s: remove only the two staggered flank walls
+    // (source IDs 304 in sector 0, 307 in sector 4). Stable actor IDs
+    // ensure no time-triggered flicker; render and hitboxes stay identical.
+    if(this.level===4&&(w.id===304||w.id===307))return [];
     if(firstRing&&w.id>=144&&w.id<=149){
      const baselineSector=firstRing[w.id];
      if(baselineSector===undefined)return []; // duplicate video observations
