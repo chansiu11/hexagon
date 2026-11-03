@@ -204,6 +204,11 @@ class Game{
     // as one wide connected passage. Draw and collision use this same list.
     // The wall tracks are still present in the unmodified source JSON.
     if(this.level===0&&[168,173,175,178].includes(w.id))return [];
+    // 32s four-sided corridor: the traced video fragments overlap into a
+    // sealed/near-unreachable ring. Preserve two adjacent escape sectors
+    // through 31.5–33.5s, without altering wall speed or other stages.
+    if(this.level===0&&this.time>=31.5&&this.time<=33.5&&
+      w.sectors?.some(s=>s===1||s===2))return [];
     if(firstRing&&w.id>=144&&w.id<=149){
      const baselineSector=firstRing[w.id];
      if(baselineSector===undefined)return []; // duplicate video observations
