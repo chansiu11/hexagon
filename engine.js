@@ -204,11 +204,6 @@ class Game{
     // as one wide connected passage. Draw and collision use this same list.
     // The wall tracks are still present in the unmodified source JSON.
     if(this.level===0&&[168,173,175,178].includes(w.id))return [];
-    // 32s four-sided corridor: the traced video fragments overlap into a
-    // sealed/near-unreachable ring. Preserve two adjacent escape sectors
-    // through 31.5–33.5s, without altering wall speed or other stages.
-    if(this.level===0&&this.time>=31.5&&this.time<=33.5&&
-      w.sectors?.some(s=>s===1||s===2))return [];
     if(firstRing&&w.id>=144&&w.id<=149){
      const baselineSector=firstRing[w.id];
      if(baselineSector===undefined)return []; // duplicate video observations
@@ -219,7 +214,12 @@ class Game{
       sides:handedOff?w.sides:6,r:w.r,thickness:w.thickness,
       ...(handedOff?{fromSector:passageSector,toSector:passageSector}:{})}];
     }
-    return w.sectors.map(sector=>({
+    // The 32s square-ring recording (IDs 239–264) overlays sectors 1 and 2
+    // from consecutive traces, sealing a human-reachable exit. Keep 0 and 3,
+    // and leave a contiguous two-sector passage. Filter by stable wall ID
+    // and sector (NOT display time), so a visible wall never pops at 31.5/33.5.
+    return w.sectors.filter(sector=>!(this.level===0&&w.id>=239&&w.id<=264&&
+      (sector===1||sector===2))).map(sector=>({
      id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
      r:w.r,thickness:w.thickness
     }));
