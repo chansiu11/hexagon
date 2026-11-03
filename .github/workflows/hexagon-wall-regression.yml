@@ -34,6 +34,8 @@ jobs:
         run: node stage-five-bonus-early.test.cjs
       - name: Ensure late stage-five wall passages remain reachable at real turning speed
         run: node stage-five-30s-reachable.test.cjs
+      - name: Verify only two staggered side walls are removed around 30 seconds of stage five
+        run: node stage-five-30s-remove-side-pair.test.cjs
       - name: Compare video-measured wall radii and morph timing across six stages
         run: node reference-wall-timing.test.cjs
       - name: Ensure all six maps use only the selected original gameplay video
