@@ -58,6 +58,8 @@ jobs:
           exit 1
       - name: Validate rendered wall pixels on every map
         run: node browser-wall-visual.test.cjs
+      - name: Verify control-mode UI, hotkeys and separate records in Chromium
+        run: node browser-control-modes.test.cjs
       - name: Wait for updated GitHub Pages content
         if: github.event_name == 'push'
         run: |
