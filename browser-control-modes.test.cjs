@@ -38,12 +38,13 @@ const {chromium}=require('playwright');
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(110);
   const next=await page.evaluate(()=>game.angle);
-  assert(Math.abs(next-first-Math.PI/3)<1e-6,'mode 2 must turn exactly one sector');
+  const angularError=(a,b)=>Math.abs(((a-b+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI);
+  assert(angularError(next,first+Math.PI/3)<1e-6,'mode 2 must turn exactly one sector');
   await page.waitForTimeout(110);
   assert.equal(await page.evaluate(()=>game.angle),next,'holding arrow must never step repeatedly');
   await page.keyboard.up('ArrowRight');
   await page.keyboard.press('ArrowLeft');
-  assert(Math.abs(await page.evaluate(()=>game.angle)-first)<1e-6);
+  assert(angularError(await page.evaluate(()=>game.angle),first)<1e-6);
   // Pressing 1 in the middle of play must reset run and isolate scores.
   await page.evaluate(()=>{game.time=8;recordsMode2[0]=19.5;records[0]=12.34;save()});
   await page.keyboard.press('Digit1');
