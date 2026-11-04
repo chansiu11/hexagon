@@ -65,7 +65,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'held-two-step-v18'; then exit 0; fi
+              grep -q 'one-shot-two-step-v19'; then exit 0; fi
             sleep 10
           done
           exit 1
