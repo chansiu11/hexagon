@@ -95,60 +95,58 @@ function drawBackdrop(game,dark,light,playing){
 function drawSectorStepEffect(g,color){
  const fx=g.stepEffect;
  if(!fx||g.controlMode!==2||!settings.motion)return;
- const u=Math.min(1,fx.age/fx.duration);
- const fade=(1-u)*(1-u),radius=66;
- const from=fx.from,arc=fx.direction*fx.count*2*Math.PI/Math.max(3,g.sides);
- ctx.save();
- // Two or three fading triangle silhouettes make the direction of travel
- // legible even when the actual character moves instantly.
- for(const fraction of [.18,.40,.67]){
-  const a=from+arc*fraction,weight=fade*(1-fraction)*.65;
-  ctx.globalAlpha=weight;
+ const u=Math.min(1,fx.age/fx.duration),fade=(1-u)*(1-u);
+ const span=fx.direction*fx.count*Math.PI*2/Math.max(3,g.sides);
+ const head=ease(Math.min(1,u*2.2));
+ ctx.save();ctx.lineCap='round';
+ // A short luminous ribbon FOLLOWING the traveling silhouette, not
+ // three stationary triangles appearing abruptly across the whole path.
+ for(let i=0;i<10;i++){
+  const back=i/10,position=Math.max(0,head-back*.34);
+  const a=fx.from+span*position;
+  ctx.globalAlpha=fade*(1-back)*.39;
   polygon(playerPoly(a),color);
  }
- // A short bright arc and a moving highlight on the player's orbit.
- ctx.globalAlpha=.70*fade;
- ctx.strokeStyle='#fff';ctx.lineWidth=fx.count===2?5:3.6;
- ctx.lineCap='round';ctx.beginPath();
- ctx.arc(0,0,radius,from,from+arc*ease(Math.min(1,u*3)),fx.direction<0);
- ctx.stroke();
- const x=Math.cos(fx.to)*radius,y=Math.sin(fx.to)*radius;
- ctx.globalAlpha=fade*.8;
- ctx.strokeStyle=color;ctx.lineWidth=2.6;
- ctx.beginPath();ctx.arc(x,y,7+18*u,0,Math.PI*2);ctx.stroke();
- // Distinct two-pulse flash for the empowered double-sector jump.
- for(let i=0;i<fx.count;i++){
-  const age=(u-i*.17)*2.5;
-  if(age<0||age>1)continue;
-  ctx.globalAlpha=(1-age)*.65;
-  ctx.beginPath();ctx.arc(x,y,10+age*24,0,Math.PI*2);ctx.stroke();
+ ctx.beginPath();ctx.arc(0,0,66,fx.from+span*Math.max(0,head-.35),fx.from+span*head,fx.direction<0);
+ ctx.strokeStyle='#fff';ctx.lineWidth=2.6;ctx.globalAlpha=fade*.60;ctx.stroke();
+ const x=Math.cos(fx.to)*66,y=Math.sin(fx.to)*66;
+ const pulse=Math.max(0,(u-.18)/.82);
+ ctx.globalAlpha=(1-pulse)*.48;
+ ctx.strokeStyle='#fff';ctx.lineWidth=2;
+ ctx.beginPath();ctx.arc(x,y,6+18*ease(pulse),0,Math.PI*2);ctx.stroke();
+ if(fx.count===2){
+  ctx.globalAlpha=fade*.52;
+  ctx.strokeStyle=color;ctx.lineWidth=2.3;
+  ctx.beginPath();ctx.arc(0,0,76,fx.from,fx.from+span*head,fx.direction<0);ctx.stroke();
  }
  ctx.restore();
 }
-
 function drawTeleportEffect(g,color){
  const warp=g.teleport;
- if(!warp||!settings.motion)return;
- const u=Math.min(1,warp.age/warp.duration),fade=(1-u)*(1-u);
- ctx.save();
- // White triangular echo remains at the former position; the real player
- // has already arrived at the opposite side and can collide there.
- ctx.globalAlpha=fade*.65;
- polygon(playerPoly(warp.from,g.playerLean),'#fff');
- // Two opposing, short-lived circular traces convey a rapid 180° swap.
- ctx.strokeStyle='#fff';ctx.lineWidth=3.1*(1-u)+.5;
+ if(!warp||g.controlMode!==1||!settings.motion)return;
+ const u=Math.min(1,warp.age/warp.duration),fade=(1-u)*(1-u),R=66;
+ ctx.save();ctx.lineCap='round';
+ // The real player already completed the snap. Sweep a luminous echo
+ // across its entire 180-degree route to communicate the distance.
  for(const sign of [-1,1]){
-  ctx.save();ctx.globalAlpha=fade*(sign===1?.62:.3);
-  ctx.beginPath();
-  ctx.arc(0,0,66,warp.from,warp.from+sign*Math.PI*Math.min(1,u*5),sign<0);
-  ctx.stroke();ctx.restore();
+  const sweep=Math.PI*ease(Math.min(1,u*2.6));
+  ctx.beginPath();ctx.arc(0,0,R,warp.from,warp.from+sign*sweep,sign<0);
+  ctx.globalAlpha=fade*(sign===1?.73:.22);
+  ctx.lineWidth=sign===1?5:2;ctx.strokeStyle='#fff';ctx.stroke();
  }
- const x=Math.cos(g.angle)*66,y=Math.sin(g.angle)*66;
- ctx.globalAlpha=.75*fade;
- ctx.strokeStyle='#fff';ctx.lineWidth=2.7;
- ctx.beginPath();ctx.arc(x,y,7+u*19,0,Math.PI*2);ctx.stroke();
- ctx.globalAlpha=.46*fade;
- polygon(playerPoly(g.angle,g.playerLean),color,'#fff',2);
+ for(let i=0;i<8;i++){
+  const phase=Math.max(0,Math.min(1,u*2.5-i*.07));
+  const a=warp.from+Math.PI*phase;
+  ctx.globalAlpha=(1-i/8)*fade*.36;
+  polygon(playerPoly(a),color);
+ }
+ // Start-point flash, then a brighter expanding landing shockwave.
+ for(const [a,mult] of [[warp.from,.55],[warp.to,1]]){
+  const x=Math.cos(a)*R,y=Math.sin(a)*R;
+  ctx.strokeStyle='#fff';ctx.globalAlpha=fade*mult*.9;ctx.lineWidth=2.4;
+  ctx.beginPath();ctx.arc(x,y,9+u*23,0,Math.PI*2);ctx.stroke();
+ }
+ ctx.globalAlpha=fade*.65;polygon(playerPoly(warp.from),'#fff');
  ctx.restore();
 }
 
