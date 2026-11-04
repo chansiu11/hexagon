@@ -18,6 +18,8 @@ jobs:
           node-version: '22'
       - name: Verify free rotation and one-sector-per-keypress modes
         run: node control-modes.test.cjs
+      - name: Verify the random seventh level has fair playable wall sequences
+        run: node random-level.test.cjs
       - name: Audit 0-60 second wall actors and camera for all six stages
         run: node camera-wall-continuity.test.cjs
       - name: Audit polygon morph and escape passages
@@ -60,12 +62,14 @@ jobs:
         run: node browser-wall-visual.test.cjs
       - name: Verify control-mode UI, hotkeys and separate records in Chromium
         run: node browser-control-modes.test.cjs
+      - name: Verify random-level navigation, replay variety and records in Chromium
+        run: node browser-random-level.test.cjs
       - name: Wait for updated GitHub Pages content
         if: github.event_name == 'push'
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'one-shot-two-step-v19'; then exit 0; fi
+              grep -q 'random-seventh-level-v20'; then exit 0; fi
             sleep 10
           done
           exit 1
