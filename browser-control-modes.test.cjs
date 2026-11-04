@@ -45,40 +45,36 @@ const {chromium}=require('playwright');
   await page.keyboard.up('ArrowRight');
   await page.keyboard.press('ArrowLeft');
   assert(angularError(await page.evaluate(()=>game.angle),first)<1e-6);
-  // W held is a modifier, not an immediate 180-degree teleport.
-  await page.keyboard.down('KeyW');
-  const held=await page.evaluate(()=>({angle:game.angle,active:game.doubleStepHeld,teleport:!!game.teleport}));
-  assert(held.active,'holding W must enable the two-sector modifier');
-  assert(!held.teleport,'mode 2 must NOT flip 180 degrees');
-  assert(angularError(held.angle,first)<1e-6,'holding modifier alone must not move the player');
+  // A short press arms one next two-sector move, without any teleport.
+  await page.keyboard.press('KeyW');
+  const armed=await page.evaluate(()=>({angle:game.angle,ready:game.doubleStepReady,teleport:!!game.teleport}));
+  assert.equal(armed.ready,true,'W press must arm one double step');
+  assert.equal(armed.teleport,false,'mode two must not teleport');
+  assert(angularError(armed.angle,first)<1e-6,'arming must not move');
   await page.keyboard.press('ArrowRight');
-  const firstTwo=await page.evaluate(()=>({angle:game.angle,count:game.stepEffect?.count}));
-  assert(angularError(firstTwo.angle,held.angle+2*Math.PI/3)<1e-6);
-  assert.equal(firstTwo.count,2);
+  const doubled=await page.evaluate(()=>({angle:game.angle,ready:game.doubleStepReady,count:game.stepEffect?.count}));
+  assert(angularError(doubled.angle,armed.angle+2*Math.PI/3)<1e-6);
+  assert.equal(doubled.count,2);
+  assert.equal(doubled.ready,false,'bonus must be consumed after one direction');
   await page.keyboard.press('ArrowRight');
-  const secondTwo=await page.evaluate(()=>({angle:game.angle,count:game.stepEffect?.count}));
-  assert(angularError(secondTwo.angle,firstTwo.angle+2*Math.PI/3)<1e-6,
-   'EVERY direction press while held must move two cells');
-  assert.equal(secondTwo.count,2);
-  await page.keyboard.up('KeyW');
-  assert.equal(await page.evaluate(()=>game.doubleStepHeld),false);
-  await page.keyboard.press('ArrowLeft');
   const normal=await page.evaluate(()=>({angle:game.angle,count:game.stepEffect?.count}));
-  assert(angularError(normal.angle,secondTwo.angle-Math.PI/3)<1e-6,
-   'after release, movement must immediately return to one sector');
+  assert(angularError(normal.angle,doubled.angle+Math.PI/3)<1e-6,'second press is one sector');
   assert.equal(normal.count,1);
-  await page.evaluate(()=>{game.stepEffect.age=.05;draw()});
-  // Mobile button also acts as a hold-only modifier; mouse simulates touch.
-  const holdButton=page.locator('#controls button').filter({hasText:'2 STEPS'});
-  assert.equal(await holdButton.count(),1);
-  const bounds=await holdButton.boundingBox();
-  await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);
-  await page.mouse.down();
-  assert.equal(await page.evaluate(()=>game.doubleStepHeld),true);
-  await page.evaluate(()=>game.stepSector(1));
-  assert.equal(await page.evaluate(()=>game.stepEffect?.count),2);
-  await page.mouse.up();
-  assert.equal(await page.evaluate(()=>game.doubleStepHeld),false);
+  // Tap the onscreen button, release, THEN turn: still exactly one double step.
+  const button=page.locator('#controls button').filter({hasText:'2 STEPS'});
+  assert.equal(await button.count(),1);
+  await button.click();
+  await page.waitForFunction(()=>game.doubleStepReady===true);
+  const afterTap=await page.evaluate(()=>game.angle);
+  assert(angularError(afterTap,normal.angle)<1e-6,'button tap must not move');
+  await page.keyboard.press('ArrowLeft');
+  const afterDouble=await page.evaluate(()=>({angle:game.angle,ready:game.doubleStepReady,count:game.stepEffect?.count}));
+  assert(angularError(afterDouble.angle,afterTap-2*Math.PI/3)<1e-6);
+  assert.equal(afterDouble.ready,false);
+  assert.equal(afterDouble.count,2);
+  await page.keyboard.press('ArrowLeft');
+  assert(angularError(await page.evaluate(()=>game.angle),afterDouble.angle-Math.PI/3)<1e-6);
+  await page.evaluate(()=>{if(game.stepEffect){game.stepEffect.age=.05;draw()}});
   // Pressing 1 in the middle of play must reset run and isolate scores.
   await page.evaluate(()=>{game.time=8;recordsMode2[0]=19.5;records[0]=12.34;save()});
   await page.keyboard.press('Digit1');
