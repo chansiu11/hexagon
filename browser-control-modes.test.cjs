@@ -32,7 +32,7 @@ const {chromium}=require('playwright');
   // Simulate a live run, then ensure one press = one side, not a hold.
   await page.evaluate(()=>{
    selected=0;game=new HexEngine.Game(0);game.setControlMode(2);
-   screen='play';settings.sound=false;game.angle=-Math.PI/2;
+   screen='play';settings.sound=false;game.angle=-Math.PI/2;buildControls();
   });
   const first=await page.evaluate(()=>game.angle);
   await page.keyboard.down('ArrowRight');
