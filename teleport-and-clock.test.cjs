@@ -8,11 +8,11 @@ for(let level=0;level<6;level++){
  assert(Math.abs(g.angle-wrap(original+PI))<1e-10,'flip must be exactly 180 degrees');
  assert.equal(g.teleport.from,original);
  assert.equal(g.teleport.to,g.angle);
- assert.equal(g.teleport.duration,.18);
+ assert.equal(g.teleport.duration,.30);
  assert(!g.teleportHalfTurn(),'repeated keydown cannot bypass short effect');
  g.update(.10,0);
  assert(g.teleport&&g.teleport.age>0,'afterimage is time-driven');
- g.update(.1,0);
+ g.update(.21,0);
  assert.equal(g.teleport,null,'afterimage expires');
  assert(g.teleportHalfTurn(),'another press after cooldown must work');
  assert(Math.abs(g.angle-wrap(original))<1e-10,'double flip restores angle');
