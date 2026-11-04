@@ -65,7 +65,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'two-control-modes-v16'; then exit 0; fi
+              grep -q 'step-doubleflip-v17'; then exit 0; fi
             sleep 10
           done
           exit 1
