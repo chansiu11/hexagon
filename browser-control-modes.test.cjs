@@ -45,6 +45,34 @@ const {chromium}=require('playwright');
   await page.keyboard.up('ArrowRight');
   await page.keyboard.press('ArrowLeft');
   assert(angularError(await page.evaluate(()=>game.angle),first)<1e-6);
+  // W / Up triggers the original 180 flip and arms exactly the NEXT
+  // horizontal turn for two sectors; the following turn is one sector.
+  await page.keyboard.press('KeyW');
+  const flipped=await page.evaluate(()=>({
+   angle:game.angle,ready:game.doubleStepReady,teleport:!!game.teleport
+  }));
+  assert.equal(flipped.ready,true,'180 button should arm double step');
+  assert(flipped.teleport,'180 button should keep visual flip');
+  assert(angularError(flipped.angle,first+Math.PI)<1e-6,'180 press should teleport');
+  await page.keyboard.press('ArrowRight');
+  const boosted=await page.evaluate(()=>({
+   angle:game.angle,ready:game.doubleStepReady,count:game.stepEffect?.count
+  }));
+  assert(angularError(boosted.angle,flipped.angle+2*Math.PI/3)<1e-6,
+   'first right press after 180 must move TWO sectors');
+  assert.equal(boosted.ready,false);
+  assert.equal(boosted.count,2,'double step must leave a stronger movement echo');
+  await page.keyboard.press('ArrowLeft');
+  const normal=await page.evaluate(()=>({
+   angle:game.angle,count:game.stepEffect?.count
+  }));
+  assert(angularError(normal.angle,boosted.angle-Math.PI/3)<1e-6,
+   'double-step effect must be consumed and normal movement restored');
+  assert.equal(normal.count,1);
+  await page.evaluate(()=>{game.stepEffect.age=.05;draw()});
+  // The mobile 180° action must be visible in mode two as well.
+  assert(await page.locator('#controls button').filter({hasText:'180°'}).count()===1,
+   'mode-two gameplay must have exactly one visible/mobile 180° button');
   // Pressing 1 in the middle of play must reset run and isolate scores.
   await page.evaluate(()=>{game.time=8;recordsMode2[0]=19.5;records[0]=12.34;save()});
   await page.keyboard.press('Digit1');
