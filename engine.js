@@ -170,7 +170,7 @@ const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
 // outgoing hexagon openings 4+5 merge into pentagon opening 4.
 const FIRST_PENTAGON_REACHABLE_SECTORS=Object.freeze({144:0,145:1,146:2,147:3});
 class Game{
- constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false}
+ constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepHeld=false}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
@@ -263,13 +263,17 @@ class Game{
  // sector centers stay aligned when stage geometry changes.
  setControlMode(mode){
   this.controlMode=mode===2?2:1;
-  this.doubleStepReady=false;
+  this.doubleStepHeld=false;
   this.stepEffect=null;
   if(this.controlMode===2){
    const sides=Math.max(3,this.sides||6),step=TAU/sides;
    this.angle=wrap((Math.round(this.angle/step-.5)+.5)*step);
    this.playerLean=0;
   }
+ }
+ setDoubleStepHeld(held){
+  this.doubleStepHeld=this.controlMode===2&&held===true&&!this.dead&&!this.timelineEnded;
+  return this.doubleStepHeld;
  }
  stepSector(direction){
   if(this.controlMode!==2||this.dead||this.timelineEnded||!direction)return false;
@@ -279,8 +283,9 @@ class Game{
   // by TWO cells when changing direction.
   const current=Math.floor(wrap(this.angle)/step+1e-9);
   const from=this.angle;
-  const count=this.doubleStepReady?2:1;
-  this.doubleStepReady=false; // One 180-degree action empowers ONE subsequent turn.
+  // Modifier: EACH distinct direction press is two sectors WHILE held.
+  // Release it and the very next press is one sector again.
+  const count=this.doubleStepHeld?2:1;
   const to=wrap((current+.5+Math.sign(direction)*count)*step);
   this.angle=to;
   this.playerLean=0;
@@ -292,15 +297,11 @@ class Game{
  // The player changes position instantly; only the decorative trail animates.
  // The short cooldown rejects held-key auto-repeat and accidental double inputs.
  teleportHalfTurn(){
-  if(this.dead||this.timelineEnded||this.teleportCooldown>0)return false;
+  if(this.controlMode===2||this.dead||this.timelineEnded||this.teleportCooldown>0)return false;
   const from=this.angle,to=wrap(from+Math.PI);
   this.angle=to;
-  this.teleport={from,to,age:0,duration:.18};
+  this.teleport={from,to,age:0,duration:.30};
   this.teleportCooldown=.18;
-  if(this.controlMode===2){
-   this.doubleStepReady=true;
-   this.stepEffect=null;
-  }
   const player=playerPoly(this.angle,this.playerLean);
   if(this.walls.some(w=>w.points?polygonOverlap(player,w.points,w.holes):
     intersect(player,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,
