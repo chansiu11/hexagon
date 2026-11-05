@@ -59,6 +59,7 @@ for(const seed of seeds){
   const game=new Game(6,data);
   game.setControlMode(mode);
   let index=0,changed=0,spinAt10=0,spinAt50=0,tiltMaxEarly=0,tiltMaxLate=0;
+  let spinEarly=0,spinLate=0,earlyFrames=0,lateFrames=0;
   for(let frame=0;frame<60*60;frame++){
    const dt=1/60;
    while(index<data.waves.length-1&&game.time>data.waves[index].impact+.35)index++;
@@ -79,6 +80,8 @@ for(const seed of seeds){
    assert(game.walls.every(w=>w.sides>=4&&w.sides<=6),
     'new polygon walls stay intact through shape morphs');
    if(game.time<10)tiltMaxEarly=Math.max(tiltMaxEarly,Math.abs(game.tilt));
+   if(game.time>2&&game.time<9){spinEarly+=Math.abs(game.rotationSpeed);earlyFrames++}
+   if(game.time>48&&game.time<58){spinLate+=Math.abs(game.rotationSpeed);lateFrames++}
    if(game.time>48)tiltMaxLate=Math.max(tiltMaxLate,Math.abs(game.tilt));
    if(Math.abs(game.time-10)<1/90)spinAt10=Math.abs(game.rotationSpeed);
    if(Math.abs(game.time-50)<1/90)spinAt50=Math.abs(game.rotationSpeed);
@@ -87,6 +90,8 @@ for(const seed of seeds){
   assert.equal(tiltMaxEarly,0,'random level tilt cannot begin before 10s');
   assert(tiltMaxLate>.08,'screen must visibly tilt after 10s');
   assert(spinAt50>0,'camera rotation must remain active late');
+  assert(spinLate/lateFrames>spinEarly/earlyFrames*1.7,
+   'rotation must become substantially stronger late in each random attempt');
   if(mode===2)assert(changed>8,'mode-two inputs must be needed repeatedly');
  }
  // The renderer/collision polygon for every actor must use its original
