@@ -160,7 +160,10 @@ if(screen==='play'){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touc
  let elapsed=dt;
  if(music.active&&music.context?.state==='running'&&Math.abs(music.position-game.time)>.22)
   music.play(selected,game.time);
-game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);game.zoom=music.visualZoom(dt);game.referenceCamera=gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
+game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);game.zoom=music.visualZoom(dt);// The random stage has its own growing rotation and post-10s tilt.
+ // Its identity placeholder camera must not suppress the animated view.
+ game.referenceCamera=selected===6?null:
+  gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
 draw();
 if(transition){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=(1-transition.age/.24)**2;ctx.drawImage(transition.snapshot,0,-transition.age*canvas.height*.04);ctx.restore()}
 if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected%3];canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.controlMode=String(settings.controlMode);canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
@@ -228,7 +231,11 @@ function drawWallField(walls,color,game){
    }
    ctx.fill('evenodd');
   }else{
-   const points=wallVisualPoly(w,game.fromSides,game.sides,game.morph);
+   // Generated random waves keep their own polygon sectors for their entire
+   // descent. Only the central core morphs, so actors never visibly jump.
+   const random=game.level===6&&game.timeline?.kind==='procedural-random';
+   const points=wallVisualPoly(w,random?w.sides:game.fromSides,
+    random?w.sides:game.sides,random?1:game.morph);
    points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
    ctx.closePath();
    ctx.fill();
