@@ -1,11 +1,13 @@
 'use strict';
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {chromium}=require('playwright');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
  try{
   const page=await browser.newPage({viewport:{width:960,height:600}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{const raf=requestAnimationFrame;window.requestAnimationFrame=fn=>raf(t=>{if(!window.__freezeAudit)fn(t)})});
   await page.goto(process.env.HEXAGON_URL||'http://127.0.0.1:4173/',{waitUntil:'load'});
   await page.waitForFunction(()=>window.HexRandomWaves?.create&&window.HexEngine?.levels?.length===7);
   // A save from the previous six-stage version must migrate in both modes.
@@ -75,6 +77,19 @@ const {chromium}=require('playwright');
   assert.deepEqual([visuals.morph.from,visuals.morph.to],[6,5]);
   assert(visuals.morph.progress>0&&visuals.morph.progress<1);
   assert.deepEqual(visuals.shapes.map(v=>v[2]),[6,5,5,6,4,5]);
+  // Capture the actual canvas through the scheduled transitions in Chromium.
+  fs.mkdirSync('wall-browser-screenshots',{recursive:true});
+  for(const t of [9.8,10.2,12.2,27.2,42.2,45.183,53.2,58]){
+   await page.evaluate(t=>{
+    window.__freezeAudit=true;transition=null;launch=null;flash=0;
+    selected=6;settings.motion=true;settings.sound=false;screen='play';
+    game=new HexEngine.Game(6,HexRandomWaves.create(1));
+    for(let i=0;i<Math.floor(t*60);i++){game.dead=false;game.update(1/60,0)}
+    game.dead=false;game.time=t;game.sampleWalls();game.referenceCamera=null;
+    screen='play';draw();
+   },t);
+   await page.screenshot({path:'wall-browser-screenshots/random-'+t+'.png'});
+  }
   assert.deepEqual(errors,[],'no runtime browser errors');
   console.log('PASS random seventh-stage menu/selection, new layout each attempt, real canvas walls and persistent mode-specific records');
  }finally{await browser.close()}

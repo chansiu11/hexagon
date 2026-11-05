@@ -6,9 +6,23 @@ const {Game,levels,shapeStateAt,wallVisualPoly,playerPoly,intersect}=require('./
 const {create,SPAWN_RADIUS,SHAPE_SCHEDULE,atTime}=require('./random-waves');
 const TAU=Math.PI*2,wrap=a=>(a%TAU+TAU)%TAU;
 const delta=(from,to)=>((to-from+Math.PI+TAU)%TAU)-Math.PI;
-const seeds=[1,2,7,19,42,77,108,2026,123456,0xdeadbeef];
+const seeds=[...new Set([1,2,7,19,42,77,108,2026,123456,0xdeadbeef,
+ ...Array.from({length:94},(_,i)=>i+3)])];
 assert.equal(levels.length,7);
 assert.equal(levels[6][0],'RANDOM HEXAGON');
+// A half-turn must test the same rigid wall polygon that is drawn, even
+// while the core has a different side count or is in the middle of a morph.
+for(const time of [12.2,27.2,42.2,45.183,53.2]){
+ const data=create(1),g=new Game(6,data);g.time=time;g.sampleWalls();
+ for(let sector=0;sector<12;sector++){
+  const probe=new Game(6,data);probe.time=time;probe.sampleWalls();
+  probe.angle=sector*TAU/12;
+  const landing=wrap(probe.angle+Math.PI),p=playerPoly(landing);
+  const expected=probe.walls.some(w=>intersect(p,wallVisualPoly(w,w.sides,w.sides,1)));
+  probe.teleportHalfTurn();assert.equal(probe.dead,expected,
+   'teleport collision must match the displayed random wall at '+time);
+ }
+}
 let narrow=0,wide=0,bestWaveCount=Infinity,fastest=0;
 for(const seed of seeds){
  const data=create(seed),copy=create(seed);
@@ -50,6 +64,12 @@ for(const seed of seeds){
     'reachable safe sector may drift only locally');
    assert(w.impact-prev.impact>=1.05,
     'wall rhythm must still leave time for real player input');
+   const clearAt=prev.impact+(66+prev.thickness-59)/prev.speed;
+   const entersAt=w.impact-(73/Math.cos(Math.PI/w.sides)-66)/w.speed;
+   const turn=Math.abs(delta(oldCenter,newCenter));
+   assert(entersAt-clearAt>=.25+Math.max(turn/(420*TAU/360),
+    Math.ceil(turn/(TAU/w.sides)-1e-9)*.18)-1e-9,
+    'real hitbox clearance must allow reaction, continuous travel and spaced key presses');
    assert(w.start>prev.start);
   }
   assert(Math.abs(w.end-Math.min(60,w.start+(w.r+w.thickness-26)/w.speed))<1e-9,
@@ -58,6 +78,7 @@ for(const seed of seeds){
  for(const mode of [1,2]){
   const game=new Game(6,data);
   game.setControlMode(mode);
+  let nextPress=0;
   let index=0,changed=0,spinAt10=0,spinAt50=0,tiltMaxEarly=0,tiltMaxLate=0;
   let spinEarly=0,spinLate=0,earlyFrames=0,lateFrames=0;
   for(let frame=0;frame<60*60;frame++){
@@ -72,7 +93,7 @@ for(const seed of seeds){
     const desired=wave.safeSector;
     const fwd=(desired-current+game.sides)%game.sides;
     const back=(current-desired+game.sides)%game.sides;
-    if(fwd||back){changed++;game.stepSector(fwd<=back?1:-1)}
+    if((fwd||back)&&game.time>=nextPress){changed++;game.stepSector(fwd<=back?1:-1);nextPress=game.time+.18}
     game.update(dt,0);
    }
    assert(!game.dead,'random level must be survivable for seed '+seed+
@@ -110,4 +131,4 @@ assert(narrow>65,'need frequent demanding one-lane gaps');
 assert(wide>2,'need occasional brief wide breathing intervals');
 assert(fastest>345,'late-game speed must be noticeably higher');
 assert.notDeepEqual(create(1).waves,create(2).waves);
-console.log('PASS harder random stage: '+bestWaveCount+'+ rings, 4/5/6-sided morphs, growing spin/tilt and playable 60s paths for 10 seeds in both modes');
+console.log('PASS harder random stage: '+bestWaveCount+'+ rings, 4/5/6-sided morphs, growing spin/tilt and playable 60s paths for '+seeds.length+' seeds in both modes');

@@ -17,7 +17,7 @@ const wrap=(a,n)=>(a%n+n)%n;
 function create(seed){
  const actualSeed=Number.isFinite(seed)?seed>>>0:(Math.random()*4294967296)>>>0;
  const random=makeRng(actualSeed),waves=[],schedule=SHAPE_SCHEDULE.map(entry=>[...entry]);
- let impact=3.6,index=0,safeSector=4,previousSides=6;
+ let impact=3.6,index=0,safeSector=4,previousSides=6,easyRun=0;
  while(impact<59.35){
   // Change the *core* shape at the scheduled time, and reserve a readable
   // interval on both sides of each morph. New-shaped actors never spawn
@@ -32,18 +32,39 @@ function create(seed){
    const move=random();
    safeSector=wrap(safeSector+(move<.39?-1:move<.78?1:0),sides);
   }
+  if(index>0&&previousSides!==sides){
+   // Mapping to a new polygon can add half a sector before the random
+   // turn. Do not combine that remap with a second, far-away opening.
+   const oldCenter=(waves[index-1].safeSector+.5)*TAU/previousSides;
+   const turn=Math.abs(wrap((safeSector+.5)*step-oldCenter+Math.PI,TAU)-Math.PI);
+   if(turn>=1.9)safeSector=Math.floor(wrap(oldCenter,TAU)/step);
+  }
   previousSides=sides;
   // Sharply more demanding than v1: ~40% narrow one-side gaps late,
   // denser arrivals, and few three-side breathing patterns.
   const type=random(),difficulty=Math.min(1,impact/56);
   const narrowChance=index<3?0:.30+.15*difficulty;
-  const openings=type<narrowChance?1:type<narrowChance+.055?3:2;
+  const openings=easyRun>=3?1:type<narrowChance?1:type<narrowChance+.055?3:2;
+  easyRun=openings===1?0:easyRun+1;
   const open=new Set([safeSector]);
   if(openings===2)open.add(wrap(safeSector+(random()<.5?-1:1),sides));
   if(openings===3){open.add(wrap(safeSector-1,sides));open.add(wrap(safeSector+1,sides))}
   const sectors=Array.from({length:sides},(_,i)=>i).filter(i=>!open.has(i));
   const speed=296+Math.min(48,impact*.77)+random()*18;
   const thickness=40+Math.floor(random()*14);
+  if(waves.length){
+   const previous=waves[waves.length-1];
+   const oldCenter=(previous.safeSector+.5)*TAU/previous.sides;
+   const turn=Math.abs(wrap((safeSector+.5)*step-oldCenter+Math.PI,TAU)-Math.PI);
+   // The triangle is inside the [59,73] radial band. Wait until the
+   // previous ring is wholly inside it, allow human input plus travel at
+   // the actual 420deg/s turn rate, and finish before the next polygon's
+   // apothem enters that band. Discrete presses get 180ms each as well.
+   const clearAt=previous.impact+(66+previous.thickness-59)/previous.speed;
+   const approach=(73/Math.cos(Math.PI/sides)-66)/speed;
+   const travel=Math.max(turn/(420*TAU/360),Math.ceil(turn/step-1e-9)*.18);
+   impact=Math.max(impact,clearAt+.25+travel+approach);
+  }
   const start=impact-(SPAWN_RADIUS-66)/speed;
   const end=Math.min(DURATION,start+(SPAWN_RADIUS+thickness-26)/speed);
   waves.push({id:index,start,end,r:SPAWN_RADIUS,speed,thickness,
