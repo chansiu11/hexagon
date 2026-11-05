@@ -170,7 +170,7 @@ const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
 // outgoing hexagon openings 4+5 merge into pentagon opening 4.
 const FIRST_PENTAGON_REACHABLE_SECTORS=Object.freeze({144:0,145:1,146:2,147:3});
 class Game{
- constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false}
+ constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false;this.randomAlignedSides=6}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170,145][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
@@ -181,6 +181,14 @@ class Game{
   // Generated stages preserve each moving wall's own geometry while the
   // central polygon smoothly morphs. No wall changes sectors mid-flight.
   const shape=shapeStateAt(this.time,data.shapeSchedule);
+  if(this.controlMode===2&&this.randomAlignedSides!==shape.to){
+   // A new polygon defines NEW sectors. Keep discrete steering in the
+   // center of its current sector, not on a new boundary (which would
+   // graze the very first wall after morphing).
+   const step=TAU/shape.to;
+   this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);
+  }
+  this.randomAlignedSides=shape.to;
   this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
   this.wallFrame=Math.min(data.duration*data.sampleRate,Math.floor(this.time*data.sampleRate));
   this.recordedCamera=null;
@@ -280,6 +288,7 @@ class Game{
   this.controlMode=mode===2?2:1;
   this.doubleStepReady=false;
   this.stepEffect=null;
+  this.randomAlignedSides=this.sides;
   if(this.controlMode===2){
    const sides=Math.max(3,this.sides||6),step=TAU/sides;
    this.angle=wrap((Math.round(this.angle/step-.5)+.5)*step);
