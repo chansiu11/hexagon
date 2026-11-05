@@ -2,7 +2,7 @@
    polygon shapes, and deterministic (per-seed) camera spin targets. No original
    stage timelines or assets are modified. */
 (function(root){'use strict';
-const SAMPLE_RATE=60,DURATION=60,SPAWN_RADIUS=735,TAU=Math.PI*2;
+const SAMPLE_RATE=60,DURATION=60,SPAWN_RADIUS=835,TAU=Math.PI*2;
 const SHAPE_SCHEDULE=Object.freeze([[0,6],[12,5],[27,6],[42,4],[53,5]]);
 function makeRng(seed){
  let state=(seed>>>0)||0x9e3779b9;
@@ -23,7 +23,7 @@ function create(seed){
   // interval on both sides of each morph. New-shaped actors never spawn
   // before the corresponding core has started its transformation.
   for(const [boundary] of schedule.slice(1))
-   if(impact>boundary-.80&&impact<boundary+2.65)impact=boundary+2.65;
+   if(impact>boundary-.80&&impact<boundary+3.2)impact=boundary+3.2;
   if(impact>=59.35)break;
   const sides=atTime(impact,schedule),step=TAU/sides;
   if(index>0){
