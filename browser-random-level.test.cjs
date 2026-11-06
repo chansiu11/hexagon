@@ -30,7 +30,7 @@ const {chromium}=require('playwright');
   });
   assert.equal(starts.screen,'play');
   assert.equal(starts.level,6);
-  assert.equal(starts.kind,'normal-pattern');
+  assert.equal(starts.kind,'mixed-pattern');
   assert(starts.waves>=20);
   await page.evaluate(()=>{
    game.time=2;
@@ -43,48 +43,56 @@ const {chromium}=require('playwright');
    return {screen,seed:game.timeline.seed,layout:game.timeline.waves.map(w=>[w.id,w.start,w.sides,w.sectors])};
   });
   assert.equal(retry.screen,'play');
-  assert.deepEqual(retry.layout,starts.layout,'normal wall order must be fixed on retry');
+  assert.notDeepEqual(retry.layout,starts.layout,'retry must remix existing patterns');
   await page.evaluate(()=>{
    records[6]=17.65;recordsMode2[6]=22.5;save();
    setControlMode(2);
   });
   const m2=await page.evaluate(()=>({mode:settings.controlMode,level:game.level,
    kind:game.timeline.kind,one:records[6],two:recordsMode2[6]}));
-  assert.deepEqual(m2,{mode:2,level:6,kind:'normal-pattern',one:17.65,two:22.5});
+  assert.deepEqual(m2,{mode:2,level:6,kind:'mixed-pattern',one:17.65,two:22.5});
   await page.reload();await page.waitForFunction(()=>window.HexRandomWaves?.create);
   assert.deepEqual(await page.evaluate(()=>({mode:settings.controlMode,one:records[6],two:recordsMode2[6]})),
    {mode:2,one:17.65,two:22.5});
-  // A reload clears the normal source cache; use the real async loader.
-  await page.evaluate(async()=>{await loadTimeline(6)});
-  // Real canvas: verify the seventh stage uses the animated camera rather
-  // than the old identity reference transform, and that the core morphs.
   const visuals=await page.evaluate(()=>{
-   selected=6;settings.motion=true;screen='play';
-   game=new HexEngine.Game(6,HexRandomWaves.create(77));
-   game.time=20.2;game.sampleWalls();
+   selected=6;settings.motion=true;screen='play';transition=null;launch=null;flash=0;
+   const data=HexRandomWaves.create(77);
+   game=new HexEngine.Game(6,data);
+   const initialTilt=game.tilt;
+   game.time=data.shapeSchedule[1][0]+.2;game.sampleWalls();
    const morph={from:game.fromSides,to:game.sides,progress:game.morph};
    game.referenceCamera=null;game.rotation=0;game.tilt=0;game.zoom=1;
    draw();const original=document.querySelector('#game').toDataURL();
-   game.rotation=1.1;game.tilt=.25;draw();
+   game.musicRotation=1.1;game.musicMotion={shakeX:3,shakeY:-2};draw();
    const moved=document.querySelector('#game').toDataURL();
+   const matrices={};
+   const wall=drawWallField,core=drawCore,player=HexEngine.playerPoly;
+   drawWallField=function(...args){matrices.walls=Array.from(ctx.getTransform().toFloat64Array());return wall(...args)};
+   drawCore=function(...args){matrices.core=Array.from(ctx.getTransform().toFloat64Array());return core(...args)};
+   // The lexical playerPoly is immutable; capture its actual final fill by
+   // wrapping polygon only for the triangle matching the player's vertices.
+   const poly=polygon;
+   polygon=function(points,...args){if(points.length===3&&points.every(([x,y])=>Math.hypot(x,y)<85))matrices.player=Array.from(ctx.getTransform().toFloat64Array());return poly(points,...args)};
+   draw();drawWallField=wall;drawCore=core;polygon=poly;
    const shapes=[];
-   for(const t of [9.8,20.2,20.8,26.95,36.4,43.2,49.9,55.5]){
-    game.time=t;game.sampleWalls();
-    shapes.push([t,game.fromSides,game.sides,game.morph]);
-    draw();
+   for(const[at,n]of data.shapeSchedule.slice(1)){
+    game.time=at+.2;game.sampleWalls();shapes.push([game.sides,n,game.morph]);
    }
-   return {different:original!==moved,morph,shapes};
+   return {different:original!==moved,morph,expected:data.shapeSchedule[1][1],initialTilt,matrices,shapes};
   });
-  assert(visuals.different,'random-level camera rotation and tilt must visibly affect canvas');
-  assert.deepEqual([visuals.morph.from,visuals.morph.to],[6,5]);
+  assert(visuals.different,'music camera shake and rotation must visibly affect canvas');
+  assert(Math.abs(visuals.initialTilt)>.06,'random initial tilt must be present on the first frame');
+  assert.deepEqual([visuals.morph.from,visuals.morph.to],[6,visuals.expected]);
   assert(visuals.morph.progress>0&&visuals.morph.progress<1);
-  assert.deepEqual(visuals.shapes.map(v=>v[2]),[6,5,5,4,5,4,5,6]);
+  assert(visuals.shapes.every(v=>v[0]===v[1]&&v[2]>0&&v[2]<1));
+  assert.deepEqual(visuals.matrices.walls,visuals.matrices.core,'walls and core must share one camera transform');
+  assert.deepEqual(visuals.matrices.walls,visuals.matrices.player,'player must share the wall camera transform');
   // Decode and play every actual bundled song through the stage-seven path.
   const audioPaths=new Set();page.on('request',r=>{if(r.url().includes('/music/'))audioPaths.add(r.url().split('/').pop())});
   await page.evaluate(()=>{selected=6;game=new HexEngine.Game(6,HexRandomWaves.create(1));screen='play'});
   await page.locator('#game').click({position:{x:480,y:300}});
   const songs=await page.evaluate(async()=>{
-   screen='paused';await music.unlock();
+   screen='paused';music.setEnabled(true);await music.unlock();
    const representatives=new Map();
    for(let seed=1;seed<=100;seed++){const d=HexRandomWaves.create(seed);representatives.set(d.musicTrack.index,d)}
    const rows=[];
@@ -101,21 +109,28 @@ const {chromium}=require('playwright');
   assert(songs.every(s=>s.duration>60&&s.bpm>=130));
   await page.waitForFunction(()=>music.source&&music.level===6&&music.position>=7.5);
   assert.deepEqual(songs.map(s=>s.key).sort(),['courtesy','focus','otis']);
+  for(const index of [0,1,2]){
+   await page.evaluate(index=>{music.randomTrackIndex=index;music.play(6,7.5)},index);
+   await page.waitForFunction(()=>{if(!music.source)return false;music.visualZoom(1/60);return music.motionFeatures().energy>.01});
+   const features=await page.evaluate(()=>music.motionFeatures());
+   assert(features.active&&features.energy>.01&&Number.isFinite(features.brightness),'live MP3 samples must drive musical motion');
+  }
   await page.evaluate(()=>music.stop());
   // Capture the actual canvas through the scheduled transitions in Chromium.
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
-  for(const t of [9.8,10.2,20.2,26.95,36.4,43.2,50.8,55.5,58]){
+  const captureTimes=await page.evaluate(()=>[.05,3,...HexRandomWaves.create(1).shapeSchedule.slice(1).map(([t])=>t+.2),58]);
+  for(const t of captureTimes){
    await page.evaluate(t=>{
     window.__freezeAudit=true;transition=null;launch=null;flash=0;
     selected=6;settings.motion=true;settings.sound=false;screen='play';
     game=new HexEngine.Game(6,HexRandomWaves.create(1));
-    for(let i=0;i<Math.floor(t*60);i++){game.dead=false;game.update(1/60,0)}
+    for(let i=0;i<Math.floor(t*60);i++){const before=game.rotation;game.dead=false;game.update(1/60,0);HexMusicMotion.apply(game,1/60,game.rotation-before,{active:true,energy:.15,bass:.08,brightness:.5,pulse:Math.exp(-((game.time*game.timeline.musicTrack.bpm/60)%1)*9)},true)}
     game.dead=false;game.time=t;game.sampleWalls();game.referenceCamera=null;
     screen='play';draw();
    },t);
    await page.screenshot({path:'wall-browser-screenshots/random-'+t+'.png'});
   }
   assert.deepEqual(errors,[],'no runtime browser errors');
-  console.log('PASS random seventh-stage menu/selection, fixed normal patterns and random music, real canvas walls and persistent mode-specific records');
+  console.log('PASS random seventh-stage menu/selection, mixed normal patterns, safe random morphs and music-reactive camera, real canvas walls and persistent mode-specific records');
  }finally{await browser.close()}
 })().catch(err=>{console.error(err);process.exitCode=1});
