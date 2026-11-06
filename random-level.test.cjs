@@ -30,30 +30,32 @@ for(let seed=1;seed<=100;seed++)for(const trackIndex of [0,1,2]){
   assert.equal(w.sides,R.atTime(w.impact,data.shapeSchedule));
   const beat=(w.impact-data.musicTrack.phase)/(30/data.musicTrack.bpm);
   assert(Math.abs(beat-Math.round(beat))<1e-8,'every gate arrival must align to music eighth notes');
-  for(const[at]of data.shapeSchedule.slice(1))assert(w.impact<=at-.85+1e-8||w.impact>=at+1.05-1e-8,'reserve a physically clear shape-change interval');
-  assert(Math.abs(w.end-Math.min(Transition.clockAt(60,data.shapeSchedule),w.start+(w.r+w.thickness-26)/w.speed))<1e-8,'actors expire only behind the core');
+  for(const[at]of data.shapeSchedule.slice(1))assert(w.impact<at||w.impact>=at+.85-1e-8,'impacts skip only the actual hold/restart, never a pre-morph warning gap');
+  assert(Math.abs(w.end-Math.min(Transition.clockAt(60,data.shapeSchedule),w.start+(w.r+w.thickness+w.outerExtra-26)/w.speed))<1e-8,'actors expire only behind the core');
   if(prev){
    const turn=Math.abs(delta((prev.safeSector+.5)*T/prev.sides,(w.safeSector+.5)*T/w.sides));
-   const clear=prev.impact+(66+prev.thickness-59)/prev.speed;
-   const enters=w.impact-(73/Math.cos(Math.PI/w.sides)-66)/w.speed;
+   const clear=Transition.timeAtClock(Transition.clockAt(prev.impact,data.shapeSchedule)+(66+prev.thickness+prev.outerExtra-59)/prev.speed,data.shapeSchedule);
+   const enters=Transition.timeAtClock(Transition.clockAt(w.impact,data.shapeSchedule)-(73/Math.cos(Math.PI/4)-66+w.innerExtra)/w.speed,data.shapeSchedule);
    assert(enters-clear>=.20+Math.max(turn/(420*T/360),Math.ceil(turn/(T/w.sides)-1e-9)*.18)-1e-8,'real turning speed, reaction and spaced discrete presses must fit');
   }
  }
+ const clearTimes=data.waves.map(w=>Transition.timeAtClock(Transition.clockAt(w.impact,data.shapeSchedule)+(66+w.thickness+w.outerExtra-59)/w.speed,data.shapeSchedule));
  for(const mode of [1,2,3]){
   const game=new Game(6,data);game.setControlMode(mode);
   assert.notEqual(game.tilt,0);
   let index=0,nextPress=0,priorTilt=game.tilt,changes=0;
   for(let frame=0;frame<3600;frame++){
-   while(index<data.waves.length-1&&game.time>data.waves[index].impact+.27)index++;
-   const wave=data.waves[index],target=(wave.safeSector+.5)*T/wave.sides;
+   while(index<data.waves.length-1&&game.time>clearTimes[index]+.02)index++;
+   const wave=data.waves[index],target=game.sectorAngle(wave.safeSector,wave.sides);
+   const landing=Array.from({length:game.sides},(_,s)=>s).sort((a,b)=>Math.abs(delta(game.sectorAngle(a),target))-Math.abs(delta(game.sectorAngle(b),target)))[0];
    if(mode===1){const d=delta(game.angle,target);game.update(1/60,Math.max(-1,Math.min(1,d/(game.playerSpeed/60))))}
    else if(mode===3){
-    if(game.sides===wave.sides&&game.time>=nextPress){game.selectSector(wave.safeSector);nextPress=game.time+.18;changes++}
+    if(game.time>=nextPress){game.selectSector(landing);nextPress=game.time+.18;changes++}
     game.update(1/60,0);
    }else{
-    if(game.sides===wave.sides&&game.time>=nextPress){
-     const current=Math.floor(wrap(game.angle)/(T/game.sides)+1e-9);
-     const forward=(wave.safeSector-current+game.sides)%game.sides,back=(current-wave.safeSector+game.sides)%game.sides;
+    if(game.time>=nextPress){
+     const current=game.currentSector();
+     const forward=(landing-current+game.sides)%game.sides,back=(current-landing+game.sides)%game.sides;
      if(forward||back){game.stepSector(forward<=back?1:-1);nextPress=game.time+.18;changes++}
     }
     game.update(1/60,0);
@@ -62,7 +64,7 @@ for(let seed=1;seed<=100;seed++)for(const trackIndex of [0,1,2]){
    assert(Math.abs(game.tilt-priorTilt)<.03,'random tilt must change continuously');priorTilt=game.tilt;
    assert(Math.abs(game.tilt)<.4);
    if(frame%2===0&&game.morph<1){
-    const free=Array.from({length:game.sides},(_,s)=>playerPoly((s+.5)*T/game.sides))
+    const free=Array.from({length:game.sides},(_,s)=>playerPoly(game.sectorAngle(s)))
      .filter(p=>game.walls.every(w=>!intersect(p,wallVisualPoly(w,game.fromSides,game.sides,game.morph))));
     assert(free.length>=1,'a real discrete landing must remain open throughout each morph');
    }

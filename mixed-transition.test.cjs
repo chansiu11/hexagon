@@ -41,7 +41,7 @@ for(let seed of [1,7,19,42,77]){
    }
    for(let j=1;j<g.walls.length;j++){
     const a=g.walls[j-1],b=g.walls[j];
-    if(a.waveId===b.waveId&&a.mixedEnd===b.mixedStart){
+    if(a.waveId===b.waveId&&a.band===b.band&&a.mixedEnd===b.mixedStart){
      assert.deepEqual(a.renderPoly[1],b.renderPoly[0],'shared inner boundary must stay welded');
      assert.deepEqual(a.renderPoly[2],b.renderPoly[3],'shared outer boundary must stay welded');
     }
