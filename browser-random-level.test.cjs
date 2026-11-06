@@ -54,6 +54,8 @@ const {chromium}=require('playwright');
   await page.reload();await page.waitForFunction(()=>window.HexRandomWaves?.create);
   assert.deepEqual(await page.evaluate(()=>({mode:settings.controlMode,one:records[6],two:recordsMode2[6]})),
    {mode:2,one:17.65,two:22.5});
+  // A reload clears the normal source cache; use the real async loader.
+  await page.evaluate(async()=>{await loadTimeline(6)});
   // Real canvas: verify the seventh stage uses the animated camera rather
   // than the old identity reference transform, and that the core morphs.
   const visuals=await page.evaluate(()=>{
