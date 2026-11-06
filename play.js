@@ -46,9 +46,19 @@ async function loadTimeline(level){
 async function start(){
  if(starting)return;if(!unlocked(selected)){beep(110,.2);return}
  starting=true;const level=selected,origin=screen;status.textContent='게임 데이터를 불러오는 중입니다.';
- try{const timeline=await loadTimeline(level);if(level!==selected||screen!==origin)return;
+ try{
+ const audioReady=settings.sound?music.unlock():Promise.resolve();
+ const [timeline]=await Promise.all([loadTimeline(level),audioReady]);
+ if(level!==selected||screen!==origin)return;
+ if(level===6)music.randomTrackIndex=timeline.musicTrack.index;
+ if(settings.sound){
+  status.textContent='음악을 준비하는 중입니다.';
+  await music.load(level);
+  if(level!==selected||screen!==origin)return;
+ }
+
  game=new Game(level,timeline);if(level===6)music.randomTrackIndex=timeline.musicTrack.index;game.setControlMode(settings.controlMode);game.sampleWalls();unlockedNow=false;paused=false;flash=0;change('play');beep(550,.1);
- }catch(error){status.textContent='게임 데이터를 불러오지 못했습니다. 다시 시작해 주세요.';console.error(error);}
+ }catch(error){status.textContent='게임 또는 음악을 불러오지 못했습니다. 다시 시작해 주세요.';console.error(error);}
  finally{starting=false;}
 }
 function confirm(){if(screen==='title')change(['select','options','credits'][menuItem]);else if(screen==='select')start();else if(screen==='over')start();else if(screen==='paused')change('play');else if(screen==='complete')change('over');else if(screen==='quit')change('title');else if(screen==='options'){const targets=[...controls.querySelectorAll('button')];targets[optionIndex]?.click()}}
@@ -170,8 +180,8 @@ if(screen==='scores'){header('','ESC - RETURN');text('HIGH SCORES - MODE '+setti
 if(screen==='credits'){header('','ESC - RETURN');text('CREDITS',480,105,50);text('ORIGINAL GAME',480,205,21,'#aaa');text('TERRY CAVANAGH',480,250,32);text('ORIGINAL MUSIC - CHIPZEL',480,320,22);text('UNOFFICIAL WEB RECREATION',480,410,22);text('MUSIC BY CHIPZEL',480,455,17,'#aaa')}
 if(screen==='quit'){text('THANKS FOR PLAYING',480,210,40);text('CLOSE THIS TAB TO EXIT',480,300,23);panel('RETURN TO MENU',435,400)}if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash*.5})`;ctx.fillRect(0,0,960,600)}ctx.restore()}
 function resize(){const dpr=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;scale=Math.min(innerWidth/960,innerHeight/600);ox=(innerWidth-960*scale)/2;oy=(innerHeight-600*scale)/2;buildControls();draw()}
-function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;clock+=dt;uiAge+=dt;pressAge+=dt;hoverAmount+=(Number(!!hovered)-hoverAmount)*(1-Math.exp(-dt*16));updatePalette(dt);if(pendingAction){pendingAction.left-=dt;if(pendingAction.left<=0){const fn=pendingAction.fn;pendingAction=null;fn()}}if(launch&&screen==='play'){launch.age+=dt;if(launch.age>=launch.duration)launch=null}if(settings.motion)spin+=dt*.18;selectionSlide=Math.max(0,selectionSlide-dt*5);flash=Math.max(0,flash-dt*3);if(transition){transition.age+=dt;if(transition.age>=.24)transition=null}
-if(screen==='play'){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touches.values()].includes(-1),right=keys.has('ArrowRight')||keys.has('KeyD')||[...touches.values()].includes(1);
+function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;clock+=dt;uiAge+=dt;pressAge+=dt;hoverAmount+=(Number(!!hovered)-hoverAmount)*(1-Math.exp(-dt*16));updatePalette(dt);if(pendingAction){pendingAction.left-=dt;if(pendingAction.left<=0){const fn=pendingAction.fn;pendingAction=null;fn()}}if(launch&&screen==='play'&&(!settings.sound||music.source&&music.context?.state==='running')){launch.age+=dt;if(launch.age>=launch.duration)launch=null}if(settings.motion)spin+=dt*.18;selectionSlide=Math.max(0,selectionSlide-dt*5);flash=Math.max(0,flash-dt*3);if(transition){transition.age+=dt;if(transition.age>=.24)transition=null}
+if(screen==='play'&&(!settings.sound||music.source&&music.context?.state==='running')){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touches.values()].includes(-1),right=keys.has('ArrowRight')||keys.has('KeyD')||[...touches.values()].includes(1);
 // Gameplay owns the steady timebase. Never pause/jump wall movement to
  // follow fluctuating audio playback latency. Only the sound transport seeks.
  let elapsed=dt;

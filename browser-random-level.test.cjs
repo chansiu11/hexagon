@@ -128,6 +128,35 @@ const {chromium}=require('playwright');
    assert(features.active&&features.energy>.01&&Number.isFinite(features.brightness),'live MP3 samples must drive musical motion');
   }
   await page.evaluate(()=>music.stop());
+  // A slow first song must keep the run at zero until real audio is ready.
+  const delayedTrack=await page.evaluate(()=>{
+   window.__savedTimelineLoader=loadTimeline;
+   loadTimeline=async()=>HexRandomWaves.create(77);
+   const d=HexRandomWaves.create(77);music.buffers.delete(d.musicTrack.key);
+   selected=6;screen='select';settings.sound=true;settings.motion=false;music.stop();
+   return d.musicTrack.key;
+  });
+  let releaseDownload,requestStarted;
+  const blocked=new Promise(resolve=>{requestStarted=resolve});
+  const release=new Promise(resolve=>{releaseDownload=resolve});
+  const songRoute='**/assets/music/'+delayedTrack+'.mp3';
+  await page.route(songRoute,async route=>{requestStarted();await release;await route.continue()});
+  await page.evaluate(()=>{window.__delayedStart=start()});
+  await blocked;
+  const before=await page.evaluate(()=>({screen,starting,time:game.time,loaded:!!music.source}));
+  await page.waitForTimeout(650);
+  const during=await page.evaluate(()=>({screen,starting,time:game.time,loaded:!!music.source}));
+  assert.deepEqual(during,before,'loading cannot enter gameplay or advance game time');
+  assert.equal(during.screen,'select');assert(during.starting&&!during.loaded);
+  releaseDownload();
+  const ready=await page.evaluate(async()=>{
+   await window.__delayedStart;await Promise.resolve();
+   return {screen,time:game.time,position:music.position,loaded:!!music.source,state:music.context.state};
+  });
+  assert.equal(ready.screen,'play');assert.equal(ready.time,0);
+  assert(ready.loaded&&ready.state==='running'&&ready.position<.1,'audio is running from its opening when gameplay begins');
+  await page.unroute(songRoute);
+  await page.evaluate(()=>{loadTimeline=window.__savedTimelineLoader;settings.sound=false;music.stop()});
   // Capture the actual canvas through the scheduled transitions in Chromium.
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
   const captureTimes=await page.evaluate(()=>{const d=HexRandomWaves.create(1),at=d.shapeSchedule[1][0];return [...new Set([.05,3,at+.01,at+.325,at+.649,at+.74,...d.shapeSchedule.slice(1).map(([t])=>t+.2),58])].sort((a,b)=>a-b)});
