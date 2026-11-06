@@ -68,8 +68,8 @@ function drawBackdrop(game,dark,light,playing){
   const point=t=>{const a=HexMixedTransition.unitAt(game.fromSides,t),b=HexMixedTransition.unitAt(game.sides,t);return [(a[0]*(1-u)+b[0]*u)*1800,(a[1]*(1-u)+b[1]*u)*1800]};
   for(let i=0;i<knots.length-1;i++){
    const mid=(knots[i]+knots[i+1])/2,points=[[0,0],point(knots[i]),point(knots[i+1])];
-   polygon(points,Math.floor(mid*game.fromSides)%2?dark:light);
-   ctx.save();ctx.globalAlpha*=u;polygon(points,Math.floor(mid*game.sides)%2?dark:light);ctx.restore();
+   polygon(points,Math.floor(HexMixedTransition.laneAt(game.fromSides,mid))%2?dark:light);
+   ctx.save();ctx.globalAlpha*=u;polygon(points,Math.floor(HexMixedTransition.laneAt(game.sides,mid))%2?dark:light);ctx.restore();
   }
   return;
  }
