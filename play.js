@@ -168,7 +168,7 @@ if(playing){ctx.save();header('BEST: '+format(bestTime(selected)),'');text('MODE
  const track=game.timeline.musicTrack,beat=(game.time-track.phase)*track.bpm/60;
  const pulse=Math.exp(-((beat%1+1)%1)*9);
  ctx.save();ctx.globalAlpha=.55+.45*pulse;
- text(track.key.toUpperCase()+' / '+track.bpm+' BPM',190,54,15,'#ddd','left');ctx.restore();
+ text('LV '+track.difficulty+' / '+track.key.toUpperCase()+' / '+track.bpm+' BPM',190,54,15,'#ddd','left');ctx.restore();
 }
 if(screen==='play'&&settings.controlMode===2){
  polygon([[28,508],[164,508],[174,566],[18,566]],'#000a','#ffffff80',2);
@@ -196,7 +196,7 @@ if(selected===6)HexMusicMotion.apply(game,elapsed,game.rotation-baseRotation,mus
   gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
 draw();
 if(transition){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=(1-transition.age/.24)**2;ctx.drawImage(transition.snapshot,0,-transition.age*canvas.height*.04);ctx.restore()}
-if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected===6?(music.randomTrackIndex??0):selected%3];canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.controlMode=String(settings.controlMode);canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
+if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected===6?(music.randomTrackIndex??0):selected%3];canvas.dataset.musicDifficulty=String(game?.timeline?.musicTrack?.difficulty||'');canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.controlMode=String(settings.controlMode);canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
 async function toggleFullscreen(){
  try{
   if(document.fullscreenElement)await document.exitFullscreen();

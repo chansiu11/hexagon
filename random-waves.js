@@ -4,15 +4,15 @@
 const BANK=typeof module!=='undefined'?require('./pattern-bank.js'):root.HexPatternBank;
 const TRANSITION=typeof module!=='undefined'?require('./mixed-transition.js'):root.HexMixedTransition;
 const TAU=Math.PI*2,SPAWN_RADIUS=1200,DURATION=60,PLAYER_SPEED=420*TAU/360;
-const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085},{index:1,key:'otis',bpm:135,phase:.005},{index:2,key:'focus',bpm:174,phase:.06}]);
+const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085,difficulty:1,cadence:1.45,speedScale:.94,spinScale:.78,tiltScale:.55},{index:1,key:'otis',bpm:135,phase:.005,difficulty:2,cadence:1.2,speedScale:1,spinScale:1,tiltScale:.85},{index:2,key:'focus',bpm:174,phase:.06,difficulty:3,cadence:.72,speedScale:1.10,spinScale:1.30,tiltScale:1.4}]);
 const wrap=(a,n=TAU)=>(a%n+n)%n,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const delta=(a,b)=>wrap(b-a+Math.PI)-Math.PI;
 function makeRng(seed){let s=(seed>>>0)||0x9e3779b9;return()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return(s>>>0)/4294967296}}
 const atTime=(time,schedule)=>{let n=schedule[0][1];for(const[t,s]of schedule)if(time>=t)n=s;else break;return n};
-function create(seed){
+function create(seed,trackIndex){
  const actualSeed=Number.isFinite(seed)?seed>>>0:(Math.random()*4294967296)>>>0;
  const random=makeRng(actualSeed),pick=makeRng(Math.imul(actualSeed,0x9e3779b1)^0x71c3a695);
- const track=TRACKS[Math.floor(pick()*3)],halfBeat=30/track.bpm,beat=60/track.bpm;
+ const track=TRACKS[Number.isInteger(trackIndex)&&trackIndex>=0&&trackIndex<3?trackIndex:Math.floor(pick()*3)],halfBeat=30/track.bpm,beat=60/track.bpm;
  const snap=t=>track.phase+Math.ceil((t-track.phase)/halfBeat-1e-9)*halfBeat;
  const shapeSchedule=[[0,6]];let boundary=Math.ceil((6.5+random()*2)/beat)*beat,shape=6;
  while(boundary<56){
@@ -50,7 +50,7 @@ function create(seed){
     // nearest reachable landing. Remove the blocking face at generation.
     safeSector=Math.floor(wrap(oldAngle)/step);blocked.delete(safeSector);
    }
-   const speed=clamp(327.4529736770803*1.15*(.98+.08*impact/60)+random()*10,365,418);
+   const speed=clamp(327.4529736770803*1.15*(.98+.08*impact/60)+random()*10,365,418)*track.speedScale;
    const thickness=clamp(gate.thickness*1.05,38,58);
    let earliest=impact;
    if(prev){
@@ -71,17 +71,17 @@ function create(seed){
   const motionImpact=TRANSITION.clockAt(impact,shapeSchedule);
   const start=motionImpact-(SPAWN_RADIUS-66)/ready.speed;
   waves.push({...ready,id:waves.length,impact,start,end:Math.min(TRANSITION.clockAt(60,shapeSchedule),start+(SPAWN_RADIUS+ready.thickness-26)/ready.speed),r:SPAWN_RADIUS,openings:ready.sides-ready.sectors.length});
-  gateIndex++;proposed=impact+clamp(ready.gap,.34,.78);
+  gateIndex++;proposed=impact+clamp(ready.gap,.34,.78)*track.cadence;
  }
  const spinEvents=[],spin=makeRng(actualSeed^0xd31f6c29);let time=0,direction=spin()<.5?-1:1;
  while(time<60.1){
   if(spin()<.65)direction*=-1;
-  spinEvents.push([time,direction*(.75+time/60*3.25+spin()*.65)]);
+  spinEvents.push([time,direction*(.75+time/60*3.25+spin()*.65)*track.spinScale]);
   time=track.phase+Math.ceil((time+(spin()<.5?2:4)*beat-track.phase)/beat)*beat;
  }
  const tiltEvents=[],tilt=makeRng(actualSeed^0xa1793c45);time=0;
  while(time<60.1){
-  const magnitude=.07+tilt()*(.20+.10*time/60);
+  const magnitude=Math.min(.38,.07+tilt()*(.20+.10*time/60)*track.tiltScale);
   tiltEvents.push([time,(tilt()<.5?-1:1)*magnitude]);time+=2.4+tilt()*3.8;
  }
  return {mode:'batched-wall-waves',kind:'mixed-pattern',seed:actualSeed,sampleRate:60,duration:DURATION,
