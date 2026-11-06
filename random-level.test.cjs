@@ -39,7 +39,7 @@ for(let seed=1;seed<=100;seed++)for(const trackIndex of [0,1,2]){
    assert(enters-clear>=.20+Math.max(turn/(420*T/360),Math.ceil(turn/(T/w.sides)-1e-9)*.18)-1e-8,'real turning speed, reaction and spaced discrete presses must fit');
   }
  }
- for(const mode of [1,2]){
+ for(const mode of [1,2,3]){
   const game=new Game(6,data);game.setControlMode(mode);
   assert.notEqual(game.tilt,0);
   let index=0,nextPress=0,priorTilt=game.tilt,changes=0;
@@ -47,7 +47,10 @@ for(let seed=1;seed<=100;seed++)for(const trackIndex of [0,1,2]){
    while(index<data.waves.length-1&&game.time>data.waves[index].impact+.27)index++;
    const wave=data.waves[index],target=(wave.safeSector+.5)*T/wave.sides;
    if(mode===1){const d=delta(game.angle,target);game.update(1/60,Math.max(-1,Math.min(1,d/(game.playerSpeed/60))))}
-   else{
+   else if(mode===3){
+    if(game.sides===wave.sides&&game.time>=nextPress){game.selectSector(wave.safeSector);nextPress=game.time+.18;changes++}
+    game.update(1/60,0);
+   }else{
     if(game.sides===wave.sides&&game.time>=nextPress){
      const current=Math.floor(wrap(game.angle)/(T/game.sides)+1e-9);
      const forward=(wave.safeSector-current+game.sides)%game.sides,back=(current-wave.safeSector+game.sides)%game.sides;
@@ -71,4 +74,4 @@ for(let seed=1;seed<=100;seed++)for(const trackIndex of [0,1,2]){
 assert.equal(seenTracks.size,3);assert.equal(seenShapes.size,3);assert.equal(seenSources.size,6);
 assert.notDeepEqual(R.create(1).waves,R.create(2).waves);
 assert.notDeepEqual(R.create(1).shapeSchedule,R.create(2).shapeSchedule);
-console.log('PASS '+R.PATTERN_BANK.length+' original motifs, '+minimumWaves+'+ beat-aligned gates, random safe morphs/initial tilt; 100 seeds x all three songs x both 60s collision replays');
+console.log('PASS '+R.PATTERN_BANK.length+' original motifs, '+minimumWaves+'+ beat-aligned gates, random safe morphs/initial tilt; 100 seeds x all three songs x all three modes in 60s collision replays');
