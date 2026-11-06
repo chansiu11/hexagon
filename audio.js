@@ -10,7 +10,7 @@ class BeatAudio {
  updatePulse(dt){if(!this.source||!this.active||this.context.state!=='running'){this.pulse=0;return 0}this.beatAnalyser.getFloatTimeDomainData(this.samples);const energy=Math.sqrt(this.samples.reduce((s,x)=>s+x*x,0)/this.samples.length);this.floor+=(energy-this.floor)*(1-Math.exp(-dt*1.4));this.peak=Math.max(energy,this.peak*Math.exp(-dt*.2),.015);const rise=energy-this.energy;const strength=Math.max(0,Math.min(1,(energy-this.floor*.8)/Math.max(.015,this.peak-this.floor*.8)));const loudness=Math.min(1,energy/.12);const impact=Math.pow(strength,1.3)*(.25+.75*Math.sqrt(loudness));const now=this.context.currentTime;this.pulse*=Math.exp(-dt*27);if(energy>.012&&rise>.004&&strength>.3&&now-this.lastHit>.12){this.pulse=Math.max(this.pulse,impact);this.lastHit=now}this.energy=energy;return this.pulse}
  // Music-only analyser: button/teleport/death effects must not shake the camera.
  motionFeatures(){
-  const quiet={active:false,energy:0,bass:0,brightness:0,pulse:0};
+  const quiet=this.quietMotionFeatures||(this.quietMotionFeatures={active:false,energy:0,bass:0,brightness:0,pulse:0});
   if(this.level!==6||!this.enabled||!this.active||!this.source||this.context?.state!=='running')return quiet;
   if(!this.motionAnalyser){
    this.motionAnalyser=this.context.createAnalyser();this.motionAnalyser.fftSize=1024;
@@ -18,7 +18,11 @@ class BeatAudio {
    this.motionSamples=new Float32Array(1024);
    this.motionSpectrum=new Uint8Array(this.motionAnalyser.frequencyBinCount);
   }
-  if(this.motionSource!==this.source){this.source.connect(this.motionAnalyser);this.motionSource=this.source;}
+  if(this.motionSource!==this.source){this.source.connect(this.motionAnalyser);this.motionSource=this.source;this.motionSampleTime=-Infinity;}
+  const now=this.context.currentTime||0,frame=this.motionFrame||(this.motionFrame={active:true,energy:0,bass:0,brightness:0,pulse:0});
+  frame.bass=this.energy;frame.pulse=this.pulse;
+  if(now-this.motionSampleTime<1/30)return frame;
+  this.motionSampleTime=now;
   this.motionAnalyser.getFloatTimeDomainData(this.motionSamples);
   this.motionAnalyser.getByteFrequencyData(this.motionSpectrum);
   let sum=0,total=0,high=0;
@@ -27,8 +31,7 @@ class BeatAudio {
    const power=this.motionSpectrum[i]**2;total+=power;
    if(i*this.context.sampleRate/this.motionAnalyser.fftSize>1200)high+=power;
   }
-  return {active:true,energy:Math.sqrt(sum/this.motionSamples.length),
-   bass:this.energy,brightness:total?high/total:0,pulse:this.pulse};
+  frame.energy=Math.sqrt(sum/this.motionSamples.length);frame.brightness=total?high/total:0;return frame;
  }
  get position(){return this.active?Math.max(0,this.context.currentTime-this.origin):0}
  visualZoom(dt){const ref=root.ReferencePulse;if(ref&&this.level===ref.level){this.pulse=0;const buffer=this.source?.buffer;if(this.active&&buffer){const position=this.position%buffer.duration;const frame=(position-ref.start)*ref.sampleRate;if(frame>=0&&frame<=ref.zoom.length-1){const i=Math.floor(frame),f=frame-i,curve=ref.zoom;this.visualMode='reference';return curve[i]*(1-f)+curve[Math.min(i+1,curve.length-1)]*f}}this.visualMode='reference-unmeasured';return 1}this.visualMode='audio-estimate';return 1+this.updatePulse(dt)*.18}

@@ -169,7 +169,7 @@ if(screen==='play'){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touc
    music.play(selected,game.time+(selected===6?elapsed:0));
 const baseRotation=game.rotation;
 game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);game.zoom=music.visualZoom(dt);
-if(selected===6)HexMusicMotion.apply(game,elapsed,game.rotation-baseRotation,music.motionFeatures(),settings.motion);// The random stage has its own growing rotation and post-10s tilt.
+if(selected===6)HexMusicMotion.apply(game,elapsed,game.rotation-baseRotation,music.motionFeatures(),settings.motion);// The random stage has its own music-reactive rotation and random tilt.
  // Its identity placeholder camera must not suppress the animated view.
  game.referenceCamera=selected===6?null:
   gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
@@ -211,7 +211,21 @@ addEventListener('keyup',e=>keys.delete(e.code));function suspend(){keys.clear()
 
 function drawLogo(word,x,y,width,height){ctx.save();const intro=settings.motion?ease(uiAge/.38):1;ctx.globalAlpha*=intro;ctx.translate(x,y+(1-intro)*16);ctx.scale(width/(word.length*.95-.1),height);VectorFont.draw(ctx,word,0,0,1,'#fff','left');ctx.restore()}
 
-function drawCore(g,r,fill,stroke){const blend=g.morph*g.morph*(3-2*g.morph);const points=Array.from({length:60},(_,i)=>{const u=i/60;function point(n){const k=u*n,j=Math.floor(k),f=k-j,a=j*Math.PI*2/n,b=(j+1)*Math.PI*2/n;return [Math.cos(a)*(1-f)+Math.cos(b)*f,Math.sin(a)*(1-f)+Math.sin(b)*f]}const a=point(g.fromSides),b=point(g.sides);return [(a[0]*(1-blend)+b[0]*blend)*r,(a[1]*(1-blend)+b[1]*blend)*r]});polygon(points,fill,stroke)}
+const mixedCoreUnits=new Map();
+function mixedCoreMesh(n){
+ if(mixedCoreUnits.has(n))return mixedCoreUnits.get(n);
+ const points=Array.from({length:60},(_,i)=>{
+  const k=i/60*n,j=Math.floor(k),f=k-j,a=j*Math.PI*2/n,b=(j+1)*Math.PI*2/n;
+  return [Math.cos(a)*(1-f)+Math.cos(b)*f,Math.sin(a)*(1-f)+Math.sin(b)*f];
+ });
+ mixedCoreUnits.set(n,points);return points;
+}
+function drawCore(g,r,fill,stroke){if(g.level===6){
+ const a=mixedCoreMesh(g.fromSides),b=mixedCoreMesh(g.sides),u=g.morph*g.morph*(3-2*g.morph);
+ const points=g.mixedCorePoints||(g.mixedCorePoints=Array.from({length:60},()=>[0,0]));
+ for(let i=0;i<60;i++){points[i][0]=(a[i][0]*(1-u)+b[i][0]*u)*r;points[i][1]=(a[i][1]*(1-u)+b[i][1]*u)*r;}
+ polygon(points,fill,stroke);return;
+}const blend=g.morph*g.morph*(3-2*g.morph);const points=Array.from({length:60},(_,i)=>{const u=i/60;function point(n){const k=u*n,j=Math.floor(k),f=k-j,a=j*Math.PI*2/n,b=(j+1)*Math.PI*2/n;return [Math.cos(a)*(1-f)+Math.cos(b)*f,Math.sin(a)*(1-f)+Math.sin(b)*f]}const a=point(g.fromSides),b=point(g.sides);return [(a[0]*(1-blend)+b[0]*blend)*r,(a[1]*(1-blend)+b[1]*blend)*r]});polygon(points,fill,stroke)}
 
 // Sampled visible radii from user-provided PC video at 3.600, 3.667, 3.700, 3.833 s.
 // Video viewport approximately 864 x 540, normalized to 960 x 600.
@@ -240,7 +254,7 @@ function drawWallField(walls,color,game){
    }
    ctx.fill('evenodd');
   }else{
-   const points=wallVisualPoly(w,game.fromSides,game.sides,game.morph);
+   const points=game.level===6&&w.renderPoly?w.renderPoly:wallVisualPoly(w,game.fromSides,game.sides,game.morph);
    points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
    ctx.closePath();
    ctx.fill();

@@ -28,12 +28,15 @@ for(const fps of [30,60,120]){
 for(let level=0;level<6;level++){const game={level,rotation:1,walls:[]},before=JSON.stringify(game);assert.equal(apply(game,1/60,.1,loud),null);assert.equal(JSON.stringify(game),before)}
 const context={window:{}};vm.runInNewContext(fs.readFileSync('./audio.js','utf8'),context);
 const audio=new context.window.BeatAudio(),connections=[];
-const analyser={fftSize:1024,frequencyBinCount:512,getFloatTimeDomainData(a){a.fill(.1)},getByteFrequencyData(a){a.fill(64)}};
+const analyser={reads:0,fftSize:1024,frequencyBinCount:512,getFloatTimeDomainData(a){this.reads++;a.fill(.1)},getByteFrequencyData(a){a.fill(64)}};
 audio.level=6;audio.enabled=true;audio.active=true;audio.energy=.06;audio.pulse=.8;
 audio.source={connect(node){connections.push(node)}};
 audio.context={state:'running',sampleRate:48000,createAnalyser(){return analyser}};
 const features=audio.motionFeatures();assert(features.active&&Math.abs(features.energy-.1)<1e-6&&features.brightness>0);
 assert.equal(connections.length,1);assert.strictEqual(connections[0],analyser);audio.motionFeatures();assert.equal(connections.length,1);
+audio.context.currentTime=.01;audio.energy=.08;audio.pulse=.4;
+const cached=audio.motionFeatures();assert.strictEqual(cached,features);assert.equal(analyser.reads,1);assert.equal(cached.bass,.08);assert.equal(cached.pulse,.4);
+audio.context.currentTime=.04;audio.motionFeatures();assert.equal(analyser.reads,2,'full-band analysis is throttled while bass and beat pulses stay fresh');
 audio.enabled=false;assert.equal(audio.motionFeatures().active,false);
 audio.enabled=true;audio.level=0;assert.equal(audio.motionFeatures().active,false);
 console.log('PASS tempo/mood/beat-driven shake, abrupt bounded camera velocity, unchanged collisions and original stages, music-only audio analysis');

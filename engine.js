@@ -1,6 +1,7 @@
 (function(root){
 'use strict';
 const TAU=Math.PI*2,STEP=TAU/6;
+const MIXED_TRANSITION=typeof module!=='undefined'?require('./mixed-transition.js'):root.HexMixedTransition;
 // The original game uses a 60 Hz update and angular arrow speeds of 7 or
 // 9 degrees/tick (Hexagonest and Hyper Hexagonest use 9). Based on
 // https://github.com/sumguytho/SuperHexagonRE#arrow_speed
@@ -106,12 +107,12 @@ function firstPentagonRingWallTime(t,schedule){
  const resumed=wallTimelineTime(FIRST_PENTAGON_RING_RESUME_TIME,schedule);
  return resumed+(t-FIRST_PENTAGON_RING_RESUME_TIME)*FIRST_PENTAGON_RING_APPROACH_SPEED;
 }
-function shapeStateAt(t,schedule){
+function shapeStateAt(t,schedule,duration=MORPH_SECONDS){
  if(!Array.isArray(schedule)||!schedule.length)return {from:6,to:6,progress:1};
  let index=0;
  for(let i=1;i<schedule.length;i++)if(schedule[i][0]<=t)index=i;else break;
  const to=schedule[index][1],from=index?schedule[index-1][1]:to;
- return {from,to,progress:index?Math.max(0,Math.min(1,(t-schedule[index][0])/MORPH_SECONDS)):1};
+ return {from,to,progress:index?Math.max(0,Math.min(1,(t-schedule[index][0])/duration)):1};
 }
 function wallVisualPoly(w,fromSides=w.sides||6,toSides=fromSides,progress=1){
  const src=w.sides||6,from=fromSides||src,to=toSides||from;
@@ -169,6 +170,51 @@ const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
 // Correct only the first ring after its offscreen 18s handoff: adjacent
 // outgoing hexagon openings 4+5 merge into pentagon opening 4.
 const FIRST_PENTAGON_REACHABLE_SECTORS=Object.freeze({144:0,145:1,146:2,147:3});
+function fastIntersect(a,b){
+ for(let shape=0;shape<2;shape++){
+  const p=shape?b:a;
+  for(let i=0;i<p.length;i++){
+   const next=p[(i+1)%p.length],x=p[i][1]-next[1],y=next[0]-p[i][0];
+   let amin=Infinity,amax=-Infinity,bmin=Infinity,bmax=-Infinity;
+   for(let j=0;j<a.length;j++){const v=a[j][0]*x+a[j][1]*y;if(v<amin)amin=v;if(v>amax)amax=v;}
+   for(let j=0;j<b.length;j++){const v=b[j][0]*x+b[j][1]*y;if(v<bmin)bmin=v;if(v>bmax)bmax=v;}
+   if(amax<bmin||bmax<amin)return false;
+  }
+ }
+ return true;
+}
+function updateMixedPoly(w,from,to,progress){
+ const key=from*10+to;
+ if(w._shape===key&&w._radius===w.r&&w._progress===progress)return;
+ if(w._shape!==key){
+  const old=Math.max(0,Math.min(from-1,Math.floor((w.sector+.5)*from/w.sides)));
+  const next=Math.max(0,Math.min(to-1,Math.floor((w.sector+.5)*to/w.sides)));
+  w._from=[Math.cos(old*TAU/from),Math.sin(old*TAU/from),Math.cos((old+1)*TAU/from),Math.sin((old+1)*TAU/from)];
+  w._to=[Math.cos(next*TAU/to),Math.sin(next*TAU/to),Math.cos((next+1)*TAU/to),Math.sin((next+1)*TAU/to)];
+ }
+ w._shape=key;w._radius=w.r;w._progress=progress;
+ const u=progress*progress*(3-2*progress),inner=Math.max(0,w.r),outer=Math.max(inner,w.r+w.thickness);
+ let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+ for(let i=0;i<4;i++){
+  const k=i===1||i===2?2:0,r=i<2?inner:outer,p=w.renderPoly[i];
+  p[0]=w._from[k]*r*(1-u)+w._to[k]*r*u;
+  p[1]=w._from[k+1]*r*(1-u)+w._to[k+1]*r*u;
+  if(p[0]<minX)minX=p[0];if(p[0]>maxX)maxX=p[0];
+  if(p[1]<minY)minY=p[1];if(p[1]>maxY)maxY=p[1];
+ }
+ w.minX=minX;w.maxX=maxX;w.minY=minY;w.maxY=maxY;
+}
+function mixedPlayerHit(game,p){
+ const minX=Math.min(p[0][0],p[1][0],p[2][0]),maxX=Math.max(p[0][0],p[1][0],p[2][0]);
+ const minY=Math.min(p[0][1],p[1][1],p[2][1]),maxY=Math.max(p[0][1],p[1][1],p[2][1]);
+ for(const w of game.walls){
+  if(w.renderPoly){
+   if(w.maxX<minX||w.minX>maxX||w.maxY<minY||w.minY>maxY)continue;
+   if(fastIntersect(p,w.renderPoly))return true;
+  }else if(intersect(p,wallVisualPoly(w,game.fromSides,game.sides,game.morph)))return true;
+ }
+ return false;
+}
 function normalPatternTime(time,data){
  const knots=data?.clockKnots;if(!knots)return time;
  for(let i=1;i<knots.length;i++)if(time<=knots[i][0]){
@@ -187,15 +233,30 @@ class Game{
  sampleWalls(){
  const data=this.timeline;if(!data)return;
  if(this.level===6&&data.kind==='mixed-pattern'){
-  const shape=shapeStateAt(this.time,data.shapeSchedule);
+  const shape=shapeStateAt(this.time,data.shapeSchedule,data.morphSeconds);
   if(this.controlMode===2&&this.randomAlignedSides!==shape.to){
    const step=TAU/shape.to;this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);
   }
   this.randomAlignedSides=shape.to;this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
-  const clock=wallTimelineTime(this.time,data.shapeSchedule);this.wallMotionTime=clock;
+  const clock=MIXED_TRANSITION.clockAt(this.time,data.shapeSchedule);this.wallMotionTime=clock;
   this.wallFrame=Math.floor(this.time*data.sampleRate);this.recordedCamera=null;
-  this.waves=data.waves.filter(w=>clock>=w.start&&clock<w.end).map(w=>({...w,r:observedWaveRadius(w,clock)}));
-  this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness})));
+  if(!this.mixedActors){
+   this.mixedActors=data.waves.map(w=>({...w,spawnRadius:w.r,actors:w.sectors.map(sector=>({
+    id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness,
+    renderPoly:[[0,0],[0,0],[0,0],[0,0]],_shape:-1
+   }))}));
+   this.waves=[];
+  }
+  // Reuse wave/actor arrays and polygons at all physics substeps. Formerly
+  // filter/map/spread/flatMap rebuilt every object up to 240 times a second.
+  this.waves.length=0;this.walls.length=0;
+  for(const wave of this.mixedActors){
+   if(clock<wave.start||clock>=wave.end)continue;
+   wave.r=wave.spawnRadius-wave.speed*(clock-wave.start);this.waves.push(wave);
+   for(const w of wave.actors){
+    w.r=wave.r;updateMixedPoly(w,shape.from,shape.to,shape.progress);this.walls.push(w);
+   }
+  }
   return;
  }
  if(data.mode==='rigid-observed-tracks'||data.mode==='batched-wall-waves'){
@@ -329,6 +390,9 @@ class Game{
   this.teleportCooldown=.18;
   const player=playerPoly(this.angle,this.playerLean);
   const batch=this.timeline?.mode==='batched-wall-waves';
+  if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
+   if(mixedPlayerHit(this,player))this.dead=true;return true;
+  }
   if(this.walls.some(w=>w.points?polygonOverlap(player,w.points,w.holes):
     intersect(player,wallVisualPoly(w,batch?this.fromSides:w.sides,
       batch?this.sides:w.sides,batch?this.morph:1))))this.dead=true;
@@ -357,7 +421,7 @@ if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
 this.tilt+=(tiltTarget-this.tilt)*Math.min(1,h*(this.level===6?2.4:3));
 if(this.timeline)this.sampleWalls();else for(const w of this.walls)w.r-=this.speed*h;
 const p=playerPoly(this.angle,this.playerLean);
-if(this.walls.some(w=>{
+if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>{
  if(w.points)return polygonOverlap(p,w.points,w.holes);
  const batch=this.timeline?.mode==='batched-wall-waves';
  return intersect(p,wallVisualPoly(w,
@@ -367,6 +431,6 @@ if(this.walls.some(w=>{
 })){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={normalPatternTime,polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={fastIntersect,normalPatternTime,polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
