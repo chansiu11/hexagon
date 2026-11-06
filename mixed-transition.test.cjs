@@ -2,6 +2,21 @@
 const assert=require('node:assert/strict');
 const Transition=require('./mixed-transition'),R=require('./random-waves');
 const {Game,wallVisualPoly,playerPoly,intersect,fastIntersect}=require('./engine');
+// Regression: every stable boundary must be a complete polygon corner,
+// never an opening ending halfway along an existing side.
+for(const native of [4,5,6])for(let sector=0;sector<native;sector++){
+ const panels=Transition.panels(native,sector);
+ let nativeSpan=0;
+ for(const [start,end]of panels){
+  nativeSpan+=Transition.laneAt(native,end)-Transition.laneAt(native,start);
+  for(const current of [4,5,6])for(const t of [start,end]){
+   const p=Transition.unitAt(current,t),index=Transition.laneAt(current,t);
+   assert.equal(index,Math.round(index),'stable lane ends only at a whole corner');
+   assert(Math.abs(Math.hypot(...p)-1)<1e-12,'no half-side boundary inset into the old polygon');
+  }
+ }
+ assert.equal(nativeSpan,1,'the native wall still covers exactly one complete side');
+}
 for(let seed of [1,7,19,42,77]){
  const data=R.create(seed),g=new Game(6,data);
  for(const [at]of data.shapeSchedule.slice(1)){
@@ -60,4 +75,4 @@ for(let seed of [1,7,19,42,77]){
   assert(wave&&Math.abs(wave.r-66)<1e-8,'pause calibration must preserve every beat-aligned arrival');
  }
 }
-console.log('PASS welded shared core/wall perimeter, full 0.65s radial freeze, smooth non-accelerated restart, exact cached polygons/SAT, stable actors and musical arrivals');
+console.log('PASS whole-edge corner collapse without half lanes, welded shared core/wall perimeter, full 0.65s radial freeze, smooth non-accelerated restart, exact cached polygons/SAT, stable actors and musical arrivals');

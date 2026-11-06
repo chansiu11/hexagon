@@ -207,12 +207,17 @@ function updateMixedPoly(w,from,to,progress){
   if(p[1]<minY)minY=p[1];if(p[1]>maxY)maxY=p[1];
  }
  w.minX=minX;w.maxX=maxX;w.minY=minY;w.maxY=maxY;
+ // A fully merged edge has no painted area and must not leave a radial
+ // collision line behind after its two corner tracks become identical.
+ const a=w.renderPoly[0],b=w.renderPoly[1],c=w.renderPoly[2];
+ w.collapsed=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))<1e-10;
 }
 function mixedPlayerHit(game,p){
  const minX=Math.min(p[0][0],p[1][0],p[2][0]),maxX=Math.max(p[0][0],p[1][0],p[2][0]);
  const minY=Math.min(p[0][1],p[1][1],p[2][1]),maxY=Math.max(p[0][1],p[1][1],p[2][1]);
  for(const w of game.walls){
   if(w.renderPoly){
+   if(w.collapsed)continue;
    if(w.maxX<minX||w.minX>maxX||w.maxY<minY||w.minY>maxY)continue;
    if(fastIntersect(p,w.renderPoly))return true;
   }else if(intersect(p,wallVisualPoly(w,game.fromSides,game.sides,game.morph)))return true;

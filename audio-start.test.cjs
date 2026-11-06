@@ -1,0 +1,26 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const sandbox={window:{},clearInterval};vm.runInNewContext(fs.readFileSync('./audio.js','utf8'),sandbox);
+(async()=>{
+ const audio=new sandbox.window.BeatAudio(),starts=[];
+ audio.context={currentTime:10,createBufferSource(){return {connect(){},disconnect(){},stop(){},start(when,offset){starts.push({when,offset,time:audio.context.currentTime})}}}};
+ audio.master={};audio.bass={};
+ const pending=[];audio.load=()=>new Promise(resolve=>pending.push(resolve));
+ audio.play(6,0);audio.context.currentTime=13;
+ assert.equal(audio.position,0,'a slow decode must not advance the unheard song clock');
+ pending.shift()({duration:90});await Promise.resolve();
+ assert.equal(starts[0].offset,0,'cold playback must begin at the start, not skip the loading seconds');
+ assert.equal(audio.position,0);audio.context.currentTime=13.2;
+ assert(Math.abs(audio.position-.2)<1e-10);
+ audio.play(6,12.5);audio.context.currentTime=17;
+ assert.equal(audio.position,12.5,'resume waits at its requested offset');
+ pending.shift()({duration:90});await Promise.resolve();
+ assert.equal(starts[1].offset,12.5);assert.equal(audio.position,12.5);
+ audio.play(6,0);audio.stop();pending.shift()({duration:90});await Promise.resolve();
+ assert.equal(starts.length,2,'cancelled loads cannot start music later');
+ audio.decodedBuffers.set(audio.trackPath(6),{duration:90});
+ audio.play(6,0);
+ assert(audio.source&&starts.length===3,'a prepared song must be started synchronously with the play screen');
+ assert.equal(starts[2].offset,0);assert.equal(audio.position,0);
+ console.log('PASS delayed cold audio starts at zero, exact resume offset and cancelled-load isolation');
+})().catch(e=>{console.error(e);process.exitCode=1});

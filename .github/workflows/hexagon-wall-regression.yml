@@ -20,6 +20,7 @@ jobs:
         run: |
           node control-modes.test.cjs
           node music-motion.test.cjs
+          node audio-start.test.cjs
           node mixed-transition.test.cjs
       - name: Verify the random seventh level has fair playable wall sequences
         run: node random-level.test.cjs
@@ -72,7 +73,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'unified-shape-mesh-v27'; then exit 0; fi
+              grep -q 'whole-edge-audio-ready-v29'; then exit 0; fi
             sleep 10
           done
           exit 1

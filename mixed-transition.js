@@ -16,18 +16,24 @@ function clockAt(time,schedule){
  }
  return time-lag;
 }
-// Common perimeter coordinates keep the core, every wall ring and backdrop
-// on one deforming mesh. Include every possible corner so wall panels stay
-// convex and neighbouring panels share the very same moving endpoint.
-const KNOTS=Object.freeze([...new Set([4,5,6].flatMap(n=>Array.from({length:n+1},(_,i)=>i/n)))].sort((a,b)=>a-b));
+// Six persistent corner tracks: reducing the polygon collapses complete
+// edges into a shared corner, rather than cutting lanes at fractional edges.
+// Every wall uses these same tracks regardless of its eventual impact shape.
+const KNOTS=Object.freeze(Array.from({length:7},(_,i)=>i/6));
+function cornerIndex(n,i){return Math.round(i*n/6);}
+function laneAt(n,t){const k=t*6,j=Math.min(5,Math.floor(k)),f=k-j;return cornerIndex(n,j)*(1-f)+cornerIndex(n,j+1)*f;}
 function unitAt(n,t){
- const k=t*n,j=Math.floor(k),f=k-j,a=j*Math.PI*2/n,b=(j+1)*Math.PI*2/n;
+ const k=t*6,j=Math.min(5,Math.floor(k)),f=k-j;
+ const a=cornerIndex(n,j)*Math.PI*2/n,b=cornerIndex(n,j+1)*Math.PI*2/n;
  return [Math.cos(a)*(1-f)+Math.cos(b)*f,Math.sin(a)*(1-f)+Math.sin(b)*f];
 }
 function panels(sides,sector){
- const lo=sector/sides,hi=(sector+1)/sides,knots=KNOTS.filter(t=>t>=lo&&t<=hi);
- return knots.slice(0,-1).map((t,i)=>[t,knots[i+1]]);
+ // Pick whole canonical edges at birth. At the wall's native shape these
+ // cover exactly one complete side; all subdivisions are permanent actors.
+ const start=KNOTS.findIndex((_,i)=>cornerIndex(sides,i)===sector);
+ const end=KNOTS.findIndex((_,i)=>cornerIndex(sides,i)===sector+1);
+ return Array.from({length:end-start},(_,i)=>[KNOTS[start+i],KNOTS[start+i+1]]);
 }
-const API={MORPH_SECONDS,RESUME_SECONDS,clockAt,unitAt,panels,KNOTS};
+const API={MORPH_SECONDS,RESUME_SECONDS,clockAt,unitAt,panels,KNOTS,laneAt};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.HexMixedTransition=API;
 })(typeof window!=='undefined'?window:globalThis);
