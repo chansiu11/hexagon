@@ -243,6 +243,7 @@ class Game{
  const data=this.timeline;if(!data)return;
  if(this.level===6&&data.kind==='mixed-pattern'){
   const shape=shapeStateAt(this.time,data.shapeSchedule,data.morphSeconds);
+  if(shape.progress!==this.morph||shape.from!==this.fromSides||shape.to!==this.sides){
   // The player rides the wall mesh. Discrete modes interpolate into a
   // surviving cell center instead of ending on a merged, dangerous vertex.
   const track=MIXED_TRANSITION.trackAtAngle(this.fromSides,this.sides,this.morph,this.angle);
@@ -256,6 +257,7 @@ class Game{
    this.angle=wrap(MIXED_TRANSITION.angleAt(shape.from,shape.to,shape.progress,ride.a+(ride.b-ride.a)*u));
    if(shape.progress>=1)this.morphPlayerTrack=null;
   }else this.angle=wrap(MIXED_TRANSITION.angleAt(shape.from,shape.to,shape.progress,track));
+  }
   this.randomAlignedSides=shape.to;this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
   const clock=MIXED_TRANSITION.clockAt(this.time,data.shapeSchedule);this.wallMotionTime=clock;
   this.wallFrame=Math.floor(this.time*data.sampleRate);this.recordedCamera=null;
