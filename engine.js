@@ -179,31 +179,23 @@ function normalPatternTime(time,data){
  return time;
 }
 class Game{
- constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false;this.randomAlignedSides=6}
+ constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false;this.randomAlignedSides=6;if(level===6&&this.timeline?.kind==='mixed-pattern')this.tilt=this.timeline.tiltEvents[0][1]}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170,145][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
  get targetSides(){if(this.level===6)return this.timeline?shapeStateAt(normalPatternTime(this.time,this.timeline),this.timeline.shapeSchedule).to:6;if(this.profile&&this.time<60){const schedule=this.profile.shapeSchedule;for(let i=schedule.length-1;i>=0;i--)if(this.time>=schedule[i][0])return schedule[i][1]}const phase=Math.floor((this.time%60)/10);return [[6,6,5,6,4,6],[6,5,6,4,6,5],[6,6,4,6,5,6]][this.level%3][phase]}
  sampleWalls(){
  const data=this.timeline;if(!data)return;
- if(this.level===6&&data.kind==='normal-pattern'){
-  // Sample the accepted normal-stage pipeline, including its global morph,
-  // pause/recovery clock, stable lifetimes and source-passage corrections.
-  const source=this.normalPatternGame||(this.normalPatternGame=new Game(0,data.normalTimeline));
-  source.time=normalPatternTime(this.time,data);source.sampleWalls();
-  if(this.controlMode===2&&this.randomAlignedSides!==source.sides){
-   const step=TAU/source.sides;
-   this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);
+ if(this.level===6&&data.kind==='mixed-pattern'){
+  const shape=shapeStateAt(this.time,data.shapeSchedule);
+  if(this.controlMode===2&&this.randomAlignedSides!==shape.to){
+   const step=TAU/shape.to;this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);
   }
-  this.randomAlignedSides=source.sides;
-  this.fromSides=source.fromSides;this.sides=source.sides;this.morph=source.morph;
+  this.randomAlignedSides=shape.to;this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
+  const clock=wallTimelineTime(this.time,data.shapeSchedule);this.wallMotionTime=clock;
   this.wallFrame=Math.floor(this.time*data.sampleRate);this.recordedCamera=null;
-  this.normalPatternTime=source.time;this.wallMotionTime=source.wallMotionTime;
-  const gain=data.radialGain,omitted=data.omittedActors;
-  this.walls=source.walls.filter(w=>!omitted.includes(w.waveId)).map(w=>({
-   ...w,r:26+(w.r-26)*gain,thickness:w.thickness*gain
-  }));
-  this.waves=source.waves;
+  this.waves=data.waves.filter(w=>clock>=w.start&&clock<w.end).map(w=>({...w,r:observedWaveRadius(w,clock)}));
+  this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness})));
   return;
  }
  if(data.mode==='rigid-observed-tracks'||data.mode==='batched-wall-waves'){
@@ -343,14 +335,14 @@ class Game{
   return true;
  }
  update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.teleportCooldown=Math.max(0,this.teleportCooldown-h);if(this.stepEffect){this.stepEffect.age+=h;if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null;}if(this.teleport){this.teleport.age+=h;if(this.teleport.age>=this.teleport.duration)this.teleport=null;}this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;if(this.controlMode===1)this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;let target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));
-if(this.level===6&&this.timeline?.kind==='normal-pattern'){
+if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
  // New target every few seconds, changing direction unpredictably, with
  // amplitude growing from gentle to strong as the level approaches 60s.
  for(const [at,rate] of this.timeline.spinEvents||[]){
   if(at>this.time)break;
   target=rate;
  }
- this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*2.6);
+ this.rotationSpeed=target;
 }else this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);
 this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
 this.shapeWait=this.pendingSides!==this.sides;
@@ -358,13 +350,9 @@ if(this.shapeWait&&(this.profile&&this.time<60||this.walls.length===0)){this.fro
 this.morph=Math.min(1,this.morph+h/0.45);
 const phase=beat%1,accent=Math.exp(-phase*10);const targetZoom=1+accent*.075+.045*Math.sin(beat*Math.PI/8);this.zoom+=(targetZoom-this.zoom)*Math.min(1,h*32);
 let tiltTarget=Math.min(1,Math.max(0,this.time-1))*.24*Math.sin(beat*Math.PI/16)*Math.sin(Math.min(this.time/4,1)*Math.PI/2);
-if(this.level===6&&this.timeline?.kind==='normal-pattern'){
- // No tilt at all before 10s; build toward stronger, smoother off-axis
- // oscillations afterwards. Keep compression safely above zero.
- const intensity=Math.min(1,Math.max(0,(this.time-10)/39));
- const phase=this.timeline.tiltPhase||0;
- tiltTarget=.38*intensity*(Math.sin(this.time*(1.40+.012*this.time)+phase)+
-  .26*Math.sin(this.time*2.87+phase*.63));
+if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
+ tiltTarget=this.timeline.tiltEvents[0][1];
+ for(const [at,tilt]of this.timeline.tiltEvents){if(at>this.time)break;tiltTarget=tilt;}
 }
 this.tilt+=(tiltTarget-this.tilt)*Math.min(1,h*(this.level===6?2.4:3));
 if(this.timeline)this.sampleWalls();else for(const w of this.walls)w.r-=this.speed*h;

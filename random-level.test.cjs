@@ -1,109 +1,74 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {Game,levels,normalPatternTime,wallVisualPoly,playerPoly,intersect,wrap,PLAYER_SPEED}=require('./engine');
-const R=require('./random-waves');
-const source=require('./assets/timelines/waves-stage-0.json');
-const T=Math.PI*2,N=180,FPS=60,FRAMES=60*FPS;
+const {Game,levels,wallVisualPoly,playerPoly,intersect,wrap}=require('./engine');
+const R=require('./random-waves'),T=Math.PI*2;
+const delta=(a,b)=>wrap(b-a+Math.PI)-Math.PI;
 assert.equal(levels.length,7);
-const representatives=new Map();
+assert.equal(new Set(R.PATTERN_BANK.map(p=>p.level)).size,6);
+for(const p of R.PATTERN_BANK){
+ const ids=new Set(require('./assets/timelines/waves-stage-'+p.level+'.json').waves.map(w=>w.id));
+ assert(p.gates.length>=4);
+ for(const gate of p.gates){assert(gate.sourceIds.every(id=>ids.has(id)));assert(gate.sectors.length>0&&gate.sectors.length<gate.sides)}
+}
+const seenTracks=new Set(),seenShapes=new Set(),seenSources=new Set();let minimumWaves=1000;
 for(let seed=1;seed<=100;seed++){
- const d=R.create(seed);assert.deepEqual(d,R.create(seed));
- assert.equal(d.kind,'normal-pattern');assert.strictEqual(d.normalTimeline,source);
- assert.strictEqual(d.waves,source.waves,'reuse normal source order and geometry rather than new random rings');
- assert.deepEqual(d.shapeSchedule,source.shapeSchedule);
- representatives.set(d.musicTrack.index,seed);
- assert(d.clockKnots.length>25,'major normal wall arrivals need real music-beat anchors');
- for(let i=1;i<d.clockKnots.length;i++){
-  const a=d.clockKnots[i-1],b=d.clockKnots[i];
-  assert(b[0]>a[0]&&b[1]>a[1]);
-  assert(Math.abs((b[1]-b[0])-(a[1]-a[0]))<=.15*(b[0]-a[0])+1e-8);
-  if(i<d.clockKnots.length-1){
-   const beat=(b[0]-d.musicTrack.phase)/(30/d.musicTrack.bpm);
-   assert(Math.abs(beat-Math.round(beat))<1e-8,'arrival anchor must be on the chosen song eighth-note grid');
+ const data=R.create(seed);assert.deepEqual(data,R.create(seed));
+ assert.equal(data.kind,'mixed-pattern');seenTracks.add(data.musicTrack.key);
+ assert(data.waves.length>=45,'mixed normal patterns must remain challenging');
+ minimumWaves=Math.min(minimumWaves,data.waves.length);
+ assert(data.shapeSchedule.length>=6);
+ assert(Math.abs(data.tiltEvents[0][1])>=.07,'random tilt starts immediately');
+ for(let i=1;i<data.shapeSchedule.length;i++){
+  assert.notEqual(data.shapeSchedule[i][1],data.shapeSchedule[i-1][1]);
+  seenShapes.add(data.shapeSchedule[i][1]);
+ }
+ for(let i=0;i<data.waves.length;i++){
+  const w=data.waves[i],prev=data.waves[i-1];seenSources.add(w.sourceLevel);
+  assert(w.sectors.length>=1&&w.sectors.length<w.sides);
+  assert(w.r*Math.cos(Math.PI/4)*.70>Math.hypot(480,300)+8,'birth must stay outside even a tilted, zoomed and shaken viewport');
+  assert(!w.sectors.includes(w.safeSector),'each gate must have a protected opening');
+  assert.equal(w.sides,R.atTime(w.impact,data.shapeSchedule));
+  const beat=(w.impact-data.musicTrack.phase)/(30/data.musicTrack.bpm);
+  assert(Math.abs(beat-Math.round(beat))<1e-8,'every gate arrival must align to music eighth notes');
+  for(const[at]of data.shapeSchedule.slice(1))assert(w.impact<=at-.85+1e-8||w.impact>=at+1.05-1e-8,'reserve a physically clear shape-change interval');
+  assert(Math.abs(w.end-Math.min(60,w.start+(w.r+w.thickness-26)/w.speed))<1e-8,'actors expire only behind the core');
+  if(prev){
+   const turn=Math.abs(delta((prev.safeSector+.5)*T/prev.sides,(w.safeSector+.5)*T/w.sides));
+   const clear=prev.impact+(66+prev.thickness-59)/prev.speed;
+   const enters=w.impact-(73/Math.cos(Math.PI/w.sides)-66)/w.speed;
+   assert(enters-clear>=.20+Math.max(turn/(420*T/360),Math.ceil(turn/(T/w.sides)-1e-9)*.18)-1e-8,'real turning speed, reaction and spaced discrete presses must fit');
   }
  }
- for(let i=0;i<=600;i++){
-  const t=i/10,dt=1e-4;
-  assert(Math.abs(normalPatternTime(t,d)-t)<.13,'normal pattern timing stays recognizable');
-  if(t>0&&t<60){const speed=(normalPatternTime(t+dt,d)-normalPatternTime(t-dt,d))/(2*dt);assert(speed>.774&&speed<1.226,'music clock must remain smooth and physically bounded')}
- }
-}
-assert.equal(representatives.size,3,'seeded random attempts must cover all three songs');
-// Circumcircle plus angular-grid margin contains every player lean and
-// every intermediate point of a continuous two-degree movement sample.
-function circleHits(angle,poly,radius=8.4){
- const x=Math.cos(angle)*66,y=Math.sin(angle)*66;let inside=true,sign=0;
- for(let i=0;i<poly.length;i++){
-  const a=poly[i],b=poly[(i+1)%poly.length],dx=b[0]-a[0],dy=b[1]-a[1];
-  const cross=dx*(y-a[1])-dy*(x-a[0]);
-  if(Math.abs(cross)>1e-8){if(sign&&Math.sign(cross)!==sign)inside=false;sign=Math.sign(cross)}
-  const t=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy||1)));
-  if(Math.hypot(x-a[0]-dx*t,y-a[1]-dy*t)<=radius)return true;
- }
- return inside;
-}
-function polygons(game){return game.walls.filter(w=>w.r<125&&w.r+w.thickness>50).map(w=>wallVisualPoly(w,game.fromSides,game.sides,game.morph))}
-for(const [track,seed] of representatives){
- const data=R.create(seed),g=new Game(6,data),normal=new Game(0,source);
- const continuousParents=[],discreteParents=[],discreteMoves=[];
- let reachable=new Uint8Array(N);reachable[135]=1;
- let stepped=new Uint8Array(6*12);stepped[4*12]=1;
- let priorSides=6,priorNear=[],minimum=N;
- for(let f=0;f<FRAMES;f++){
-  const time=(f+1)/FPS;g.time=time;g.sampleWalls();
-  normal.time=normalPatternTime(time,data);normal.sampleWalls();
-  const expected=normal.walls.filter(w=>!R.OMITTED_ACTORS.includes(w.waveId)).map(w=>({...w,r:26+(w.r-26)*R.RADIAL_GAIN,thickness:w.thickness*R.RADIAL_GAIN}));
-  assert.deepEqual(g.walls,expected,'normal actor IDs, sectors, order, morph and accelerated radial motion must match');
-  const near=polygons(g),union=[...priorNear,...near];
-  const free=Array.from({length:N},(_,a)=>union.every(poly=>!circleHits(a*T/N,poly)));
-  const next=new Uint8Array(N),parents=new Int16Array(N).fill(-1);
-  for(let a=0;a<N;a++)if(free[a])for(let d=-3;d<=3;d++){
-   const prev=(a-d+N)%N;if(!reachable[prev])continue;
-   let clear=true;for(let k=0;k<=Math.abs(d);k++)if(!free[(prev+Math.sign(d)*k+N)%N]){clear=false;break}
-   if(clear){next[a]=1;parents[a]=prev;break}
-  }
-  assert(next.some(Boolean),'mode 1 needs a swept reachable path for '+data.musicTrack.key+' at '+time);
-  minimum=Math.min(minimum,next.reduce((a,b)=>a+b,0));
-  continuousParents.push(parents);reachable=next;
-  const step=T/g.sides,nextStepped=new Uint8Array(g.sides*12),sp=new Int16Array(g.sides*12).fill(-1),sm=new Int8Array(g.sides*12);
-  for(let k=0;k<stepped.length;k++)if(stepped[k]){
-   const a=(Math.floor(k/12)+.5)*T/priorSides,cooldown=Math.max(0,k%12-1);
-   for(let move of cooldown?[0]:[-1,0,1]){
-    let angle=wrap(a+move*T/priorSides);
-    const oldPlayer=playerPoly(angle);
-    if(priorNear.some(p=>intersect(oldPlayer,p)))continue;
-    if(g.sides!==priorSides)angle=wrap((Math.floor(angle/step)+.5)*step);
-    if(near.some(p=>intersect(playerPoly(angle),p)))continue;
-    const sector=Math.floor(angle/step+1e-9),key=sector*12+(move?11:cooldown);
-    nextStepped[key]=1;sp[key]=k;sm[key]=move;
+ for(const mode of [1,2]){
+  const game=new Game(6,data);game.setControlMode(mode);
+  assert.notEqual(game.tilt,0);
+  let index=0,nextPress=0,priorTilt=game.tilt,changes=0;
+  for(let frame=0;frame<3600;frame++){
+   while(index<data.waves.length-1&&game.time>data.waves[index].impact+.27)index++;
+   const wave=data.waves[index],target=(wave.safeSector+.5)*T/wave.sides;
+   if(mode===1){const d=delta(game.angle,target);game.update(1/60,Math.max(-1,Math.min(1,d/(game.playerSpeed/60))))}
+   else{
+    if(game.sides===wave.sides&&game.time>=nextPress){
+     const current=Math.floor(wrap(game.angle)/(T/game.sides)+1e-9);
+     const forward=(wave.safeSector-current+game.sides)%game.sides,back=(current-wave.safeSector+game.sides)%game.sides;
+     if(forward||back){game.stepSector(forward<=back?1:-1);nextPress=game.time+.18;changes++}
+    }
+    game.update(1/60,0);
+   }
+   assert(!game.dead,'unreachable mixed pattern: seed '+seed+', mode '+mode+', time '+game.time.toFixed(4)+', wave '+index);
+   assert(Math.abs(game.tilt-priorTilt)<.03,'random tilt must change continuously');priorTilt=game.tilt;
+   assert(Math.abs(game.tilt)<.4);
+   if(frame%2===0&&game.morph<1){
+    const free=Array.from({length:game.sides},(_,s)=>playerPoly((s+.5)*T/game.sides))
+     .filter(p=>game.walls.every(w=>!intersect(p,wallVisualPoly(w,game.fromSides,game.sides,game.morph))));
+    assert(free.length>=1,'a real discrete landing must remain open throughout each morph');
    }
   }
-  assert(nextStepped.some(Boolean),'mode 2 needs spaced discrete landings for '+data.musicTrack.key+' at '+time);
-  discreteParents.push(sp);discreteMoves.push(sm);stepped=nextStepped;priorSides=g.sides;priorNear=near;
+  assert(game.timelineEnded&&game.completed&&game.time===60);
+  if(mode===2)assert(changes>10);
  }
- let a=reachable.findIndex(Boolean),k=stepped.findIndex(Boolean);
- const headings=new Int16Array(FRAMES+1),moves=new Int8Array(FRAMES);headings[FRAMES]=a;
- for(let f=FRAMES-1;f>=0;f--){a=continuousParents[f][a];headings[f]=a;moves[f]=discreteMoves[f][k];k=discreteParents[f][k]}
- for(const mode of [1,2]){
-  const run=new Game(6,data);run.setControlMode(mode);let maxEarlyTilt=0,maxLateTilt=0,changes=0;
-  for(let f=0;f<FRAMES;f++){
-   let input=0;
-   if(mode===1){const delta=((headings[f+1]-headings[f]+N*1.5)%N)-N/2;input=delta*T/N/(PLAYER_SPEED/FPS)}
-   else if(moves[f]){assert(run.stepSector(moves[f]));changes++}
-   run.update(1/FPS,input);
-   assert(!run.dead,'actual Game.update collision replay failed: '+data.musicTrack.key+' mode '+mode+' at '+run.time);
-   if(run.time<10)maxEarlyTilt=Math.max(maxEarlyTilt,Math.abs(run.tilt));
-   if(run.time>45)maxLateTilt=Math.max(maxLateTilt,Math.abs(run.tilt));
-  }
-  assert(run.completed&&run.timelineEnded);assert.equal(maxEarlyTilt,0);assert(maxLateTilt>.08);
-  if(mode===2)assert(changes>20,'normal patterns must require frequent deliberate movement');
- }
- // Teleport must use the same morphing polygons as the drawn normal actors.
- for(const time of [19.9,20.2,26.9,36.4,43.2,49.8,55.4])for(let i=0;i<12;i++){
-  const run=new Game(6,data);run.time=time;run.sampleWalls();run.angle=i*T/12;
-  const expected=run.walls.some(w=>intersect(playerPoly(wrap(run.angle+Math.PI)),wallVisualPoly(w,run.fromSides,run.sides,run.morph)));
-  run.teleportHalfTurn();assert.equal(run.dead,expected);
- }
- console.log('PASS '+data.musicTrack.key+': normal walls, beat clock, both real 60s collision replays; minimum '+minimum+'/'+N+' reachable angles');
 }
-console.log('PASS 100 seeds, all three music tracks, fixed normal patterns, unchanged source and physically playable music synchronization');
+assert.equal(seenTracks.size,3);assert.equal(seenShapes.size,3);assert.equal(seenSources.size,6);
+assert.notDeepEqual(R.create(1).waves,R.create(2).waves);
+assert.notDeepEqual(R.create(1).shapeSchedule,R.create(2).shapeSchedule);
+console.log('PASS '+R.PATTERN_BANK.length+' original motifs, '+minimumWaves+'+ beat-aligned gates, random safe morphs/initial tilt; 100 seeds x both 60s collision replays');

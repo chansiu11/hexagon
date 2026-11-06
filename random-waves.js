@@ -1,89 +1,90 @@
-/* Stage seven reuses the normal first-stage wall actors and shape schedule.
-   Randomness selects the music and camera, never the prescribed wall order. */
+/* Stage seven mixes formations extracted from the six normal stages.
+   Every authored gate keeps a reachable opening before it is ever spawned. */
 (function(root){'use strict';
-const TAU=Math.PI*2,DURATION=60,SAMPLE_RATE=60,RADIAL_GAIN=1.15;
-const SHAPE_SCHEDULE=Object.freeze([[0,6],[20,5],[26.733,4],[36.2,5],[43,4],[49.667,5],[55.267,6]]);
-// Only stage seven: these overlapping source observations seal discrete
-// landings near 30s, 40s, 50-51s and 56s. Stable IDs prevent popping.
-const OMITTED_ACTORS=Object.freeze([414,406,418,424,426,503,417,335,230,235,233]);
-// Tempo and phase measured from bass/transient onsets in the bundled MP3s.
-const TRACKS=Object.freeze([
- {index:0,key:'courtesy',bpm:130,phase:.085},
- {index:1,key:'otis',bpm:135,phase:.005},
- {index:2,key:'focus',bpm:174,phase:.06}
-]);
-let normalSource=null;
-function makeRng(seed){let state=(seed>>>0)||0x9e3779b9;return()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296}}
-function setSource(source){
- if(source?.mode!=='batched-wall-waves'||!source.waves?.length)throw Error('Normal stage wall source is unavailable');
- normalSource=source;
-}
-const atTime=(t,schedule)=>{let sides=schedule[0][1];for(const[at,n]of schedule)if(t>=at)sides=n;else break;return sides};
-function engine(){return typeof module!=='undefined'?require('./engine.js'):root.HexEngine}
-const impactCache=new WeakMap();
-function normalImpacts(source){
- if(impactCache.has(source))return impactCache.get(source);
- const e=engine(),g=new e.Game(0,source),events=[],previous=new Map();
- // Measure the actual normal-stage faces rather than the noisy raw track
- // estimates: existing corrections, first-ring slowdown and morph all apply.
- for(let frame=0;frame<=3600;frame++){
-  const time=frame/60;g.time=time;g.sampleWalls();
-  for(const w of g.walls){
-   const accelerated={...w,r:26+(w.r-26)*RADIAL_GAIN,thickness:w.thickness*RADIAL_GAIN};
-   const p=e.wallVisualPoly(accelerated,g.fromSides,g.sides,g.morph);
-   const face=Math.hypot((p[0][0]+p[1][0])/2,(p[0][1]+p[1][1])/2);
-   const prev=previous.get(w.id);
-   if(prev&&prev.face>66&&face<=66&&face<prev.face){
-    const at=time-(1/60)*(66-face)/(prev.face-face);
-    if(at>1&&at<59&&source.shapeSchedule.every(([boundary])=>Math.abs(at-boundary)>.7))events.push(at);
-   }
-   previous.set(w.id,{face});
-  }
- }
- events.sort((a,b)=>a-b);impactCache.set(source,events);return events;
-}
-function beatKnots(source,track){
- const events=normalImpacts(source);
- const knots=[[0,0]],halfBeat=30/track.bpm;let lastEvent=-1;
- for(const sourceTime of events){
-  if(sourceTime-lastEvent<.28)continue;
-  lastEvent=sourceTime;
-  const target=track.phase+Math.round((sourceTime-track.phase)/halfBeat)*halfBeat;
-  const prior=knots[knots.length-1],offset=sourceTime-target,priorOffset=prior[1]-prior[0];
-  // Smoothstep interpolation keeps velocity continuous and bounded.
-  // Never compress a normal escape interval by more than 22.5 percent.
-  if(target-prior[0]<.3||Math.abs(offset-priorOffset)>.15*(target-prior[0]))continue;
-  knots.push([target,sourceTime]);
- }
- while(knots.length>1&&Math.abs(knots.at(-1)[1]-knots.at(-1)[0])>.15*(60-knots.at(-1)[0]))knots.pop();
- knots.push([60,60]);return knots;
-}
-const plans=new WeakMap();
-function create(seed,source=normalSource){
- if(!source&&typeof module!=='undefined')source=require('./assets/timelines/waves-stage-0.json');
- if(!source)throw Error('Load the normal first stage before starting stage seven');
+const BANK=typeof module!=='undefined'?require('./pattern-bank.js'):root.HexPatternBank;
+const TAU=Math.PI*2,SPAWN_RADIUS=1200,DURATION=60,PLAYER_SPEED=420*TAU/360;
+const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085},{index:1,key:'otis',bpm:135,phase:.005},{index:2,key:'focus',bpm:174,phase:.06}]);
+const wrap=(a,n=TAU)=>(a%n+n)%n,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const delta=(a,b)=>wrap(b-a+Math.PI)-Math.PI;
+function makeRng(seed){let s=(seed>>>0)||0x9e3779b9;return()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return(s>>>0)/4294967296}}
+const atTime=(time,schedule)=>{let n=schedule[0][1];for(const[t,s]of schedule)if(time>=t)n=s;else break;return n};
+function create(seed){
  const actualSeed=Number.isFinite(seed)?seed>>>0:(Math.random()*4294967296)>>>0;
  const random=makeRng(actualSeed),pick=makeRng(Math.imul(actualSeed,0x9e3779b1)^0x71c3a695);
- const track=TRACKS[Math.floor(pick()*TRACKS.length)];
- let cache=plans.get(source);if(!cache){cache=TRACKS.map(t=>beatKnots(source,t));plans.set(source,cache)}
- // Smoothly interpolated target spin changes. Later changes are more rapid
- // and much faster. The player, core and walls share the same camera transform.
- const spinEvents=[],spinStartRandom=makeRng(actualSeed^0xd31f6c29);
- let t=0,sign=spinStartRandom()<.5?-1:1;
- while(t<DURATION+.1){
-  if(spinStartRandom()<.67)sign*=-1;
-  const ramp=Math.pow(Math.min(1,t/DURATION),1.08);
-  const magnitude=.72+ramp*4.45+spinStartRandom()*(.45+ramp*.55);
-  spinEvents.push([t,sign*magnitude]);
-  t+=Math.max(1.45,3.7-t*.037)+spinStartRandom()*.85;
+ const track=TRACKS[Math.floor(pick()*3)],halfBeat=30/track.bpm,beat=60/track.bpm;
+ const snap=t=>track.phase+Math.ceil((t-track.phase)/halfBeat-1e-9)*halfBeat;
+ const shapeSchedule=[[0,6]];let boundary=Math.ceil((6.5+random()*2)/beat)*beat,shape=6;
+ while(boundary<56){
+  const choices=[4,5,6].filter(n=>n!==shape);shape=choices[Math.floor(random()*choices.length)];
+  shapeSchedule.push([boundary,shape]);boundary=Math.ceil((boundary+6.1+random()*2.8)/beat)*beat;
  }
- const tiltPhase=random()*TAU;
- return {mode:'batched-wall-waves',kind:'normal-pattern',seed:actualSeed,
-  sampleRate:SAMPLE_RATE,duration:DURATION,shapeSchedule:source.shapeSchedule,
-  normalTimeline:source,waves:source.waves,radialGain:RADIAL_GAIN,
-  omittedActors:OMITTED_ACTORS,clockKnots:cache[track.index],musicTrack:track,
-  spinEvents,tiltPhase,offscreenBirth:true};
+ function outsideMorph(t){
+  let next=snap(t);
+  for(const[at]of shapeSchedule.slice(1))if(next>at-.85&&next<at+1.05)next=snap(at+1.05);
+  return next;
+ }
+ const waves=[];let proposed=3.3,pattern=null,gateIndex=0,patternSides=6,offset=0,lastLevel=-1,stationary=0;
+ while(proposed<59.3){
+  let impact=outsideMorph(proposed),ready=null;
+  if(impact>=59.3)break;
+  for(let retry=0;retry<5;retry++){
+   const sides=atTime(impact,shapeSchedule),step=TAU/sides,prev=waves.at(-1);
+   if(!pattern||gateIndex>=pattern.gates.length||patternSides!==sides){
+    const choices=BANK.filter(p=>p.level!==lastLevel);
+    pattern=choices[Math.floor(random()*choices.length)];lastLevel=pattern.level;
+    gateIndex=0;patternSides=sides;offset=Math.floor(random()*sides);
+   }
+   const gate=pattern.gates[gateIndex],blocked=new Set();
+   for(let sector=0;sector<sides;sector++){
+    const sourceSector=Math.floor(wrap(sector-offset+.5,sides)*gate.sides/sides);
+    if(gate.sectors.includes(sourceSector))blocked.add(sector);
+   }
+   const oldAngle=prev?(prev.safeSector+.5)*TAU/prev.sides:Math.PI*1.5;
+   const candidates=Array.from({length:sides},(_,i)=>i).filter(i=>!blocked.has(i))
+    .sort((a,b)=>Math.abs(delta(oldAngle,(a+.5)*step))-Math.abs(delta(oldAngle,(b+.5)*step)));
+   let safeSector=candidates[0];
+   if(stationary>=2&&candidates.length>1&&Math.abs(delta(oldAngle,(candidates[1]+.5)*step))<1.9)safeSector=candidates[1];
+   if(safeSector===undefined||Math.abs(delta(oldAngle,(safeSector+.5)*step))>=1.9){
+    // Quantising a source formation to a new polygon must never seal the
+    // nearest reachable landing. Remove the blocking face at generation.
+    safeSector=Math.floor(wrap(oldAngle)/step);blocked.delete(safeSector);
+   }
+   const speed=clamp(327.4529736770803*1.15*(.98+.08*impact/60)+random()*10,365,418);
+   const thickness=clamp(gate.thickness*1.05,38,58);
+   let earliest=impact;
+   if(prev){
+    const turn=Math.abs(delta(oldAngle,(safeSector+.5)*step));
+    const clearAt=prev.impact+(66+prev.thickness-59)/prev.speed;
+    const approach=(73/Math.cos(Math.PI/sides)-66)/speed;
+    const travel=Math.max(turn/PLAYER_SPEED,Math.ceil(turn/step-1e-9)*.18);
+    earliest=outsideMorph(Math.max(impact,clearAt+.20+travel+approach));
+   }
+   if(atTime(earliest,shapeSchedule)!==sides){impact=earliest;continue;}
+   impact=earliest;
+   ready={sides,safeSector,sectors:[...blocked].sort((a,b)=>a-b),speed,thickness,
+    patternId:pattern.id,sourceLevel:pattern.level,sourceIds:gate.sourceIds,gap:gate.gap};break;
+  }
+  if(!ready||impact>=59.3)break;
+  const prev=waves.at(-1),angle=(ready.safeSector+.5)*TAU/ready.sides;
+  stationary=prev&&Math.abs(delta((prev.safeSector+.5)*TAU/prev.sides,angle))<.1?stationary+1:0;
+  const start=impact-(SPAWN_RADIUS-66)/ready.speed;
+  waves.push({...ready,id:waves.length,impact,start,end:Math.min(60,start+(SPAWN_RADIUS+ready.thickness-26)/ready.speed),r:SPAWN_RADIUS,openings:ready.sides-ready.sectors.length});
+  gateIndex++;proposed=impact+clamp(ready.gap,.34,.78);
+ }
+ const spinEvents=[],spin=makeRng(actualSeed^0xd31f6c29);let time=0,direction=spin()<.5?-1:1;
+ while(time<60.1){
+  if(spin()<.65)direction*=-1;
+  spinEvents.push([time,direction*(.75+time/60*3.25+spin()*.65)]);
+  time=track.phase+Math.ceil((time+(spin()<.5?2:4)*beat-track.phase)/beat)*beat;
+ }
+ const tiltEvents=[],tilt=makeRng(actualSeed^0xa1793c45);time=0;
+ while(time<60.1){
+  const magnitude=.07+tilt()*(.20+.10*time/60);
+  tiltEvents.push([time,(tilt()<.5?-1:1)*magnitude]);time+=2.4+tilt()*3.8;
+ }
+ return {mode:'batched-wall-waves',kind:'mixed-pattern',seed:actualSeed,sampleRate:60,duration:DURATION,
+  shapeSchedule,waves,musicTrack:track,spinEvents,tiltEvents,offscreenBirth:true};
 }
-const API={create,setSource,makeRng,SHAPE_SCHEDULE,RADIAL_GAIN,OMITTED_ACTORS,TRACKS,atTime};
+const API={create,makeRng,atTime,SPAWN_RADIUS,TRACKS,PATTERN_BANK:BANK};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.HexRandomWaves=API;
 })(typeof window!=='undefined'?window:globalThis);
