@@ -13,6 +13,24 @@ for(let seed of [1,7,19,42,77]){
    assert.deepEqual(g.walls.map(w=>[w.id,w.r]),actors,'no radial movement, births or disappearing walls while morphing');
    assert.deepEqual(g.waves.map(w=>w.id),waves);
    assert(Math.abs(g.morph-i/65)<1e-8,'morph progress must span the complete hold');
+   for(const w of g.walls){
+    // Both boundaries of every physical wall panel must be exact scaled
+    // points on the core's mesh, including corners in the outgoing shape.
+    const u=g.morph*g.morph*(3-2*g.morph);
+    for(const [t,vertex] of [[w.mixedStart,0],[w.mixedEnd,1]]){
+     const a=Transition.unitAt(g.fromSides,t),b=Transition.unitAt(g.sides,t);
+     const p=w.renderPoly[vertex];
+     assert(Math.abs(p[0]-(a[0]*(1-u)+b[0]*u)*Math.max(0,w.r))<1e-9);
+     assert(Math.abs(p[1]-(a[1]*(1-u)+b[1]*u)*Math.max(0,w.r))<1e-9);
+    }
+   }
+   for(let j=1;j<g.walls.length;j++){
+    const a=g.walls[j-1],b=g.walls[j];
+    if(a.waveId===b.waveId&&a.mixedEnd===b.mixedStart){
+     assert.deepEqual(a.renderPoly[1],b.renderPoly[0],'shared inner boundary must stay welded');
+     assert.deepEqual(a.renderPoly[2],b.renderPoly[3],'shared outer boundary must stay welded');
+    }
+   }
    for(const w of g.walls)assert.deepEqual(w.renderPoly,wallVisualPoly(w,g.fromSides,g.sides,g.morph),'cached render and hitbox must match the accepted polygon exactly');
   }
   let previousSpeed=0;
@@ -42,4 +60,4 @@ for(let seed of [1,7,19,42,77]){
   assert(wave&&Math.abs(wave.r-66)<1e-8,'pause calibration must preserve every beat-aligned arrival');
  }
 }
-console.log('PASS full 0.65s radial freeze, smooth non-accelerated restart, exact cached polygons/SAT, stable actors and musical arrivals');
+console.log('PASS welded shared core/wall perimeter, full 0.65s radial freeze, smooth non-accelerated restart, exact cached polygons/SAT, stable actors and musical arrivals');

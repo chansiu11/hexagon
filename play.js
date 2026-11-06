@@ -63,6 +63,17 @@ function updatePalette(dt){const neutral=['title','options','credits','quit','sc
 function palette(){return displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)')}
 
 function drawBackdrop(game,dark,light,playing){
+ if(playing&&game.level===6&&game.morph<1&&game.fromSides!==game.sides){
+  const u=game.morph*game.morph*(3-2*game.morph),knots=HexMixedTransition.KNOTS;
+  const point=t=>{const a=HexMixedTransition.unitAt(game.fromSides,t),b=HexMixedTransition.unitAt(game.sides,t);return [(a[0]*(1-u)+b[0]*u)*1800,(a[1]*(1-u)+b[1]*u)*1800]};
+  for(let i=0;i<knots.length-1;i++){
+   const mid=(knots[i]+knots[i+1])/2,points=[[0,0],point(knots[i]),point(knots[i+1])];
+   polygon(points,Math.floor(mid*game.fromSides)%2?dark:light);
+   ctx.save();ctx.globalAlpha*=u;polygon(points,Math.floor(mid*game.sides)%2?dark:light);ctx.restore();
+  }
+  return;
+ }
+
  const paint=(sides,opacity)=>{
   ctx.save();ctx.globalAlpha*=opacity;
   for(let i=0;i<sides;i++){
@@ -215,8 +226,7 @@ const mixedCoreUnits=new Map();
 function mixedCoreMesh(n){
  if(mixedCoreUnits.has(n))return mixedCoreUnits.get(n);
  const points=Array.from({length:60},(_,i)=>{
-  const k=i/60*n,j=Math.floor(k),f=k-j,a=j*Math.PI*2/n,b=(j+1)*Math.PI*2/n;
-  return [Math.cos(a)*(1-f)+Math.cos(b)*f,Math.sin(a)*(1-f)+Math.sin(b)*f];
+  return HexMixedTransition.unitAt(n,i/60);
  });
  mixedCoreUnits.set(n,points);return points;
 }
@@ -238,6 +248,22 @@ function gentleStartCamera(m,time){if(!m||time>=2)return m;const angle=Math.atan
 // A single nonzero fill forms the union: overlapping sectors do not produce
 // internal seams or transparent cracks from separate antialiased draw calls.
 function drawWallField(walls,color,game){
+ if(game.level===6){
+  // Draw each connected run as one contour. Collision uses the convex
+  // panels of this same mesh; internal panel edges never become fill seams.
+  ctx.fillStyle=color;
+  for(let i=0;i<walls.length;){
+   let end=i+1;
+   while(end<walls.length&&walls[end].waveId===walls[i].waveId&&walls[end-1].mixedEnd===walls[end].mixedStart)end++;
+   ctx.beginPath();const first=walls[i].renderPoly[0];ctx.moveTo(first[0],first[1]);
+   for(let j=i;j<end;j++){const p=walls[j].renderPoly[1];ctx.lineTo(p[0],p[1]);}
+   const outer=walls[end-1].renderPoly[2];ctx.lineTo(outer[0],outer[1]);
+   for(let j=end-1;j>=i;j--){const p=walls[j].renderPoly[3];ctx.lineTo(p[0],p[1]);}
+   ctx.closePath();ctx.fill();i=end;
+  }
+  return;
+ }
+
  // Paint each wall actor independently instead of asking the GPU to rasterize
  // every overlapping sector as one huge nonzero-winding compound path. An
  // unstable compound fill can leave whole wall sectors blank for one frame,
