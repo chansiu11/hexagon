@@ -115,6 +115,12 @@ function shapeStateAt(t,schedule,duration=MORPH_SECONDS){
  return {from,to,progress:index?Math.max(0,Math.min(1,(t-schedule[index][0])/duration)):1};
 }
 function wallVisualPoly(w,fromSides=w.sides||6,toSides=fromSides,progress=1){
+ if(w.mixedStart!==undefined){
+  const u=progress*progress*(3-2*progress),inner=Math.max(0,w.r),outer=Math.max(inner,w.r+w.thickness);
+  const a=MIXED_TRANSITION.unitAt(fromSides,w.mixedStart),b=MIXED_TRANSITION.unitAt(fromSides,w.mixedEnd);
+  const c=MIXED_TRANSITION.unitAt(toSides,w.mixedStart),d=MIXED_TRANSITION.unitAt(toSides,w.mixedEnd);
+  return [[a,c,inner],[b,d,inner],[b,d,outer],[a,c,outer]].map(([x,y,r])=>[x[0]*r*(1-u)+y[0]*r*u,x[1]*r*(1-u)+y[1]*r*u]);
+ }
  const src=w.sides||6,from=fromSides||src,to=toSides||from;
  // The four actors at the first 6->5 passage use consistent side indices
  // throughout the morph; all other waves use the original sector mapping.
@@ -187,10 +193,8 @@ function updateMixedPoly(w,from,to,progress){
  const key=from*10+to;
  if(w._shape===key&&w._radius===w.r&&w._progress===progress)return;
  if(w._shape!==key){
-  const old=Math.max(0,Math.min(from-1,Math.floor((w.sector+.5)*from/w.sides)));
-  const next=Math.max(0,Math.min(to-1,Math.floor((w.sector+.5)*to/w.sides)));
-  w._from=[Math.cos(old*TAU/from),Math.sin(old*TAU/from),Math.cos((old+1)*TAU/from),Math.sin((old+1)*TAU/from)];
-  w._to=[Math.cos(next*TAU/to),Math.sin(next*TAU/to),Math.cos((next+1)*TAU/to),Math.sin((next+1)*TAU/to)];
+  w._from=[...MIXED_TRANSITION.unitAt(from,w.mixedStart),...MIXED_TRANSITION.unitAt(from,w.mixedEnd)];
+  w._to=[...MIXED_TRANSITION.unitAt(to,w.mixedStart),...MIXED_TRANSITION.unitAt(to,w.mixedEnd)];
  }
  w._shape=key;w._radius=w.r;w._progress=progress;
  const u=progress*progress*(3-2*progress),inner=Math.max(0,w.r),outer=Math.max(inner,w.r+w.thickness);
@@ -241,10 +245,10 @@ class Game{
   const clock=MIXED_TRANSITION.clockAt(this.time,data.shapeSchedule);this.wallMotionTime=clock;
   this.wallFrame=Math.floor(this.time*data.sampleRate);this.recordedCamera=null;
   if(!this.mixedActors){
-   this.mixedActors=data.waves.map(w=>({...w,spawnRadius:w.r,actors:w.sectors.map(sector=>({
-    id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness,
+   this.mixedActors=data.waves.map(w=>({...w,spawnRadius:w.r,actors:w.sectors.flatMap(sector=>MIXED_TRANSITION.panels(w.sides,sector).map(([mixedStart,mixedEnd],part)=>({
+    id:w.id+':'+sector+':'+part,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness,mixedStart,mixedEnd,
     renderPoly:[[0,0],[0,0],[0,0],[0,0]],_shape:-1
-   }))}));
+   })))}));
    this.waves=[];
   }
   // Reuse wave/actor arrays and polygons at all physics substeps. Formerly
