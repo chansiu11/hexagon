@@ -169,35 +169,41 @@ const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
 // Correct only the first ring after its offscreen 18s handoff: adjacent
 // outgoing hexagon openings 4+5 merge into pentagon opening 4.
 const FIRST_PENTAGON_REACHABLE_SECTORS=Object.freeze({144:0,145:1,146:2,147:3});
+function normalPatternTime(time,data){
+ const knots=data?.clockKnots;if(!knots)return time;
+ for(let i=1;i<knots.length;i++)if(time<=knots[i][0]){
+  const a=knots[i-1],b=knots[i],u=Math.max(0,Math.min(1,(time-a[0])/(b[0]-a[0])));
+  const ease=u*u*(3-2*u);
+  return time+(a[1]-a[0])*(1-ease)+(b[1]-b[0])*ease;
+ }
+ return time;
+}
 class Game{
  constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false;this.randomAlignedSides=6}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170,145][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
- get targetSides(){if(this.level===6)return this.timeline?shapeStateAt(this.time,this.timeline.shapeSchedule).to:6;if(this.profile&&this.time<60){const schedule=this.profile.shapeSchedule;for(let i=schedule.length-1;i>=0;i--)if(this.time>=schedule[i][0])return schedule[i][1]}const phase=Math.floor((this.time%60)/10);return [[6,6,5,6,4,6],[6,5,6,4,6,5],[6,6,4,6,5,6]][this.level%3][phase]}
+ get targetSides(){if(this.level===6)return this.timeline?shapeStateAt(normalPatternTime(this.time,this.timeline),this.timeline.shapeSchedule).to:6;if(this.profile&&this.time<60){const schedule=this.profile.shapeSchedule;for(let i=schedule.length-1;i>=0;i--)if(this.time>=schedule[i][0])return schedule[i][1]}const phase=Math.floor((this.time%60)/10);return [[6,6,5,6,4,6],[6,5,6,4,6,5],[6,6,4,6,5,6]][this.level%3][phase]}
  sampleWalls(){
  const data=this.timeline;if(!data)return;
- if(this.level===6&&data.kind==='procedural-random'){
-  // Generated stages preserve each moving wall's own geometry while the
-  // central polygon smoothly morphs. No wall changes sectors mid-flight.
-  const shape=shapeStateAt(this.time,data.shapeSchedule);
-  if(this.controlMode===2&&this.randomAlignedSides!==shape.to){
-   // A new polygon defines NEW sectors. Keep discrete steering in the
-   // center of its current sector, not on a new boundary (which would
-   // graze the very first wall after morphing).
-   const step=TAU/shape.to;
+ if(this.level===6&&data.kind==='normal-pattern'){
+  // Sample the accepted normal-stage pipeline, including its global morph,
+  // pause/recovery clock, stable lifetimes and source-passage corrections.
+  const source=this.normalPatternGame||(this.normalPatternGame=new Game(0,data.normalTimeline));
+  source.time=normalPatternTime(this.time,data);source.sampleWalls();
+  if(this.controlMode===2&&this.randomAlignedSides!==source.sides){
+   const step=TAU/source.sides;
    this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);
   }
-  this.randomAlignedSides=shape.to;
-  this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
-  this.wallFrame=Math.min(data.duration*data.sampleRate,Math.floor(this.time*data.sampleRate));
-  this.recordedCamera=null;
-  this.waves=data.waves.filter(w=>this.time>=w.start&&this.time<w.end)
-   .map(w=>({...w,r:observedWaveRadius(w,this.time)}));
-  this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({
-   id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
-   r:w.r,thickness:w.thickness
-  })));
+  this.randomAlignedSides=source.sides;
+  this.fromSides=source.fromSides;this.sides=source.sides;this.morph=source.morph;
+  this.wallFrame=Math.floor(this.time*data.sampleRate);this.recordedCamera=null;
+  this.normalPatternTime=source.time;this.wallMotionTime=source.wallMotionTime;
+  const gain=data.radialGain,omitted=data.omittedActors;
+  this.walls=source.walls.filter(w=>!omitted.includes(w.waveId)).map(w=>({
+   ...w,r:26+(w.r-26)*gain,thickness:w.thickness*gain
+  }));
+  this.waves=source.waves;
   return;
  }
  if(data.mode==='rigid-observed-tracks'||data.mode==='batched-wall-waves'){
@@ -330,15 +336,14 @@ class Game{
   this.teleport={from,to,age:0,duration:.30};
   this.teleportCooldown=.18;
   const player=playerPoly(this.angle,this.playerLean);
-  const batch=this.timeline?.mode==='batched-wall-waves'&&
-   !(this.level===6&&this.timeline?.kind==='procedural-random');
+  const batch=this.timeline?.mode==='batched-wall-waves';
   if(this.walls.some(w=>w.points?polygonOverlap(player,w.points,w.holes):
     intersect(player,wallVisualPoly(w,batch?this.fromSides:w.sides,
       batch?this.sides:w.sides,batch?this.morph:1))))this.dead=true;
   return true;
  }
  update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.teleportCooldown=Math.max(0,this.teleportCooldown-h);if(this.stepEffect){this.stepEffect.age+=h;if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null;}if(this.teleport){this.teleport.age+=h;if(this.teleport.age>=this.teleport.duration)this.teleport=null;}this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;if(this.controlMode===1)this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;let target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));
-if(this.level===6&&this.timeline?.kind==='procedural-random'){
+if(this.level===6&&this.timeline?.kind==='normal-pattern'){
  // New target every few seconds, changing direction unpredictably, with
  // amplitude growing from gentle to strong as the level approaches 60s.
  for(const [at,rate] of this.timeline.spinEvents||[]){
@@ -353,7 +358,7 @@ if(this.shapeWait&&(this.profile&&this.time<60||this.walls.length===0)){this.fro
 this.morph=Math.min(1,this.morph+h/0.45);
 const phase=beat%1,accent=Math.exp(-phase*10);const targetZoom=1+accent*.075+.045*Math.sin(beat*Math.PI/8);this.zoom+=(targetZoom-this.zoom)*Math.min(1,h*32);
 let tiltTarget=Math.min(1,Math.max(0,this.time-1))*.24*Math.sin(beat*Math.PI/16)*Math.sin(Math.min(this.time/4,1)*Math.PI/2);
-if(this.level===6&&this.timeline?.kind==='procedural-random'){
+if(this.level===6&&this.timeline?.kind==='normal-pattern'){
  // No tilt at all before 10s; build toward stronger, smoother off-axis
  // oscillations afterwards. Keep compression safely above zero.
  const intensity=Math.min(1,Math.max(0,(this.time-10)/39));
@@ -366,15 +371,14 @@ if(this.timeline)this.sampleWalls();else for(const w of this.walls)w.r-=this.spe
 const p=playerPoly(this.angle,this.playerLean);
 if(this.walls.some(w=>{
  if(w.points)return polygonOverlap(p,w.points,w.holes);
- const random=this.level===6&&this.timeline?.kind==='procedural-random';
  const batch=this.timeline?.mode==='batched-wall-waves';
  return intersect(p,wallVisualPoly(w,
-  random?w.sides:batch?this.fromSides:w.sides,
-  random?w.sides:batch?this.sides:w.sides,
-  random?1:batch?this.morph:1));
+  batch?this.fromSides:w.sides,
+  batch?this.sides:w.sides,
+  batch?this.morph:1));
 })){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={normalPatternTime,polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 

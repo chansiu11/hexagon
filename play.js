@@ -27,6 +27,7 @@ function setControlMode(mode){
  if(game&&['play','paused'].includes(screen)){
   game=new Game(selected,selected===6?HexRandomWaves.create():game.timeline);
   game.setControlMode(mode);game.sampleWalls();
+  if(selected===6)music.randomTrackIndex=game.timeline.musicTrack.index;
   unlockedNow=false;flash=0;music.stop();
   if(screen==='play')music.play(selected,0);
  }
@@ -38,7 +39,7 @@ function choose(d){selectionSlide=1;slideDirection=d;beep();if(screen==='title')
 let starting=false;const timelineCache=new Map();
 async function loadTimeline(level){
  // Every new random-stage attempt gets a new seed and wave arrangement.
- if(level===6)return HexRandomWaves.create();
+ if(level===6){const source=await loadTimeline(0);HexRandomWaves.setSource(source);return HexRandomWaves.create()}
  if(!timelineCache.has(level))timelineCache.set(level,fetch('assets/timelines/'+'waves-stage-'+level+'.json?v=8',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('wall timeline '+r.status);return r.json();}).catch(e=>{timelineCache.delete(level);throw e;}));
  return timelineCache.get(level);
 }
@@ -46,7 +47,7 @@ async function start(){
  if(starting)return;if(!unlocked(selected)){beep(110,.2);return}
  starting=true;const level=selected,origin=screen;status.textContent='게임 데이터를 불러오는 중입니다.';
  try{const timeline=await loadTimeline(level);if(level!==selected||screen!==origin)return;
- game=new Game(level,timeline);game.setControlMode(settings.controlMode);game.sampleWalls();unlockedNow=false;paused=false;flash=0;change('play');beep(550,.1);
+ game=new Game(level,timeline);if(level===6)music.randomTrackIndex=timeline.musicTrack.index;game.setControlMode(settings.controlMode);game.sampleWalls();unlockedNow=false;paused=false;flash=0;change('play');beep(550,.1);
  }catch(error){status.textContent='게임 데이터를 불러오지 못했습니다. 다시 시작해 주세요.';console.error(error);}
  finally{starting=false;}
 }
@@ -141,8 +142,13 @@ function drawTeleportEffect(g,color){
 
 function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';ctx.fillRect(0,0,canvas.width,canvas.height);const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();const [dark,light,accent]=palette();const playing=['play','over','paused','complete'].includes(screen);const launchBlend=launch?1-Math.pow(1-Math.min(1,launch.age/launch.duration),3):1;let cx=480,cy=playing?300:screen==='select'?470:600;const rotation=settings.motion?(playing?game.rotation:spin):0;ctx.save();ctx.translate(cx,cy);const camera=playing&&settings.motion&&!launch?game.referenceCamera:null;if(camera){if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}else{if(playing&&settings.motion){ctx.rotate(game.tilt*.55);ctx.transform(1,0,Math.sin(game.tilt)*.3,Math.cos(game.tilt*1.65),0,0);ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const angle=game.tilt*.55,c=Math.cos(angle),s=Math.sin(angle),shear=Math.sin(game.tilt)*.3,compress=Math.cos(game.tilt*1.65),z=game.zoom,cr=Math.cos(rotation),sr=Math.sin(rotation);const a=c*z,b=s*z,d=(s*shear+c*compress)*z,k=(c*shear-s*compress)*z;game.lastDrawCamera=[a*cr+k*sr,b*cr+d*sr,-a*sr+k*cr,-b*sr+d*cr,0,0];game.cameraWasActive=false}}drawBackdrop(game,dark,light,playing);if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera?50:45.8807,dark,accent);ctx.restore();drawTeleportEffect(game,accent);drawSectorStepEffect(game,accent);const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead?'#fff':accent)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
 if(screen==='title'){header('','ESC - QUIT');drawLogo('SUPER',220,160,520,100);drawLogo('HEXAGON',305,268,490,65);arrows();ctx.save();ctx.translate(selectionSlide*slideDirection*35,0);panel(['START GAME','OPTIONS','CREDITS'][menuItem]);ctx.restore();text('PRESS SPACE TO SELECT',480,565,23,'#fff')}
-if(screen==='select'){header('TAB - HIGH SCORES','MODE '+settings.controlMode+'  |  ESC - RETURN');ctx.fillStyle='#000';ctx.fillRect(0,95,960,155);text(levels[selected][0],480+selectionSlide*slideDirection*45,115,49,accent);text('DIFFICULTY: '+levels[selected][1],480,177,23,'#ddd');text('BEST TIME: '+format(bestTime(selected)),480,211,23,'#ddd');if(selected>=3&&selected<6)text('HYPER MODE',885,68,16,accent,'right');if(selected===6)text('NEW WALLS EVERY RUN',900,68,16,accent,'right');panel(unlocked(selected)?'PRESS SPACE TO START':'LOCKED',270,470);if(!unlocked(selected))text('SURVIVE 60S IN '+levels[selected-3][0],480,345,17,'#ddd');arrows()}
-if(playing){ctx.save();header('BEST: '+format(bestTime(selected)),'');text('MODE '+settings.controlMode,78,54,17,'#ddd','left');
+if(screen==='select'){header('TAB - HIGH SCORES','MODE '+settings.controlMode+'  |  ESC - RETURN');ctx.fillStyle='#000';ctx.fillRect(0,95,960,155);text(levels[selected][0],480+selectionSlide*slideDirection*45,115,49,accent);text('DIFFICULTY: '+levels[selected][1],480,177,23,'#ddd');text('BEST TIME: '+format(bestTime(selected)),480,211,23,'#ddd');if(selected>=3&&selected<6)text('HYPER MODE',885,68,16,accent,'right');if(selected===6)text('NORMAL PATTERNS / RANDOM MUSIC',900,68,16,accent,'right');panel(unlocked(selected)?'PRESS SPACE TO START':'LOCKED',270,470);if(!unlocked(selected))text('SURVIVE 60S IN '+levels[selected-3][0],480,345,17,'#ddd');arrows()}
+if(playing){ctx.save();header('BEST: '+format(bestTime(selected)),'');text('MODE '+settings.controlMode,78,54,17,'#ddd','left');if(selected===6&&game.timeline?.musicTrack){
+ const track=game.timeline.musicTrack,beat=(game.time-track.phase)*track.bpm/60;
+ const pulse=Math.exp(-((beat%1+1)%1)*9);
+ ctx.save();ctx.globalAlpha=.55+.45*pulse;
+ text(track.key.toUpperCase()+' / '+track.bpm+' BPM',190,54,15,'#ddd','left');ctx.restore();
+}
 if(screen==='play'&&settings.controlMode===2){
  polygon([[28,508],[164,508],[174,566],[18,566]],'#000a','#ffffff80',2);
  text(game.doubleStepReady?'READY':'2 STEPS',96,517,game.doubleStepReady?24:21,'#fff');
@@ -158,15 +164,16 @@ if(screen==='play'){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touc
 // Gameplay owns the steady timebase. Never pause/jump wall movement to
  // follow fluctuating audio playback latency. Only the sound transport seeks.
  let elapsed=dt;
- if(music.active&&music.context?.state==='running'&&Math.abs(music.position-game.time)>.22)
-  music.play(selected,game.time);
+ if(music.active&&music.context?.state==='running'&&
+  Math.abs(music.position-game.time-(selected===6?elapsed:0))>(selected===6?.045:.22))
+   music.play(selected,game.time+(selected===6?elapsed:0));
 game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);game.zoom=music.visualZoom(dt);// The random stage has its own growing rotation and post-10s tilt.
  // Its identity placeholder camera must not suppress the animated view.
  game.referenceCamera=selected===6?null:
   gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();flash=.35;change(unlockedNow?'complete':'over');beep(90,.3)}}
 draw();
 if(transition){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=(1-transition.age/.24)**2;ctx.drawImage(transition.snapshot,0,-transition.age*canvas.height*.04);ctx.restore()}
-if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected%3];canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.controlMode=String(settings.controlMode);canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
+if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected===6?(music.randomTrackIndex??0):selected%3];canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.controlMode=String(settings.controlMode);canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
 async function toggleFullscreen(){
  try{
   if(document.fullscreenElement)await document.exitFullscreen();
@@ -231,11 +238,7 @@ function drawWallField(walls,color,game){
    }
    ctx.fill('evenodd');
   }else{
-   // Generated random waves keep their own polygon sectors for their entire
-   // descent. Only the central core morphs, so actors never visibly jump.
-   const random=game.level===6&&game.timeline?.kind==='procedural-random';
-   const points=wallVisualPoly(w,random?w.sides:game.fromSides,
-    random?w.sides:game.sides,random?1:game.morph);
+   const points=wallVisualPoly(w,game.fromSides,game.sides,game.morph);
    points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
    ctx.closePath();
    ctx.fill();
