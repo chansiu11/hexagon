@@ -132,7 +132,7 @@ const {chromium}=require('playwright');
   const delayedTrack=await page.evaluate(()=>{
    window.__savedTimelineLoader=loadTimeline;
    loadTimeline=async()=>HexRandomWaves.create(77);
-   const d=HexRandomWaves.create(77);music.buffers.delete(d.musicTrack.key);
+   const d=HexRandomWaves.create(77);music.buffers.delete(d.musicTrack.key);music.decodedBuffers.delete(d.musicTrack.key);
    selected=6;screen='select';settings.sound=true;settings.motion=false;music.stop();
    return d.musicTrack.key;
   });
@@ -154,7 +154,7 @@ const {chromium}=require('playwright');
    return {screen,time:game.time,position:music.position,loaded:!!music.source,state:music.context.state};
   });
   assert.equal(ready.screen,'play');assert.equal(ready.time,0);
-  assert(ready.loaded&&ready.state==='running'&&ready.position<.1,'audio is running from its opening when gameplay begins');
+  assert(ready.loaded&&ready.state==='running'&&ready.position<.1,'audio is running from its opening when gameplay begins: '+JSON.stringify(ready));
   await page.unroute(songRoute);
   await page.evaluate(()=>{loadTimeline=window.__savedTimelineLoader;settings.sound=false;music.stop()});
   // Capture the actual canvas through the scheduled transitions in Chromium.

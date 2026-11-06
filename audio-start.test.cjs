@@ -18,5 +18,9 @@ const sandbox={window:{},clearInterval};vm.runInNewContext(fs.readFileSync('./au
  assert.equal(starts[1].offset,12.5);assert.equal(audio.position,12.5);
  audio.play(6,0);audio.stop();pending.shift()({duration:90});await Promise.resolve();
  assert.equal(starts.length,2,'cancelled loads cannot start music later');
+ audio.decodedBuffers.set(audio.trackPath(6),{duration:90});
+ audio.play(6,0);
+ assert(audio.source&&starts.length===3,'a prepared song must be started synchronously with the play screen');
+ assert.equal(starts[2].offset,0);assert.equal(audio.position,0);
  console.log('PASS delayed cold audio starts at zero, exact resume offset and cancelled-load isolation');
 })().catch(e=>{console.error(e);process.exitCode=1});
