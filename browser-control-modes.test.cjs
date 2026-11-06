@@ -89,6 +89,57 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.HexEngine?.Game&&typeof setControlMode==='function');
   assert.deepEqual(await page.evaluate(()=>({mode:settings.controlMode,old:records[0],second:recordsMode2[0]})),
     {mode:1,old:12.34,second:19.5},'mode and separate records must survive reload');
+  // Mode 3 accepts every Latin letter/number as a physical key binding.
+  // Freeze only the test clock so every key sees the same live geometry.
+  await page.evaluate(()=>{window.requestAnimationFrame=()=>0});
+  await page.waitForTimeout(60);
+  await page.keyboard.press('Digit3');
+  assert.equal(await page.evaluate(()=>settings.controlMode),3);
+  const pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  for(let start=0;start<36;start+=6){
+   const bindings=pool.slice(start,start+6).split('');
+   await page.evaluate(bindings=>{
+    selected=6;screen='play';transition=null;launch=null;flash=0;settings.sound=false;settings.motion=true;
+    game=new HexEngine.Game(6,HexRandomWaves.create(77));game.setControlMode(3);game.directKeys=bindings;game.sampleWalls();
+    buildControls();draw();
+   },bindings);
+   for(let i=0;i<6;i++){
+    await page.keyboard.press(/[A-Z]/.test(bindings[i])?'Key'+bindings[i]:'Digit'+bindings[i]);
+    const state=await page.evaluate(()=>({mode:settings.controlMode,angle:game.angle}));
+    assert.equal(state.mode,3,'assigned digits must select lanes rather than switch modes');
+    assert(angularError(state.angle,(i+.5)*Math.PI/3)<1e-6,'each shown key must select its own slot');
+   }
+  }
+  require('node:fs').mkdirSync('wall-browser-screenshots',{recursive:true});
+  for(const sides of [6,5,4]){
+   await page.evaluate(sides=>{
+    game=new HexEngine.Game(6,HexRandomWaves.create(77));game.setControlMode(3);
+    game.sides=sides;game.fromSides=sides;game.morph=1;game.directKeys=['A','Z','1','2','3','0'];
+    game.musicRotation=1.1;game.tilt=.25;game.sampleWalls();game.sides=sides;game.fromSides=sides;
+    buildControls();draw();
+   },sides);
+   const targets=await page.evaluate(()=>game.directTargets);
+   assert.equal(targets.length,sides);
+   assert.equal(await page.locator('#controls button').count(),sides);
+   for(let i=0;i<sides;i++){
+    await page.mouse.click(targets[i].x,targets[i].y);
+    assert(angularError(await page.evaluate(()=>game.angle),(i+.5)*Math.PI*2/sides)<1e-6,'rotated/tilted world labels must have matching touch targets');
+   }
+   if(sides===4){
+    const before=await page.evaluate(()=>game.angle);await page.keyboard.press('Digit3');
+    assert.equal(await page.evaluate(()=>settings.controlMode),3);assert.equal(await page.evaluate(()=>game.angle),before,'hidden fifth key cannot target a square');
+   }
+   await page.screenshot({path:'wall-browser-screenshots/direct-mode-'+sides+'.png'});
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{resize();buildControls();draw()});
+  await page.locator('#controls button').filter({hasText:'Z 칸으로 이동'}).click();
+  assert(angularError(await page.evaluate(()=>game.angle),1.5*Math.PI/2)<1e-6,'mobile key dock selects its labelled slot');
+  await page.screenshot({path:'wall-browser-screenshots/direct-mode-mobile.png'});
+  await page.evaluate(()=>{recordsMode3[6]=22.22;save()});
+  await page.reload();await page.waitForFunction(()=>window.HexDirectControls);
+  assert.deepEqual(await page.evaluate(()=>({mode:settings.controlMode,third:recordsMode3[6],one:records[0],two:recordsMode2[0]})),
+   {mode:3,third:22.22,one:12.34,two:19.5},'mode three records persist without touching the previous modes');
   assert.deepEqual(errors,[],'browser runtime errors');
   console.log('PASS browser options switch, digit 1/2 controls, one-step key hold, live-run reset, legacy-save migration and separate persistent records');
  }finally{await browser.close()}

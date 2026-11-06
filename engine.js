@@ -353,11 +353,12 @@ class Game{
  // Mode 2 advances one whole CURRENT polygon sector per discrete input;
  // sector centers stay aligned when stage geometry changes.
  setControlMode(mode){
-  this.controlMode=mode===2?2:1;
+  this.controlMode=mode===3?3:mode===2?2:1;
   this.doubleStepReady=false;
   this.stepEffect=null;
   this.randomAlignedSides=this.sides;
-  if(this.controlMode===2){
+  this.directSides=this.sides;
+  if(this.controlMode===2||this.controlMode===3){
    const sides=Math.max(3,this.sides||6),step=TAU/sides;
    this.angle=wrap((Math.round(this.angle/step-.5)+.5)*step);
    this.playerLean=0;
@@ -389,10 +390,22 @@ class Game{
   this.stepEffect={from,to,direction:Math.sign(direction),count,age:0,duration:count===2?.30:.23};
   return true;
  }
+ // Mode 3 jumps only to the explicitly labelled current polygon sector.
+ selectSector(sector){
+  const sides=Math.max(3,this.sides||6);
+  if(this.controlMode!==3||this.dead||this.timelineEnded||!Number.isInteger(sector)||sector<0||sector>=sides)return false;
+  const from=this.angle,to=(sector+.5)*TAU/sides;
+  let turn=wrap(to-from+Math.PI)-Math.PI;
+  this.angle=to;this.playerLean=0;
+  if(Math.abs(turn)>1e-9)this.stepEffect={from,to,direction:Math.sign(turn),count:Math.abs(turn)/(TAU/sides),age:0,duration:.23};
+  const p=playerPoly(to),batch=this.timeline?.mode==='batched-wall-waves';
+  if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,batch?this.fromSides:w.sides,batch?this.sides:w.sides,batch?this.morph:1))))this.dead=true;
+  return true;
+ }
  // The player changes position instantly; only the decorative trail animates.
  // The short cooldown rejects held-key auto-repeat and accidental double inputs.
  teleportHalfTurn(){
-  if(this.controlMode===2||this.dead||this.timelineEnded||this.teleportCooldown>0)return false;
+  if(this.controlMode!==1||this.dead||this.timelineEnded||this.teleportCooldown>0)return false;
   const from=this.angle,to=wrap(from+Math.PI);
   this.angle=to;
   this.teleport={from,to,age:0,duration:.30};
@@ -429,6 +442,9 @@ if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
 }
 this.tilt+=(tiltTarget-this.tilt)*Math.min(1,h*(this.level===6?2.4:3));
 if(this.timeline)this.sampleWalls();else for(const w of this.walls)w.r-=this.speed*h;
+if(this.controlMode===3&&this.directSides!==this.sides){
+ const step=TAU/this.sides;this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);this.directSides=this.sides;
+}
 const p=playerPoly(this.angle,this.playerLean);
 if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>{
  if(w.points)return polygonOverlap(p,w.points,w.holes);
