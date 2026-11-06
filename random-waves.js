@@ -1,78 +1,71 @@
-/* Seventh stage: faster but physically reachable randomized walls, changing
-   polygon shapes, and deterministic (per-seed) camera spin targets. No original
-   stage timelines or assets are modified. */
+/* Stage seven reuses the normal first-stage wall actors and shape schedule.
+   Randomness selects the music and camera, never the prescribed wall order. */
 (function(root){'use strict';
-const SAMPLE_RATE=60,DURATION=60,SPAWN_RADIUS=835,TAU=Math.PI*2;
-const SHAPE_SCHEDULE=Object.freeze([[0,6],[12,5],[27,6],[42,4],[53,5]]);
-function makeRng(seed){
- let state=(seed>>>0)||0x9e3779b9;
- return ()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
-  return (state>>>0)/4294967296};
+const TAU=Math.PI*2,DURATION=60,SAMPLE_RATE=60,RADIAL_GAIN=1.15;
+const SHAPE_SCHEDULE=Object.freeze([[0,6],[20,5],[26.733,4],[36.2,5],[43,4],[49.667,5],[55.267,6]]);
+// Only stage seven: these overlapping source observations seal discrete
+// landings near 30s, 40s, 50-51s and 56s. Stable IDs prevent popping.
+const OMITTED_ACTORS=Object.freeze([414,406,418,424,426,503,417,335,230,235,233]);
+// Tempo and phase measured from bass/transient onsets in the bundled MP3s.
+const TRACKS=Object.freeze([
+ {index:0,key:'courtesy',bpm:130,phase:.085},
+ {index:1,key:'otis',bpm:135,phase:.005},
+ {index:2,key:'focus',bpm:174,phase:.06}
+]);
+let normalSource=null;
+function makeRng(seed){let state=(seed>>>0)||0x9e3779b9;return()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296}}
+function setSource(source){
+ if(source?.mode!=='batched-wall-waves'||!source.waves?.length)throw Error('Normal stage wall source is unavailable');
+ normalSource=source;
 }
-const atTime=(t,schedule)=>{let sides=schedule[0][1];
- for(const [start,n] of schedule)if(t>=start)sides=n;else break;
- return sides;
-};
-const wrap=(a,n)=>(a%n+n)%n;
-function create(seed){
- const actualSeed=Number.isFinite(seed)?seed>>>0:(Math.random()*4294967296)>>>0;
- const random=makeRng(actualSeed),waves=[],schedule=SHAPE_SCHEDULE.map(entry=>[...entry]);
- let impact=3.6,index=0,safeSector=4,previousSides=6,easyRun=0;
- while(impact<59.35){
-  // Change the *core* shape at the scheduled time, and reserve a readable
-  // interval on both sides of each morph. New-shaped actors never spawn
-  // before the corresponding core has started its transformation.
-  for(const [boundary] of schedule.slice(1))
-   if(impact>boundary-.80&&impact<boundary+3.2)impact=boundary+3.2;
-  if(impact>=59.35)break;
-  const sides=atTime(impact,schedule),step=TAU/sides;
-  if(index>0){
-   const oldCenter=(safeSector+.5)*TAU/previousSides;
-   safeSector=Math.floor(wrap(oldCenter,TAU)/step);
-   const move=random();
-   safeSector=wrap(safeSector+(move<.39?-1:move<.78?1:0),sides);
+const atTime=(t,schedule)=>{let sides=schedule[0][1];for(const[at,n]of schedule)if(t>=at)sides=n;else break;return sides};
+function engine(){return typeof module!=='undefined'?require('./engine.js'):root.HexEngine}
+const impactCache=new WeakMap();
+function normalImpacts(source){
+ if(impactCache.has(source))return impactCache.get(source);
+ const e=engine(),g=new e.Game(0,source),events=[],previous=new Map();
+ // Measure the actual normal-stage faces rather than the noisy raw track
+ // estimates: existing corrections, first-ring slowdown and morph all apply.
+ for(let frame=0;frame<=3600;frame++){
+  const time=frame/60;g.time=time;g.sampleWalls();
+  for(const w of g.walls){
+   const accelerated={...w,r:26+(w.r-26)*RADIAL_GAIN,thickness:w.thickness*RADIAL_GAIN};
+   const p=e.wallVisualPoly(accelerated,g.fromSides,g.sides,g.morph);
+   const face=Math.hypot((p[0][0]+p[1][0])/2,(p[0][1]+p[1][1])/2);
+   const prev=previous.get(w.id);
+   if(prev&&prev.face>66&&face<=66&&face<prev.face){
+    const at=time-(1/60)*(66-face)/(prev.face-face);
+    if(at>1&&at<59&&source.shapeSchedule.every(([boundary])=>Math.abs(at-boundary)>.7))events.push(at);
+   }
+   previous.set(w.id,{face});
   }
-  if(index>0&&previousSides!==sides){
-   // Mapping to a new polygon can add half a sector before the random
-   // turn. Do not combine that remap with a second, far-away opening.
-   const oldCenter=(waves[index-1].safeSector+.5)*TAU/previousSides;
-   const turn=Math.abs(wrap((safeSector+.5)*step-oldCenter+Math.PI,TAU)-Math.PI);
-   if(turn>=1.9)safeSector=Math.floor(wrap(oldCenter,TAU)/step);
-  }
-  previousSides=sides;
-  // Sharply more demanding than v1: ~40% narrow one-side gaps late,
-  // denser arrivals, and few three-side breathing patterns.
-  const type=random(),difficulty=Math.min(1,impact/56);
-  const narrowChance=index<3?0:.30+.15*difficulty;
-  const openings=easyRun>=3?1:type<narrowChance?1:type<narrowChance+.055?3:2;
-  easyRun=openings===1?0:easyRun+1;
-  const open=new Set([safeSector]);
-  if(openings===2)open.add(wrap(safeSector+(random()<.5?-1:1),sides));
-  if(openings===3){open.add(wrap(safeSector-1,sides));open.add(wrap(safeSector+1,sides))}
-  const sectors=Array.from({length:sides},(_,i)=>i).filter(i=>!open.has(i));
-  const speed=296+Math.min(48,impact*.77)+random()*18;
-  const thickness=40+Math.floor(random()*14);
-  if(waves.length){
-   const previous=waves[waves.length-1];
-   const oldCenter=(previous.safeSector+.5)*TAU/previous.sides;
-   const turn=Math.abs(wrap((safeSector+.5)*step-oldCenter+Math.PI,TAU)-Math.PI);
-   // The triangle is inside the [59,73] radial band. Wait until the
-   // previous ring is wholly inside it, allow human input plus travel at
-   // the actual 420deg/s turn rate, and finish before the next polygon's
-   // apothem enters that band. Discrete presses get 180ms each as well.
-   const clearAt=previous.impact+(66+previous.thickness-59)/previous.speed;
-   const approach=(73/Math.cos(Math.PI/sides)-66)/speed;
-   const travel=Math.max(turn/(420*TAU/360),Math.ceil(turn/step-1e-9)*.18);
-   impact=Math.max(impact,clearAt+.25+travel+approach);
-  }
-  const start=impact-(SPAWN_RADIUS-66)/speed;
-  const end=Math.min(DURATION,start+(SPAWN_RADIUS+thickness-26)/speed);
-  waves.push({id:index,start,end,r:SPAWN_RADIUS,speed,thickness,
-   sides,sectors,safeSector,openings,impact});
-  index++;
-  const spacing=impact<13?1.70:impact<32?1.48:impact<48?1.34:1.22;
-  impact+=spacing+(random()-.5)*.22+(openings===1?.12:0);
  }
+ events.sort((a,b)=>a-b);impactCache.set(source,events);return events;
+}
+function beatKnots(source,track){
+ const events=normalImpacts(source);
+ const knots=[[0,0]],halfBeat=30/track.bpm;let lastEvent=-1;
+ for(const sourceTime of events){
+  if(sourceTime-lastEvent<.28)continue;
+  lastEvent=sourceTime;
+  const target=track.phase+Math.round((sourceTime-track.phase)/halfBeat)*halfBeat;
+  const prior=knots[knots.length-1],offset=sourceTime-target,priorOffset=prior[1]-prior[0];
+  // Smoothstep interpolation keeps velocity continuous and bounded.
+  // Never compress a normal escape interval by more than 22.5 percent.
+  if(target-prior[0]<.3||Math.abs(offset-priorOffset)>.15*(target-prior[0]))continue;
+  knots.push([target,sourceTime]);
+ }
+ while(knots.length>1&&Math.abs(knots.at(-1)[1]-knots.at(-1)[0])>.15*(60-knots.at(-1)[0]))knots.pop();
+ knots.push([60,60]);return knots;
+}
+const plans=new WeakMap();
+function create(seed,source=normalSource){
+ if(!source&&typeof module!=='undefined')source=require('./assets/timelines/waves-stage-0.json');
+ if(!source)throw Error('Load the normal first stage before starting stage seven');
+ const actualSeed=Number.isFinite(seed)?seed>>>0:(Math.random()*4294967296)>>>0;
+ const random=makeRng(actualSeed),pick=makeRng(Math.imul(actualSeed,0x9e3779b1)^0x71c3a695);
+ const track=TRACKS[Math.floor(pick()*TRACKS.length)];
+ let cache=plans.get(source);if(!cache){cache=TRACKS.map(t=>beatKnots(source,t));plans.set(source,cache)}
  // Smoothly interpolated target spin changes. Later changes are more rapid
  // and much faster. The player, core and walls share the same camera transform.
  const spinEvents=[],spinStartRandom=makeRng(actualSeed^0xd31f6c29);
@@ -85,12 +78,12 @@ function create(seed){
   t+=Math.max(1.45,3.7-t*.037)+spinStartRandom()*.85;
  }
  const tiltPhase=random()*TAU;
- const camera=Array.from({length:DURATION*SAMPLE_RATE+1},()=>[1,0,0,1,0,0]);
- return {mode:'batched-wall-waves',kind:'procedural-random',seed:actualSeed,
-  sampleRate:SAMPLE_RATE,duration:DURATION,shapeSchedule:schedule,
-  camera,waves,spinEvents,tiltPhase,offscreenBirth:true};
+ return {mode:'batched-wall-waves',kind:'normal-pattern',seed:actualSeed,
+  sampleRate:SAMPLE_RATE,duration:DURATION,shapeSchedule:source.shapeSchedule,
+  normalTimeline:source,waves:source.waves,radialGain:RADIAL_GAIN,
+  omittedActors:OMITTED_ACTORS,clockKnots:cache[track.index],musicTrack:track,
+  spinEvents,tiltPhase,offscreenBirth:true};
 }
-const API={create,makeRng,SPAWN_RADIUS,SHAPE_SCHEDULE,atTime};
-if(typeof module!=='undefined'&&module.exports)module.exports=API;
-else root.HexRandomWaves=API;
+const API={create,setSource,makeRng,SHAPE_SCHEDULE,RADIAL_GAIN,OMITTED_ACTORS,TRACKS,atTime};
+if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.HexRandomWaves=API;
 })(typeof window!=='undefined'?window:globalThis);
