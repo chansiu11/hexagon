@@ -16,6 +16,12 @@ function clockAt(time,schedule){
  }
  return time-lag;
 }
+function timeAtClock(clock,schedule){
+ if(clock<=0)return clock;
+ let lo=0,hi=Math.max(60,clock+schedule.length);
+ for(let i=0;i<52;i++){const mid=(lo+hi)/2;if(clockAt(mid,schedule)<clock)lo=mid;else hi=mid;}
+ return hi;
+}
 // Six persistent corner tracks: reducing the polygon collapses complete
 // edges into a shared corner, rather than cutting lanes at fractional edges.
 // Every wall uses these same tracks regardless of its eventual impact shape.
@@ -34,6 +40,26 @@ function panels(sides,sector){
  const end=KNOTS.findIndex((_,i)=>cornerIndex(sides,i)===sector+1);
  return Array.from({length:end-start},(_,i)=>[KNOTS[start+i],KNOTS[start+i+1]]);
 }
-const API={MORPH_SECONDS,RESUME_SECONDS,clockAt,unitAt,panels,KNOTS,laneAt};
+function pointAt(from,to,progress,t){
+ const u=progress*progress*(3-2*progress),a=unitAt(from,t),b=unitAt(to,t);
+ return [a[0]*(1-u)+b[0]*u,a[1]*(1-u)+b[1]*u];
+}
+function sectorT(sides,sector){
+ const target=sector+.5;
+ for(let i=0;i<6;i++){const a=cornerIndex(sides,i),b=cornerIndex(sides,i+1);if(b>a&&target>=a&&target<=b)return (i+(target-a)/(b-a))/6;}
+ return 0;
+}
+function angleAt(from,to,progress,t){const p=pointAt(from,to,progress,t);return Math.atan2(p[1],p[0]);}
+function trackAtAngle(from,to,progress,angle){
+ const dx=Math.cos(angle),dy=Math.sin(angle);
+ for(let i=0;i<6;i++){
+  const a=pointAt(from,to,progress,i/6),b=pointAt(from,to,progress,(i+1)/6),vx=b[0]-a[0],vy=b[1]-a[1],den=vx*dy-vy*dx;
+  if(Math.abs(den)<1e-12)continue;
+  const u=-(a[0]*dy-a[1]*dx)/den;
+  if(u>=-1e-9&&u<=1+1e-9&&(a[0]+u*vx)*dx+(a[1]+u*vy)*dy>0)return (i+Math.max(0,Math.min(1,u)))/6;
+ }
+ return ((angle/(Math.PI*2))%1+1)%1;
+}
+const API={MORPH_SECONDS,RESUME_SECONDS,clockAt,timeAtClock,unitAt,panels,KNOTS,laneAt,pointAt,sectorT,angleAt,trackAtAngle};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.HexMixedTransition=API;
 })(typeof window!=='undefined'?window:globalThis);

@@ -243,17 +243,37 @@ class Game{
  const data=this.timeline;if(!data)return;
  if(this.level===6&&data.kind==='mixed-pattern'){
   const shape=shapeStateAt(this.time,data.shapeSchedule,data.morphSeconds);
-  if(this.controlMode===2&&this.randomAlignedSides!==shape.to){
-   const step=TAU/shape.to;this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);
+  if(shape.progress!==this.morph||shape.from!==this.fromSides||shape.to!==this.sides){
+  // The player rides the wall mesh. Discrete modes interpolate into a
+  // surviving cell center instead of ending on a merged, dangerous vertex.
+  const track=MIXED_TRANSITION.trackAtAngle(this.fromSides,this.sides,this.morph,this.angle);
+  if(this.controlMode!==1){
+   if(!this.morphPlayerTrack||shape.progress<this.morph||shape.from!==this.fromSides||shape.to!==this.sides){
+    const final=MIXED_TRANSITION.angleAt(shape.to,shape.to,1,track);
+    const sector=Math.floor(wrap(final)/(TAU/shape.to));
+    this.morphPlayerTrack={a:track,b:MIXED_TRANSITION.sectorT(shape.to,sector)};
+   }
+   const u=shape.progress*shape.progress*(3-2*shape.progress),ride=this.morphPlayerTrack;
+   this.angle=wrap(MIXED_TRANSITION.angleAt(shape.from,shape.to,shape.progress,ride.a+(ride.b-ride.a)*u));
+   if(shape.progress>=1)this.morphPlayerTrack=null;
+  }else this.angle=wrap(MIXED_TRANSITION.angleAt(shape.from,shape.to,shape.progress,track));
   }
   this.randomAlignedSides=shape.to;this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
   const clock=MIXED_TRANSITION.clockAt(this.time,data.shapeSchedule);this.wallMotionTime=clock;
   this.wallFrame=Math.floor(this.time*data.sampleRate);this.recordedCamera=null;
   if(!this.mixedActors){
-   this.mixedActors=data.waves.map(w=>({...w,spawnRadius:w.r,actors:w.sectors.flatMap(sector=>MIXED_TRANSITION.panels(w.sides,sector).map(([mixedStart,mixedEnd],part)=>({
-    id:w.id+':'+sector+':'+part,waveId:w.id,sector,sides:w.sides,r:w.r,thickness:w.thickness,mixedStart,mixedEnd,
-    renderPoly:[[0,0],[0,0],[0,0],[0,0]],_shape:-1
-   })))}));
+   this.mixedActors=data.waves.map(w=>{
+    const actor=(sector,mixedStart,mixedEnd,part,band='main',offset=0,thickness=w.thickness)=>({
+     id:w.id+':'+sector+':'+band+':'+part,waveId:w.id,sector,sides:w.sides,r:w.r,thickness,band,offset,mixedStart,mixedEnd,
+     renderPoly:[[0,0],[0,0],[0,0],[0,0]],_shape:-1
+    });
+    const actors=w.sectors.flatMap(sector=>MIXED_TRANSITION.panels(w.sides,sector).map(([a,b],part)=>actor(sector,a,b,part)));
+    for(const rim of w.smallWalls||[]){
+     const panels=MIXED_TRANSITION.panels(w.sides,rim.sector),[a,b]=panels[Math.min(panels.length-1,Math.floor(rim.pick*panels.length))];
+     actors.push(actor(rim.sector,a+(b-a)*.2,a+(b-a)*.8,0,rim.band,rim.offset,rim.thickness));
+    }
+    return {...w,spawnRadius:w.r,actors};
+   });
    this.waves=[];
   }
   // Reuse wave/actor arrays and polygons at all physics substeps. Formerly
@@ -263,7 +283,7 @@ class Game{
    if(clock<wave.start||clock>=wave.end)continue;
    wave.r=wave.spawnRadius-wave.speed*(clock-wave.start);this.waves.push(wave);
    for(const w of wave.actors){
-    w.r=wave.r;updateMixedPoly(w,shape.from,shape.to,shape.progress);this.walls.push(w);
+    w.r=wave.r+w.offset;updateMixedPoly(w,shape.from,shape.to,shape.progress);this.walls.push(w);
    }
   }
   return;
@@ -355,6 +375,7 @@ class Game{
  setControlMode(mode){
   this.controlMode=mode===3?3:mode===2?2:1;
   this.doubleStepReady=false;
+  this.morphPlayerTrack=null;
   this.stepEffect=null;
   this.randomAlignedSides=this.sides;
   this.directSides=this.sides;
@@ -363,6 +384,14 @@ class Game{
    this.angle=wrap((Math.round(this.angle/step-.5)+.5)*step);
    this.playerLean=0;
   }
+ }
+ sectorAngle(sector,sides=this.sides){
+  return this.level===6&&this.timeline?.kind==='mixed-pattern'?wrap(MIXED_TRANSITION.angleAt(this.fromSides,this.sides,this.morph,MIXED_TRANSITION.sectorT(sides,sector))):(sector+.5)*TAU/sides;
+ }
+ currentSector(){
+  let best=0,distance=Infinity;
+  for(let i=0;i<this.sides;i++){const d=Math.abs(wrap(this.sectorAngle(i)-this.angle+Math.PI)-Math.PI);if(d<distance){distance=d;best=i}}
+  return best;
  }
  armDoubleStep(){
   if(this.controlMode!==2||this.dead||this.timelineEnded)return false;
@@ -377,13 +406,14 @@ class Game{
   // After snapping, derive the containing sector rather than rounding a
   // half-integer: floating-point ties at pentagon/square centers can jump
   // by TWO cells when changing direction.
-  const current=Math.floor(wrap(this.angle)/step+1e-9);
+  const current=this.level===6&&this.timeline?.kind==='mixed-pattern'?this.currentSector():Math.floor(wrap(this.angle)/step+1e-9);
   const from=this.angle;
   // Exactly one two-sector move per bonus activation.
   const count=this.doubleStepReady?2:1;
   this.doubleStepReady=false;
-  const to=wrap((current+.5+Math.sign(direction)*count)*step);
+  const to=this.sectorAngle((current+Math.sign(direction)*count+sides)%sides);
   this.angle=to;
+  if(this.level===6&&this.timeline?.kind==='mixed-pattern'&&this.morph<1){const t=MIXED_TRANSITION.sectorT(sides,(current+Math.sign(direction)*count+sides)%sides);this.morphPlayerTrack={a:t,b:t};}
   this.playerLean=0;
   // Only a temporary VISUAL echo of an instantaneous position change:
   // the real hitbox remains at this.angle, never in the animation.
@@ -394,9 +424,10 @@ class Game{
  selectSector(sector){
   const sides=Math.max(3,this.sides||6);
   if(this.controlMode!==3||this.dead||this.timelineEnded||!Number.isInteger(sector)||sector<0||sector>=sides)return false;
-  const from=this.angle,to=(sector+.5)*TAU/sides;
+  const from=this.angle,to=this.sectorAngle(sector);
   let turn=wrap(to-from+Math.PI)-Math.PI;
   this.angle=to;this.playerLean=0;
+  if(this.level===6&&this.timeline?.kind==='mixed-pattern'&&this.morph<1){const t=MIXED_TRANSITION.sectorT(sides,sector);this.morphPlayerTrack={a:t,b:t};}
   if(Math.abs(turn)>1e-9)this.stepEffect={from,to,direction:Math.sign(turn),count:Math.abs(turn)/(TAU/sides),age:0,duration:.23};
   const p=playerPoly(to),batch=this.timeline?.mode==='batched-wall-waves';
   if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,batch?this.fromSides:w.sides,batch?this.sides:w.sides,batch?this.morph:1))))this.dead=true;
@@ -430,10 +461,10 @@ if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
  }
  this.rotationSpeed=target;
 }else this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);
-this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
+this.rotation+=this.rotationSpeed*h;if(!(this.level===6&&this.timeline?.kind==='mixed-pattern')){this.pendingSides=this.targetSides;
 this.shapeWait=this.pendingSides!==this.sides;
 if(this.shapeWait&&(this.profile&&this.time<60||this.walls.length===0)){this.fromSides=this.sides;this.sides=this.pendingSides;this.morph=0;this.lastGap=Math.floor(wrap(this.angle)/TAU*this.sides);this.shapeWait=false}
-this.morph=Math.min(1,this.morph+h/0.45);
+this.morph=Math.min(1,this.morph+h/0.45);}
 const phase=beat%1,accent=Math.exp(-phase*10);const targetZoom=1+accent*.075+.045*Math.sin(beat*Math.PI/8);this.zoom+=(targetZoom-this.zoom)*Math.min(1,h*32);
 let tiltTarget=Math.min(1,Math.max(0,this.time-1))*.24*Math.sin(beat*Math.PI/16)*Math.sin(Math.min(this.time/4,1)*Math.PI/2);
 if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
@@ -442,7 +473,7 @@ if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
 }
 this.tilt+=(tiltTarget-this.tilt)*Math.min(1,h*(this.level===6?2.4:3));
 if(this.timeline)this.sampleWalls();else for(const w of this.walls)w.r-=this.speed*h;
-if(this.controlMode===3&&this.directSides!==this.sides){
+if(this.controlMode===3&&this.level!==6&&this.directSides!==this.sides){
  const step=TAU/this.sides;this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);this.directSides=this.sides;
 }
 const p=playerPoly(this.angle,this.playerLean);

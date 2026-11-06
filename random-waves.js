@@ -14,20 +14,24 @@ function create(seed,trackIndex){
  const random=makeRng(actualSeed),pick=makeRng(Math.imul(actualSeed,0x9e3779b1)^0x71c3a695);
  const track=TRACKS[Number.isInteger(trackIndex)&&trackIndex>=0&&trackIndex<3?trackIndex:Math.floor(pick()*3)],halfBeat=30/track.bpm,beat=60/track.bpm;
  const snap=t=>track.phase+Math.ceil((t-track.phase)/halfBeat-1e-9)*halfBeat;
- const shapeSchedule=[[0,6]];let boundary=Math.ceil((6.5+random()*2)/beat)*beat,shape=6;
+ const shapeSchedule=[[0,6]];let boundary=3.8+random()*4.2,shape=6;
  while(boundary<56){
   const choices=[4,5,6].filter(n=>n!==shape);shape=choices[Math.floor(random()*choices.length)];
-  shapeSchedule.push([boundary,shape]);boundary=Math.ceil((boundary+6.1+random()*2.8)/beat)*beat;
+  shapeSchedule.push([boundary,shape]);boundary+=3.7+random()*5.1;
  }
  function outsideMorph(t){
   let next=snap(t);
-  for(const[at]of shapeSchedule.slice(1))if(next>at-.85&&next<at+1.05)next=snap(at+1.05);
+  for(const[at]of shapeSchedule.slice(1))if(next>=at&&next<at+.85)next=snap(at+.85);
   return next;
  }
+ const rims=makeRng(actualSeed^0x5a18c93d);
  const waves=[];let proposed=3.3,pattern=null,gateIndex=0,patternSides=6,offset=0,lastLevel=-1,stationary=0;
  while(proposed<59.3){
   let impact=outsideMorph(proposed),ready=null;
   if(impact>=59.3)break;
+  const rimPlan=[];
+  if(rims()<.48)rimPlan.push({band:'inner',gap:14+rims()*14,thickness:6+rims()*5,pick:rims()});
+  if(rims()<.48)rimPlan.push({band:'outer',gap:10+rims()*15,thickness:6+rims()*5,pick:rims()});
   for(let retry=0;retry<5;retry++){
    const sides=atTime(impact,shapeSchedule),step=TAU/sides,prev=waves.at(-1);
    if(!pattern||gateIndex>=pattern.gates.length||patternSides!==sides){
@@ -50,19 +54,31 @@ function create(seed,trackIndex){
     // nearest reachable landing. Remove the blocking face at generation.
     safeSector=Math.floor(wrap(oldAngle)/step);blocked.delete(safeSector);
    }
+   // A disappearing side must carry its opening into the adjoining faces,
+   // rather than squeezing the player's route to a zero-width corner.
+   const t=TRANSITION.sectorT(sides,safeSector);
+   for(const n of [4,5,6]){
+    const k=Math.min(5,Math.floor(t*6)),a=TRANSITION.laneAt(n,k/6),b=TRANSITION.laneAt(n,(k+1)/6);
+    if(a===b){blocked.delete((safeSector+sides-1)%sides);blocked.delete((safeSector+1)%sides);}
+   }
+   if(!blocked.size)blocked.add((safeSector+Math.floor(sides/2))%sides);
    const speed=clamp(327.4529736770803*1.15*(.98+.08*impact/60)+random()*10,365,418)*track.speedScale;
    const thickness=clamp(gate.thickness*1.05,38,58);
+   const smallWalls=rimPlan.map(r=>({...r,offset:r.band==='inner'?-r.gap:thickness+r.gap,
+    sector:[...blocked][Math.min(blocked.size-1,Math.floor(r.pick*blocked.size))]}));
+   const innerExtra=Math.max(0,...smallWalls.map(r=>-r.offset));
+   const outerExtra=Math.max(0,...smallWalls.map(r=>r.offset+r.thickness-thickness));
    let earliest=impact;
    if(prev){
     const turn=Math.abs(delta(oldAngle,(safeSector+.5)*step));
-    const clearAt=prev.impact+(66+prev.thickness-59)/prev.speed;
-    const approach=(73/Math.cos(Math.PI/sides)-66)/speed;
+    const clearAt=TRANSITION.timeAtClock(TRANSITION.clockAt(prev.impact,shapeSchedule)+(66+prev.thickness+prev.outerExtra-59)/prev.speed,shapeSchedule);
+    const approach=(73/Math.cos(Math.PI/4)-66+innerExtra)/speed;
     const travel=Math.max(turn/PLAYER_SPEED,Math.ceil(turn/step-1e-9)*.18);
-    earliest=outsideMorph(Math.max(impact,clearAt+.20+travel+approach));
+    earliest=outsideMorph(Math.max(impact,TRANSITION.timeAtClock(TRANSITION.clockAt(clearAt+.20+travel,shapeSchedule)+approach,shapeSchedule)));
    }
    if(atTime(earliest,shapeSchedule)!==sides){impact=earliest;continue;}
    impact=earliest;
-   ready={sides,safeSector,sectors:[...blocked].sort((a,b)=>a-b),speed,thickness,
+   ready={sides,safeSector,smallWalls,innerExtra,outerExtra,sectors:[...blocked].sort((a,b)=>a-b),speed,thickness,
     patternId:pattern.id,sourceLevel:pattern.level,sourceIds:gate.sourceIds,gap:gate.gap};break;
   }
   if(!ready||impact>=59.3)break;
@@ -70,7 +86,7 @@ function create(seed,trackIndex){
   stationary=prev&&Math.abs(delta((prev.safeSector+.5)*TAU/prev.sides,angle))<.1?stationary+1:0;
   const motionImpact=TRANSITION.clockAt(impact,shapeSchedule);
   const start=motionImpact-(SPAWN_RADIUS-66)/ready.speed;
-  waves.push({...ready,id:waves.length,impact,start,end:Math.min(TRANSITION.clockAt(60,shapeSchedule),start+(SPAWN_RADIUS+ready.thickness-26)/ready.speed),r:SPAWN_RADIUS,openings:ready.sides-ready.sectors.length});
+  waves.push({...ready,id:waves.length,impact,start,end:Math.min(TRANSITION.clockAt(60,shapeSchedule),start+(SPAWN_RADIUS+ready.thickness+ready.outerExtra-26)/ready.speed),r:SPAWN_RADIUS,openings:ready.sides-ready.sectors.length});
   gateIndex++;proposed=impact+clamp(ready.gap,.34,.78)*track.cadence;
  }
  const spinEvents=[],spin=makeRng(actualSeed^0xd31f6c29);let time=0,direction=spin()<.5?-1:1;

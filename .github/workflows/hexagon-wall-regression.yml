@@ -24,6 +24,7 @@ jobs:
           node song-difficulty.test.cjs
           node audio-start.test.cjs
           node mixed-transition.test.cjs
+          node surprise-morph.test.cjs
       - name: Verify the random seventh level has fair playable wall sequences
         run: node random-level.test.cjs
       - name: Audit 0-60 second wall actors and camera for all six stages
@@ -75,7 +76,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'direct-key-mode-v31'; then exit 0; fi
+              grep -q 'surprise-rim-morph-v32'; then exit 0; fi
             sleep 10
           done
           exit 1

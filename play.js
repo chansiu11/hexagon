@@ -138,7 +138,7 @@ function drawDirectLabels(g){
  const m=ctx.getTransform(),dpr=Math.min(devicePixelRatio||1,2),targets=[];
  ctx.save();ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
  for(let i=0;i<g.sides;i++){
-  const a=(i+.5)*Math.PI*2/g.sides,x=Math.cos(a)*108,y=Math.sin(a)*108;
+  const a=g.sectorAngle(i),x=Math.cos(a)*108,y=Math.sin(a)*108;
   const px=m.a*x+m.c*y+m.e,py=m.b*x+m.d*y+m.f;
   const ux=(px/dpr-ox)/scale,uy=(py/dpr-oy)/scale;
   targets.push({sector:i,x:px/dpr,y:py/dpr,key:directKeys(g)[i]});
@@ -288,7 +288,7 @@ function drawWallField(walls,color,game){
   ctx.fillStyle=color;
   for(let i=0;i<walls.length;){
    let end=i+1;
-   while(end<walls.length&&walls[end].waveId===walls[i].waveId&&walls[end-1].mixedEnd===walls[end].mixedStart)end++;
+   while(end<walls.length&&walls[end].waveId===walls[i].waveId&&walls[end].band===walls[i].band&&walls[end].r===walls[i].r&&walls[end-1].mixedEnd===walls[end].mixedStart)end++;
    ctx.beginPath();const first=walls[i].renderPoly[0];ctx.moveTo(first[0],first[1]);
    for(let j=i;j<end;j++){const p=walls[j].renderPoly[1];ctx.lineTo(p[0],p[1]);}
    const outer=walls[end-1].renderPoly[2];ctx.lineTo(outer[0],outer[1]);

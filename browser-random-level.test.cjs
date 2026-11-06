@@ -99,6 +99,22 @@ const {chromium}=require('playwright');
   assert(visuals.shapes.every(v=>v[0]===v[1]&&v[2]>0&&v[2]<1));
   assert.deepEqual(visuals.matrices.walls,visuals.matrices.core,'walls and core must share one camera transform');
   assert.deepEqual(visuals.matrices.walls,visuals.matrices.player,'player must share the wall camera transform');
+  const carry=await page.evaluate(()=>{
+   const data=HexRandomWaves.create(1),at=data.shapeSchedule[1][0],rows=[];
+   for(const mode of [1,2,3]){
+    game=new HexEngine.Game(6,data);game.setControlMode(mode);game.angle=2.5*Math.PI/3;
+    game.time=at-.01;game.sampleWalls();let last=game.angle,largest=0;
+    for(let i=0;i<=90;i++){
+     game.time=at-.01+i/120;game.sampleWalls();draw();
+     const turn=((game.angle-last+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;
+     largest=Math.max(largest,Math.abs(turn));last=game.angle;
+    }
+    rows.push({mode,largest,bands:[...new Set(game.walls.map(w=>w.band))]});
+   }
+   return rows;
+  });
+  assert(carry.every(r=>r.largest<.06),'the painted player must follow the moving cells without a snap in every mode');
+  assert(carry.some(r=>r.bands.some(b=>b==='inner'||b==='outer')),'small radial walls must reach the real canvas actor list');
   // Decode and play every actual bundled song through the stage-seven path.
   const audioPaths=new Set();page.on('request',r=>{if(r.url().includes('/music/'))audioPaths.add(r.url().split('/').pop())});
   await page.evaluate(()=>{selected=6;game=new HexEngine.Game(6,HexRandomWaves.create(1));screen='play'});
@@ -159,7 +175,7 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{loadTimeline=window.__savedTimelineLoader;settings.sound=false;music.stop()});
   // Capture the actual canvas through the scheduled transitions in Chromium.
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
-  const captureTimes=await page.evaluate(()=>{const d=HexRandomWaves.create(1),at=d.shapeSchedule[1][0];return [...new Set([.05,3,at+.01,at+.325,at+.649,at+.74,...d.shapeSchedule.slice(1).map(([t])=>t+.2),58])].sort((a,b)=>a-b)});
+  const captureTimes=await page.evaluate(()=>{const d=HexRandomWaves.create(1),at=d.shapeSchedule[1][0];return [...new Set([.05,3,at-.02,at+.01,at+.325,at+.649,at+.74,...d.shapeSchedule.slice(1).map(([t])=>t+.2),58])].sort((a,b)=>a-b)});
   for(const t of captureTimes){
    await page.evaluate(t=>{
     window.__freezeAudit=true;transition=null;launch=null;flash=0;
