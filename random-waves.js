@@ -2,6 +2,7 @@
    Every authored gate keeps a reachable opening before it is ever spawned. */
 (function(root){'use strict';
 const BANK=typeof module!=='undefined'?require('./pattern-bank.js'):root.HexPatternBank;
+const TRANSITION=typeof module!=='undefined'?require('./mixed-transition.js'):root.HexMixedTransition;
 const TAU=Math.PI*2,SPAWN_RADIUS=1200,DURATION=60,PLAYER_SPEED=420*TAU/360;
 const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085},{index:1,key:'otis',bpm:135,phase:.005},{index:2,key:'focus',bpm:174,phase:.06}]);
 const wrap=(a,n=TAU)=>(a%n+n)%n,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -67,8 +68,9 @@ function create(seed){
   if(!ready||impact>=59.3)break;
   const prev=waves.at(-1),angle=(ready.safeSector+.5)*TAU/ready.sides;
   stationary=prev&&Math.abs(delta((prev.safeSector+.5)*TAU/prev.sides,angle))<.1?stationary+1:0;
-  const start=impact-(SPAWN_RADIUS-66)/ready.speed;
-  waves.push({...ready,id:waves.length,impact,start,end:Math.min(60,start+(SPAWN_RADIUS+ready.thickness-26)/ready.speed),r:SPAWN_RADIUS,openings:ready.sides-ready.sectors.length});
+  const motionImpact=TRANSITION.clockAt(impact,shapeSchedule);
+  const start=motionImpact-(SPAWN_RADIUS-66)/ready.speed;
+  waves.push({...ready,id:waves.length,impact,start,end:Math.min(TRANSITION.clockAt(60,shapeSchedule),start+(SPAWN_RADIUS+ready.thickness-26)/ready.speed),r:SPAWN_RADIUS,openings:ready.sides-ready.sectors.length});
   gateIndex++;proposed=impact+clamp(ready.gap,.34,.78);
  }
  const spinEvents=[],spin=makeRng(actualSeed^0xd31f6c29);let time=0,direction=spin()<.5?-1:1;
@@ -83,7 +85,7 @@ function create(seed){
   tiltEvents.push([time,(tilt()<.5?-1:1)*magnitude]);time+=2.4+tilt()*3.8;
  }
  return {mode:'batched-wall-waves',kind:'mixed-pattern',seed:actualSeed,sampleRate:60,duration:DURATION,
-  shapeSchedule,waves,musicTrack:track,spinEvents,tiltEvents,offscreenBirth:true};
+  shapeSchedule,morphSeconds:TRANSITION.MORPH_SECONDS,waves,musicTrack:track,spinEvents,tiltEvents,offscreenBirth:true};
 }
 const API={create,makeRng,atTime,SPAWN_RADIUS,TRACKS,PATTERN_BANK:BANK};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.HexRandomWaves=API;

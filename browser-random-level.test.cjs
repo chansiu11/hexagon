@@ -59,6 +59,12 @@ const {chromium}=require('playwright');
    const data=HexRandomWaves.create(77);
    game=new HexEngine.Game(6,data);
    const initialTilt=game.tilt;
+   const hold=[];
+   for(const offset of [0,.325,.65]){
+    game.time=data.shapeSchedule[1][0]+offset;game.sampleWalls();draw();
+    hold.push({clock:game.wallMotionTime,radii:game.walls.map(w=>[w.id,w.r]),progress:game.morph,core:game.mixedCorePoints.map(p=>p.slice())});
+   }
+
    game.time=data.shapeSchedule[1][0]+.2;game.sampleWalls();
    const morph={from:game.fromSides,to:game.sides,progress:game.morph};
    game.referenceCamera=null;game.rotation=0;game.tilt=0;game.zoom=1;
@@ -78,9 +84,15 @@ const {chromium}=require('playwright');
    for(const[at,n]of data.shapeSchedule.slice(1)){
     game.time=at+.2;game.sampleWalls();shapes.push([game.sides,n,game.morph]);
    }
-   return {different:original!==moved,morph,expected:data.shapeSchedule[1][1],initialTilt,matrices,shapes};
+   return {hold,different:original!==moved,morph,expected:data.shapeSchedule[1][1],initialTilt,matrices,shapes};
   });
   assert(visuals.different,'music camera shake and rotation must visibly affect canvas');
+  assert.deepEqual(visuals.hold[0].radii,visuals.hold[1].radii);
+  assert.deepEqual(visuals.hold[0].radii,visuals.hold[2].radii,'walls stay radially frozen across the full browser morph');
+  assert.deepEqual(visuals.hold.map(v=>Math.round(v.progress*100)),[0,50,100]);
+  assert.notDeepEqual(visuals.hold[0].core,visuals.hold[1].core);
+  assert.notDeepEqual(visuals.hold[1].core,visuals.hold[2].core,'the core keeps morphing while wall descent is paused');
+
   assert(Math.abs(visuals.initialTilt)>.06,'random initial tilt must be present on the first frame');
   assert.deepEqual([visuals.morph.from,visuals.morph.to],[6,visuals.expected]);
   assert(visuals.morph.progress>0&&visuals.morph.progress<1);
@@ -118,7 +130,7 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>music.stop());
   // Capture the actual canvas through the scheduled transitions in Chromium.
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
-  const captureTimes=await page.evaluate(()=>[.05,3,...HexRandomWaves.create(1).shapeSchedule.slice(1).map(([t])=>t+.2),58]);
+  const captureTimes=await page.evaluate(()=>{const d=HexRandomWaves.create(1),at=d.shapeSchedule[1][0];return [...new Set([.05,3,at+.01,at+.325,at+.649,at+.74,...d.shapeSchedule.slice(1).map(([t])=>t+.2),58])].sort((a,b)=>a-b)});
   for(const t of captureTimes){
    await page.evaluate(t=>{
     window.__freezeAudit=true;transition=null;launch=null;flash=0;

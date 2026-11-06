@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict');
 const {Game,levels,wallVisualPoly,playerPoly,intersect,wrap}=require('./engine');
-const R=require('./random-waves'),T=Math.PI*2;
+const R=require('./random-waves'),Transition=require('./mixed-transition'),T=Math.PI*2;
 const delta=(a,b)=>wrap(b-a+Math.PI)-Math.PI;
 assert.equal(levels.length,7);
 assert.equal(new Set(R.PATTERN_BANK.map(p=>p.level)).size,6);
@@ -31,7 +31,7 @@ for(let seed=1;seed<=100;seed++){
   const beat=(w.impact-data.musicTrack.phase)/(30/data.musicTrack.bpm);
   assert(Math.abs(beat-Math.round(beat))<1e-8,'every gate arrival must align to music eighth notes');
   for(const[at]of data.shapeSchedule.slice(1))assert(w.impact<=at-.85+1e-8||w.impact>=at+1.05-1e-8,'reserve a physically clear shape-change interval');
-  assert(Math.abs(w.end-Math.min(60,w.start+(w.r+w.thickness-26)/w.speed))<1e-8,'actors expire only behind the core');
+  assert(Math.abs(w.end-Math.min(Transition.clockAt(60,data.shapeSchedule),w.start+(w.r+w.thickness-26)/w.speed))<1e-8,'actors expire only behind the core');
   if(prev){
    const turn=Math.abs(delta((prev.safeSector+.5)*T/prev.sides,(w.safeSector+.5)*T/w.sides));
    const clear=prev.impact+(66+prev.thickness-59)/prev.speed;
