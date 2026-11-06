@@ -2,7 +2,7 @@
    Every authored gate keeps a reachable opening before it is ever spawned. */
 (function(root){'use strict';
 const BANK=typeof module!=='undefined'?require('./pattern-bank.js'):root.HexPatternBank;
-const TAU=Math.PI*2,SPAWN_RADIUS=835,DURATION=60,PLAYER_SPEED=420*TAU/360;
+const TAU=Math.PI*2,SPAWN_RADIUS=1200,DURATION=60,PLAYER_SPEED=420*TAU/360;
 const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085},{index:1,key:'otis',bpm:135,phase:.005},{index:2,key:'focus',bpm:174,phase:.06}]);
 const wrap=(a,n=TAU)=>(a%n+n)%n,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const delta=(a,b)=>wrap(b-a+Math.PI)-Math.PI;

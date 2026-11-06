@@ -25,6 +25,7 @@ for(let seed=1;seed<=100;seed++){
  for(let i=0;i<data.waves.length;i++){
   const w=data.waves[i],prev=data.waves[i-1];seenSources.add(w.sourceLevel);
   assert(w.sectors.length>=1&&w.sectors.length<w.sides);
+  assert(w.r*Math.cos(Math.PI/4)*.70>Math.hypot(480,300)+8,'birth must stay outside even a tilted, zoomed and shaken viewport');
   assert(!w.sectors.includes(w.safeSector),'each gate must have a protected opening');
   assert.equal(w.sides,R.atTime(w.impact,data.shapeSchedule));
   const beat=(w.impact-data.musicTrack.phase)/(30/data.musicTrack.bpm);
