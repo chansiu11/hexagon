@@ -11,8 +11,8 @@ for(const p of R.PATTERN_BANK){
  for(const gate of p.gates){assert(gate.sourceIds.every(id=>ids.has(id)));assert(gate.sectors.length>0&&gate.sectors.length<gate.sides)}
 }
 const seenTracks=new Set(),seenShapes=new Set(),seenSources=new Set();let minimumWaves=1000;
-for(let seed=1;seed<=100;seed++){
- const data=R.create(seed);assert.deepEqual(data,R.create(seed));
+for(let seed=1;seed<=100;seed++)for(const trackIndex of [0,1,2]){
+ const data=R.create(seed,trackIndex);assert.deepEqual(data,R.create(seed,trackIndex));
  assert.equal(data.kind,'mixed-pattern');seenTracks.add(data.musicTrack.key);
  assert(data.waves.length>=45,'mixed normal patterns must remain challenging');
  minimumWaves=Math.min(minimumWaves,data.waves.length);
@@ -71,4 +71,4 @@ for(let seed=1;seed<=100;seed++){
 assert.equal(seenTracks.size,3);assert.equal(seenShapes.size,3);assert.equal(seenSources.size,6);
 assert.notDeepEqual(R.create(1).waves,R.create(2).waves);
 assert.notDeepEqual(R.create(1).shapeSchedule,R.create(2).shapeSchedule);
-console.log('PASS '+R.PATTERN_BANK.length+' original motifs, '+minimumWaves+'+ beat-aligned gates, random safe morphs/initial tilt; 100 seeds x both 60s collision replays');
+console.log('PASS '+R.PATTERN_BANK.length+' original motifs, '+minimumWaves+'+ beat-aligned gates, random safe morphs/initial tilt; 100 seeds x all three songs x both 60s collision replays');
