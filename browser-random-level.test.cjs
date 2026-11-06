@@ -1,11 +1,13 @@
 'use strict';
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {chromium}=require('playwright');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
  try{
   const page=await browser.newPage({viewport:{width:960,height:600}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{const raf=requestAnimationFrame;window.requestAnimationFrame=fn=>raf(t=>{if(!window.__freezeAudit)fn(t)})});
   await page.goto(process.env.HEXAGON_URL||'http://127.0.0.1:4173/',{waitUntil:'load'});
   await page.waitForFunction(()=>window.HexRandomWaves?.create&&window.HexEngine?.levels?.length===7);
   // A save from the previous six-stage version must migrate in both modes.
@@ -52,6 +54,42 @@ const {chromium}=require('playwright');
   await page.reload();await page.waitForFunction(()=>window.HexRandomWaves?.create);
   assert.deepEqual(await page.evaluate(()=>({mode:settings.controlMode,one:records[6],two:recordsMode2[6]})),
    {mode:2,one:17.65,two:22.5});
+  // Real canvas: verify the seventh stage uses the animated camera rather
+  // than the old identity reference transform, and that the core morphs.
+  const visuals=await page.evaluate(()=>{
+   selected=6;settings.motion=true;screen='play';
+   game=new HexEngine.Game(6,HexRandomWaves.create(77));
+   game.time=12.2;game.sampleWalls();
+   const morph={from:game.fromSides,to:game.sides,progress:game.morph};
+   game.referenceCamera=null;game.rotation=0;game.tilt=0;game.zoom=1;
+   draw();const original=document.querySelector('#game').toDataURL();
+   game.rotation=1.1;game.tilt=.25;draw();
+   const moved=document.querySelector('#game').toDataURL();
+   const shapes=[];
+   for(const t of [9.8,12.2,12.6,27.2,42.2,53.2]){
+    game.time=t;game.sampleWalls();
+    shapes.push([t,game.fromSides,game.sides,game.morph]);
+    draw();
+   }
+   return {different:original!==moved,morph,shapes};
+  });
+  assert(visuals.different,'random-level camera rotation and tilt must visibly affect canvas');
+  assert.deepEqual([visuals.morph.from,visuals.morph.to],[6,5]);
+  assert(visuals.morph.progress>0&&visuals.morph.progress<1);
+  assert.deepEqual(visuals.shapes.map(v=>v[2]),[6,5,5,6,4,5]);
+  // Capture the actual canvas through the scheduled transitions in Chromium.
+  fs.mkdirSync('wall-browser-screenshots',{recursive:true});
+  for(const t of [9.8,10.2,12.2,27.2,42.2,45.183,53.2,58]){
+   await page.evaluate(t=>{
+    window.__freezeAudit=true;transition=null;launch=null;flash=0;
+    selected=6;settings.motion=true;settings.sound=false;screen='play';
+    game=new HexEngine.Game(6,HexRandomWaves.create(1));
+    for(let i=0;i<Math.floor(t*60);i++){game.dead=false;game.update(1/60,0)}
+    game.dead=false;game.time=t;game.sampleWalls();game.referenceCamera=null;
+    screen='play';draw();
+   },t);
+   await page.screenshot({path:'wall-browser-screenshots/random-'+t+'.png'});
+  }
   assert.deepEqual(errors,[],'no runtime browser errors');
   console.log('PASS random seventh-stage menu/selection, new layout each attempt, real canvas walls and persistent mode-specific records');
  }finally{await browser.close()}

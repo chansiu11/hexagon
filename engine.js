@@ -133,7 +133,7 @@ function wallVisualPoly(w,fromSides=w.sides||6,toSides=fromSides,progress=1){
   vertex(oldSector+1,newSector+1,outside),vertex(oldSector,newSector,outside)];
 }
 const profiles=typeof module!=='undefined'?require('./stage-profiles.js'):(root.StageProfiles||[]);
-const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGONEST','HARDEST',285,290],['HEXAGON','HARDESTER',190,300],['HEXAGONER','HARDESTEST',225,335],['HEXAGONEST','HARDESTESTEST',0,370],['RANDOM HEXAGON','BALANCED',265,278]];
+const levels=[['HEXAGON','HARD',32,220],['HEXAGONER','HARDER',120,250],['HEXAGONEST','HARDEST',285,290],['HEXAGON','HARDESTER',190,300],['HEXAGONER','HARDESTEST',225,335],['HEXAGONEST','HARDESTESTEST',0,370],['RANDOM HEXAGON','CHAOTIC',265,326]];
 const wrap=a=>(a%TAU+TAU)%TAU;
 function intersect(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],axis=[p[i][1]-q[1],q[0]-p[i][0]];const aa=a.map(v=>v[0]*axis[0]+v[1]*axis[1]),bb=b.map(v=>v[0]*axis[0]+v[1]*axis[1]);if(Math.max(...aa)<Math.min(...bb)||Math.max(...bb)<Math.min(...aa))return false}return true}
 function wallPoly(r,sector,thickness=30,sides=6){
@@ -170,13 +170,36 @@ const FIRST_PENTAGON_RING_SECTORS=Object.freeze({144:0,145:3,146:4,147:5});
 // outgoing hexagon openings 4+5 merge into pentagon opening 4.
 const FIRST_PENTAGON_REACHABLE_SECTORS=Object.freeze({144:0,145:1,146:2,147:3});
 class Game{
- constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false}
+ constructor(level=0,timeline=null){this.level=level;this.profile=profiles[level];this.timeline=timeline&&typeof timeline==='object'?stabilizeTimeline(level,timeline):null;this.timelineEnded=false;this.time=0;this.angle=-Math.PI/2;this.rotation=0;this.rotationSpeed=.9;this.playerLean=0;this.sides=6;this.fromSides=6;this.morph=1;this.pendingSides=6;this.shapeWait=false;this.zoom=1;this.tilt=0;this.walls=[];this.next=0.08;this.dead=false;this.lastGap=4;this.pattern=0;this.rings=0;this.completed=false;this.teleport=null;this.teleportCooldown=0;this.controlMode=1;this.stepEffect=null;this.doubleStepReady=false;this.randomAlignedSides=6}
  get playerSpeed(){return PLAYER_SPEED_BY_LEVEL[this.level]??PLAYER_SPEED}
  get bpm(){return [130,140,150,150,160,170,145][this.level]}
  get speed(){return levels[this.level][3]+Math.min(this.time/60,1)*18+(this.completed&&this.level<3?65:0)}
- get targetSides(){if(this.level===6)return 6;if(this.profile&&this.time<60){const schedule=this.profile.shapeSchedule;for(let i=schedule.length-1;i>=0;i--)if(this.time>=schedule[i][0])return schedule[i][1]}const phase=Math.floor((this.time%60)/10);return [[6,6,5,6,4,6],[6,5,6,4,6,5],[6,6,4,6,5,6]][this.level%3][phase]}
+ get targetSides(){if(this.level===6)return this.timeline?shapeStateAt(this.time,this.timeline.shapeSchedule).to:6;if(this.profile&&this.time<60){const schedule=this.profile.shapeSchedule;for(let i=schedule.length-1;i>=0;i--)if(this.time>=schedule[i][0])return schedule[i][1]}const phase=Math.floor((this.time%60)/10);return [[6,6,5,6,4,6],[6,5,6,4,6,5],[6,6,4,6,5,6]][this.level%3][phase]}
  sampleWalls(){
  const data=this.timeline;if(!data)return;
+ if(this.level===6&&data.kind==='procedural-random'){
+  // Generated stages preserve each moving wall's own geometry while the
+  // central polygon smoothly morphs. No wall changes sectors mid-flight.
+  const shape=shapeStateAt(this.time,data.shapeSchedule);
+  if(this.controlMode===2&&this.randomAlignedSides!==shape.to){
+   // A new polygon defines NEW sectors. Keep discrete steering in the
+   // center of its current sector, not on a new boundary (which would
+   // graze the very first wall after morphing).
+   const step=TAU/shape.to;
+   this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);
+  }
+  this.randomAlignedSides=shape.to;
+  this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
+  this.wallFrame=Math.min(data.duration*data.sampleRate,Math.floor(this.time*data.sampleRate));
+  this.recordedCamera=null;
+  this.waves=data.waves.filter(w=>this.time>=w.start&&this.time<w.end)
+   .map(w=>({...w,r:observedWaveRadius(w,this.time)}));
+  this.walls=this.waves.flatMap(w=>w.sectors.map(sector=>({
+   id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
+   r:w.r,thickness:w.thickness
+  })));
+  return;
+ }
  if(data.mode==='rigid-observed-tracks'||data.mode==='batched-wall-waves'){
   const position=Math.max(0,Math.min(data.camera.length-1,this.time*data.sampleRate)),index=Math.floor(position),u=position-index;
   const a=data.camera[index],b=data.camera[Math.min(index+1,data.camera.length-1)];
@@ -265,6 +288,7 @@ class Game{
   this.controlMode=mode===2?2:1;
   this.doubleStepReady=false;
   this.stepEffect=null;
+  this.randomAlignedSides=this.sides;
   if(this.controlMode===2){
    const sides=Math.max(3,this.sides||6),step=TAU/sides;
    this.angle=wrap((Math.round(this.angle/step-.5)+.5)*step);
@@ -306,21 +330,49 @@ class Game{
   this.teleport={from,to,age:0,duration:.30};
   this.teleportCooldown=.18;
   const player=playerPoly(this.angle,this.playerLean);
+  const batch=this.timeline?.mode==='batched-wall-waves'&&
+   !(this.level===6&&this.timeline?.kind==='procedural-random');
   if(this.walls.some(w=>w.points?polygonOverlap(player,w.points,w.holes):
-    intersect(player,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,
-      this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,
-      this.timeline?.mode==='batched-wall-waves'?this.morph:1))))this.dead=true;
+    intersect(player,wallVisualPoly(w,batch?this.fromSides:w.sides,
+      batch?this.sides:w.sides,batch?this.morph:1))))this.dead=true;
   return true;
  }
- update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.teleportCooldown=Math.max(0,this.teleportCooldown-h);if(this.stepEffect){this.stepEffect.age+=h;if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null;}if(this.teleport){this.teleport.age+=h;if(this.teleport.age>=this.teleport.duration)this.teleport=null;}this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;if(this.controlMode===1)this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;const target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
+ update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.teleportCooldown=Math.max(0,this.teleportCooldown-h);if(this.stepEffect){this.stepEffect.age+=h;if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null;}if(this.teleport){this.teleport.age+=h;if(this.teleport.age>=this.teleport.duration)this.teleport=null;}this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;if(this.controlMode===1)this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;let target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));
+if(this.level===6&&this.timeline?.kind==='procedural-random'){
+ // New target every few seconds, changing direction unpredictably, with
+ // amplitude growing from gentle to strong as the level approaches 60s.
+ for(const [at,rate] of this.timeline.spinEvents||[]){
+  if(at>this.time)break;
+  target=rate;
+ }
+ this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*2.6);
+}else this.rotationSpeed+=(target-this.rotationSpeed)*Math.min(1,h*7);
+this.rotation+=this.rotationSpeed*h;this.pendingSides=this.targetSides;
 this.shapeWait=this.pendingSides!==this.sides;
 if(this.shapeWait&&(this.profile&&this.time<60||this.walls.length===0)){this.fromSides=this.sides;this.sides=this.pendingSides;this.morph=0;this.lastGap=Math.floor(wrap(this.angle)/TAU*this.sides);this.shapeWait=false}
 this.morph=Math.min(1,this.morph+h/0.45);
 const phase=beat%1,accent=Math.exp(-phase*10);const targetZoom=1+accent*.075+.045*Math.sin(beat*Math.PI/8);this.zoom+=(targetZoom-this.zoom)*Math.min(1,h*32);
-const tiltTarget=Math.min(1,Math.max(0,this.time-1))*.24*Math.sin(beat*Math.PI/16)*Math.sin(Math.min(this.time/4,1)*Math.PI/2);this.tilt+=(tiltTarget-this.tilt)*Math.min(1,h*3);
+let tiltTarget=Math.min(1,Math.max(0,this.time-1))*.24*Math.sin(beat*Math.PI/16)*Math.sin(Math.min(this.time/4,1)*Math.PI/2);
+if(this.level===6&&this.timeline?.kind==='procedural-random'){
+ // No tilt at all before 10s; build toward stronger, smoother off-axis
+ // oscillations afterwards. Keep compression safely above zero.
+ const intensity=Math.min(1,Math.max(0,(this.time-10)/39));
+ const phase=this.timeline.tiltPhase||0;
+ tiltTarget=.38*intensity*(Math.sin(this.time*(1.40+.012*this.time)+phase)+
+  .26*Math.sin(this.time*2.87+phase*.63));
+}
+this.tilt+=(tiltTarget-this.tilt)*Math.min(1,h*(this.level===6?2.4:3));
 if(this.timeline)this.sampleWalls();else for(const w of this.walls)w.r-=this.speed*h;
 const p=playerPoly(this.angle,this.playerLean);
-if(this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,this.timeline?.mode==='batched-wall-waves'?this.fromSides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.sides:w.sides,this.timeline?.mode==='batched-wall-waves'?this.morph:1)))){this.dead=true;break}
+if(this.walls.some(w=>{
+ if(w.points)return polygonOverlap(p,w.points,w.holes);
+ const random=this.level===6&&this.timeline?.kind==='procedural-random';
+ const batch=this.timeline?.mode==='batched-wall-waves';
+ return intersect(p,wallVisualPoly(w,
+  random?w.sides:batch?this.fromSides:w.sides,
+  random?w.sides:batch?this.sides:w.sides,
+  random?1:batch?this.morph:1));
+})){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
 const API={polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
