@@ -9,8 +9,13 @@ class BeatAudio {
  async loadVoices(){return Promise.all(['begin','line','triangle','square','pentagon','hexagon','death'].map(key=>{
   if(!this.voiceLoads.has(key)){const pending=fetch('assets/voice/'+key+'.mp3').then(r=>{if(!r.ok)throw Error('Voice unavailable: '+key);return r.arrayBuffer()}).then(b=>this.context.decodeAudioData(b)).then(b=>this.voiceBuffers.set(key,b));this.voiceLoads.set(key,pending);pending.catch(()=>this.voiceLoads.delete(key))}return this.voiceLoads.get(key);
  }))}
- beginRun(){this.spoken.clear();for(const n of this.nodes){try{n.stop()}catch{}}this.nodes.clear()}
+ beginRun(){this.spoken.clear();this.lastShapeCue=null;for(const n of this.nodes){try{n.stop()}catch{}}this.nodes.clear()}
  voice(key){if(!this.context||!this.enabled)return false;const buffer=this.voiceBuffers.get(key);if(!buffer)return false;const source=this.context.createBufferSource(),gain=this.context.createGain();source.buffer=buffer;gain.gain.value=1.4;source.connect(gain).connect(this.master);this.nodes.add(source);source.onended=()=>{this.nodes.delete(source);source.disconnect();gain.disconnect()};source.start();return true}
+ shape(sides,eventAt){
+  if(!(eventAt>0)||eventAt===this.lastShapeCue)return false;
+  const key={4:'square',5:'pentagon',6:'hexagon'}[sides];if(!key)return false;
+  this.lastShapeCue=eventAt;return this.voice(key);
+ }
  progress(time){let newest=null;for(const [at,key]of [[10,'line'],[20,'triangle'],[30,'square'],[45,'pentagon'],[60,'hexagon']])if(time>=at&&!this.spoken.has(key)){this.spoken.add(key);newest=key}if(newest)this.voice(newest)}
  play(level=0,offset=0){if(!this.context)return;this.stop(true);const request=this.request;this.level=level;this.pendingOffset=offset;this.origin=this.context.currentTime-offset;this.active=true;this.error=null;this.pulse=0;this.energy=0;this.floor=.005;this.peak=.025;this.lastHit=-10;const begin=buffer=>{if(request!==this.request||!this.active)return;const source=this.context.createBufferSource();source.buffer=buffer;source.loop=true;source.connect(this.master);source.connect(this.bass);this.origin=this.context.currentTime-offset;source.start(0,offset%buffer.duration);this.source=source};const decoded=this.decodedBuffers.get(this.trackPath(level));if(decoded)begin(decoded);else this.load(level).then(begin).catch(e=>{if(request===this.request)this.error=e.message})}
  stop(preserveEffects=false){this.request++;clearInterval(this.timer);this.active=false;if(this.source){this.source.stop();this.source.disconnect();this.source=null}if(!preserveEffects){for(const n of this.nodes){try{n.stop()}catch{}}this.nodes.clear()}this.pulse=0}

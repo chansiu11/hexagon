@@ -4,11 +4,23 @@
 (function(root){'use strict';
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const M=typeof module!=='undefined'?require('./mixed-transition'):root.HexMixedTransition;
-const TAU=Math.PI*2,MORPH=.65;
+const MOTION=typeof module!=='undefined'?require('./hard-motion'):root.HexHardMotion;
+const TAU=Math.PI*2,MORPH=.18;
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
 function seedNow(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
 const delta=(a,b)=>(b-a+Math.PI*3)%TAU-Math.PI;
-function shapeAt(t,s){return E.shapeStateAt(t,s,MORPH)}
+function shapeAt(t,s){const shape=E.shapeStateAt(t,s,MORPH);shape.at=0;for(let i=1;i<s.length&&s[i][0]<=t;i++)shape.at=s[i][0];return shape}
+// HARD has its own short hold; stage seven retains its .65s clock.
+function wallClock(time,schedule){
+ let lag=0;
+ for(let i=1;i<schedule.length;i++){
+  const a=schedule[i][0],elapsed=time-a;if(elapsed<=0)break;
+  if(elapsed<=MORPH)return a-lag;
+  if(elapsed<MORPH+.18){const u=(elapsed-MORPH)/.18;return a-lag+.18*(u*u*u-.5*u*u*u*u)}
+  lag+=MORPH+.09;
+ }
+ return time-lag;
+}
 // Invert this stage's wall clock directly. A global binary search used to
 // rescan every past morph ~52 times for each generated gate.
 function realTimeAtClock(clock,schedule){
@@ -28,7 +40,7 @@ function create(seed=seedNow(),duration=3600){
  let t=21+shapeRandom()*1.3,n=6;
  while(t<duration){n=n===5?(shapeRandom()<.5?4:6):5;schedule.push([t,n]);t+=4.3+shapeRandom()*4.5}
  const at=t=>shapeAt(t,schedule).to;
- const clock=t=>M.clockAt(t,schedule);
+ const clock=t=>wallClock(t,schedule);
  let impact=2.3,last=null,id=0,lastPattern=-1,group=0,bag=[];
  while(impact<duration){
   if(!bag.length){bag=Array.from({length:12},(_,i)=>i);for(let k=bag.length-1;k>0;k--){const j=pick(k+1);[bag[k],bag[j]]=[bag[j],bag[k]]}if(group===0){const k=bag.indexOf(4);[bag[k],bag[9]]=[bag[9],bag[k]]}if(bag[bag.length-1]===lastPattern)[bag[0],bag[bag.length-1]]=[bag[bag.length-1],bag[0]]}
@@ -39,7 +51,7 @@ function create(seed=seedNow(),duration=3600){
    n=at(impact);gap=((gap%n)+n)%n;
    if(j&&(pattern===1||pattern===3||pattern===5||pattern===9||pattern===10))gap=(gap+direction+n)%n;
    if(j&&pattern===2)gap=(gap+Math.floor(n/2))%n;
-   const speed=220+(impact>=60?65:0),thickness=pattern===4||pattern===11?100+pick(81):pattern===6?18:32+pick(21);
+   const speed=MOTION.wallSpeed(impact),thickness=pattern===4||pattern===11?100+pick(81):pattern===6?18:32+pick(21);
    const innerExtra=pattern===10?32:0,outerExtra=pattern===10?32:0;
    let safeAngle=(gap+.5)*TAU/n;
    for(let attempt=0;attempt<12;attempt++){
@@ -49,7 +61,7 @@ function create(seed=seedNow(),duration=3600){
      const turn=Math.abs(delta(last.safeAngle,safeAngle));
      const clear=realTimeAtClock(clock(last.impact)+(66+last.thickness+(last.outerExtra||0)-59)/last.speed,schedule);
      const changes=schedule.some(([a])=>a>last.impact&&a<=impact);
-     const travel=.22+Math.max(turn/E.PLAYER_SPEED,Math.ceil(turn/(TAU/n)-1e-9)*.18)+(changes?.36:0);
+     const travel=MOTION.CLOCK_RATE*(.22+Math.max(turn/E.PLAYER_SPEED,Math.ceil(turn/(TAU/n)-1e-9)*.18))+(changes?.36:0);
      impact=Math.max(impact,realTimeAtClock(clock(clear+travel)+(73/.60-66+innerExtra)/speed,schedule));
     }
     for(const [a]of schedule.slice(1)){
@@ -75,7 +87,8 @@ function create(seed=seedNow(),duration=3600){
    waves.push(wave);last=wave;
    impact+=pattern===4?.56:pattern===5?.66:.78;
   }
-  groups.push({at:groupStart,pattern,rate:(random()<.5?-1:1)*(1.8+random()*1.7),tilt:(random()-.5)*.65});
+  const spinDirection=random()<.5?-1:1;random(); // Retain the wall RNG stream; magnitude is now time-tiered.
+  groups.push({at:groupStart,pattern,rate:spinDirection,tilt:(random()-.5)*.65});
   group++;impact+=.25+random()*.35;
  }
  return {mode:'hard-rules',kind:'hard-rules',seed:seed>>>0,duration,shapeSchedule:schedule,morphSeconds:MORPH,waves,groups};
@@ -89,8 +102,8 @@ class HardGame extends E.Game{
  sectorAngle(s,sides=this.sides){return E.wrap(M.angleAt(this.fromSides,this.sides,this.morph,M.sectorT(sides,s)))}
  sampleWalls(){
   const data=this.timeline;if(!this._actors)return;
-  const shape=shapeAt(this.time,data.shapeSchedule),clock=M.clockAt(this.time,data.shapeSchedule);
-  this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;this.wallMotionTime=clock;this.wallFrame=Math.floor(this.time*60);
+  const shape=shapeAt(this.time,data.shapeSchedule),clock=wallClock(this.time,data.shapeSchedule);
+  this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;this.morphEventAt=shape.at;this.wallMotionTime=clock;this.wallFrame=Math.floor(this.time*60);
   this.walls.length=0;if(!this.waves)this.waves=[];this.waves.length=0;
   const key=shape.from+':'+shape.to+':'+shape.progress;
   if(this._unitKey!==key){this._unitKey=key;this._units=M.KNOTS.map(t=>M.pointAt(shape.from,shape.to,shape.progress,t))}
@@ -114,7 +127,7 @@ class HardGame extends E.Game{
  teleportHalfTurn(){if(this.controlMode!==1||this.dead||this.teleportCooldown>0)return false;const from=this.angle;this.angle=E.wrap(from+Math.PI);this.teleport={from,to:this.angle,age:0,duration:.30};this.teleportCooldown=.18;this.die(this.hit());return true}
  update(dt,input=0){
   if(this.dead||this.timelineEnded)return;
-  const steps=Math.max(1,Math.ceil(dt*240)),h=dt/steps;
+  const steps=Math.max(1,Math.ceil(dt*240)),h=dt/steps,clockStep=h*MOTION.CLOCK_RATE;
   for(let i=0;i<steps;i++){
    if(this.controlMode===1&&input){
     const from=this.angle,to=E.wrap(from+input*this.playerSpeed*h);
@@ -123,7 +136,7 @@ class HardGame extends E.Game{
     if(!this.hit(to))this.angle=to;else{let lo=0,hi=1;for(let k=0;k<12;k++){const u=(lo+hi)/2;if(this.hit(E.wrap(from+input*this.playerSpeed*h*u)))hi=u;else lo=u}this.angle=E.wrap(from+input*this.playerSpeed*h*lo)}
    }
    const track=M.trackAtAngle(this.fromSides,this.sides,this.morph,this.angle),oldTo=this.sides,oldProgress=this.morph;
-   this.time=Math.min(this.time+h,this.timeline.duration);this.sampleWalls();
+   this.time=Math.min(this.time+clockStep,this.timeline.duration);this.sampleWalls();
    if(this.morph!==oldProgress||this.sides!==oldTo){
     if(this.controlMode===1)this.angle=E.wrap(M.angleAt(this.fromSides,this.sides,this.morph,track));
     else{
@@ -134,14 +147,14 @@ class HardGame extends E.Game{
    this.teleportCooldown=Math.max(0,this.teleportCooldown-h);
    for(const key of ['teleport','stepEffect'])if(this[key]){this[key].age+=h;if(this[key].age>=this[key].duration)this[key]=null}
    let event=this.timeline.groups[0];for(const g of this.timeline.groups){if(g.at>this.time)break;event=g}
-   this.rotationSpeed=event.rate;this.rotation+=event.rate*h;
-   this.tilt+=(event.tilt-this.tilt)*(1-Math.exp(-h*2.5));
-   const beat=this.time*130/60;this.zoom=1.03+.085*Math.exp(-(beat%1)*9)+.09*(1+Math.sin(this.time*.48))/2;
+   this.rotationSpeed=Math.sign(event.rate)*MOTION.spinRate(this.time)*MOTION.CLOCK_RATE;this.rotation+=this.rotationSpeed*h;
+   this.tilt=Math.acos(MOTION.viewState(this.time,this.timeline.groups).compression);
+   this.zoom=MOTION.zoomAt(this.time);
    this.playerLean=0;this.completed=this.time>=60;this.die(this.hit());if(this.dead)break;
    if(this.time>=this.timeline.duration){this.timelineEnded=true;break}
   }
  }
 }
 function palette(t){const phase=t%3.1/3.1,hue=t<60?2+48*(.5-.5*Math.cos(phase*TAU)):180+58*(.5-.5*Math.cos(phase*TAU));return [hue,90,[12,20,53]]}
-const API={create,HardGame,palette,shapeAt,realTimeAtClock};if(typeof module!=='undefined')module.exports=API;else root.HexHardMode=API;
+const API={create,HardGame,palette,shapeAt,realTimeAtClock,wallClock,MORPH_SECONDS:MORPH};if(typeof module!=='undefined')module.exports=API;else root.HexHardMode=API;
 })(typeof window!=='undefined'?window:globalThis);

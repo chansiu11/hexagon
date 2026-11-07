@@ -13,3 +13,5 @@ Source: the user's supplied `VGkmTsx3HIw` HARD recording, not downloaded game as
 | death.mp3 | 103.97–105.72 | Collision / game-over sound and voice |
 
 All clips preload before an audible attempt. Explicit retry/pause stops pending clips; a corrective music seek preserves a playing announcement. Sound-off mutes both the song and announcements. No browser speech-synthesis voice is used.
+
+In HARD v36, Square/Pentagon/Hexagon are triggered by the actual polygon morph start instead of the rank milestones above. The fixed rank cues remain for other stages. Begin and Death are unchanged.

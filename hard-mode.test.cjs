@@ -1,10 +1,10 @@
 'use strict';
-const assert=require('node:assert/strict'),H=require('./hard-mode'),E=require('./engine'),M=require('./mixed-transition');
+const assert=require('node:assert/strict'),H=require('./hard-mode'),E=require('./engine'),M=require('./mixed-transition'),Motion=require('./hard-motion');
 let runs=0;
 for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
  const data=H.create(seed),g=new H.HardGame(data);g.setControlMode(mode);
  let index=0,next=0;
- const clear=data.waves.map(w=>M.timeAtClock(M.clockAt(w.impact,data.shapeSchedule)+(66+w.thickness+(w.outerExtra||0)-59)/w.speed,data.shapeSchedule));
+ const clear=data.waves.map(w=>H.realTimeAtClock(H.wallClock(w.impact,data.shapeSchedule)+(66+w.thickness+(w.outerExtra||0)-59)/w.speed,data.shapeSchedule));
  for(let f=0;f<7201;f++){
   while(index<data.waves.length-1&&g.time>clear[index]+.02)index++;
   const wave=data.waves[index],target=g.sectorAngle(wave.safeSector,wave.sides),delta=(a,b)=>E.wrap(b-a+Math.PI)-Math.PI;
@@ -13,7 +13,7 @@ for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
   else{
    if(g.time>=next){
     if(mode===3)g.selectSector(landing);else{const current=g.currentSector(),a=(landing-current+g.sides)%g.sides,b=(current-landing+g.sides)%g.sides;if(a||b)g.stepSector(a<=b?1:-1)}
-    next=g.time+.18;
+    next=g.time+.18*Motion.CLOCK_RATE;
    }
    g.update(1/60);
   }

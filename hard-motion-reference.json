@@ -1,0 +1,498 @@
+{
+  "method": "Three supplied HARD recordings; 960x600 viewport; core-edge line fits and forward/backward LK wall-corner flow; orbit normalized to 66; clock digits matched to supplied-video glyphs. Speeds are robust estimates, not original engine constants. Steady spin is estimated from the second affine row (removing upper-triangular projection shear), using 6\u20139s, 15\u201318s and 80\u201383s video windows; changing-side pairs are excluded.",
+  "clips": [
+    {
+      "file": "YTDown.com_YouTube_Media_VGkmTsx3HIw_Super-Hexagon-Hard-104-05-Courtesy-HD_001_1080p.mp4",
+      "clockRate": 1.0415764385427304,
+      "clockSamples": [
+        [
+          10,
+          6.633333333333333
+        ],
+        [
+          15,
+          11.85
+        ],
+        [
+          25,
+          22.25
+        ],
+        [
+          40,
+          37.88333333333333
+        ],
+        [
+          60,
+          58.71666666666667
+        ],
+        [
+          80,
+          79.53333333333333
+        ],
+        [
+          100,
+          100.38333333333334
+        ]
+      ],
+      "rotation": [
+        {
+          "videoWindow": [
+            6,
+            9
+          ],
+          "samples": 28,
+          "meanDegreesPerGameSecond": 59.88,
+          "medianDegreesPerGameSecond": 57.3365
+        },
+        {
+          "videoWindow": [
+            15,
+            18
+          ],
+          "samples": 24,
+          "meanDegreesPerGameSecond": 119.9519,
+          "medianDegreesPerGameSecond": 118.4849
+        },
+        {
+          "videoWindow": [
+            80,
+            83
+          ],
+          "samples": 25,
+          "meanDegreesPerGameSecond": 180.1989,
+          "medianDegreesPerGameSecond": 175.4183
+        }
+      ],
+      "projectionQuantiles": [
+        0.8842,
+        0.9194,
+        0.9312
+      ],
+      "wallWindows": [
+        {
+          "range": [
+            6,
+            9
+          ],
+          "count": 378,
+          "worldSpeedQuantiles": [
+            173.18072757395265,
+            239.2016336568249,
+            289.29590010011844,
+            364.64869168374776,
+            473.62839549631843
+          ]
+        },
+        {
+          "range": [
+            15,
+            18
+          ],
+          "count": 192,
+          "worldSpeedQuantiles": [
+            127.08613479460007,
+            184.99126877304963,
+            246.4007044501472,
+            393.79534943451733,
+            505.0063955157781
+          ]
+        },
+        {
+          "range": [
+            27,
+            30
+          ],
+          "count": 140,
+          "worldSpeedQuantiles": [
+            88.11024131474231,
+            154.66763718049927,
+            263.36859924026635,
+            431.74988202236227,
+            576.1051007375577
+          ]
+        },
+        {
+          "range": [
+            45,
+            48
+          ],
+          "count": 92,
+          "worldSpeedQuantiles": [
+            117.43823567930502,
+            230.8685378621086,
+            321.87755494887074,
+            459.8966559668865,
+            526.024915395755
+          ]
+        },
+        {
+          "range": [
+            65,
+            68
+          ],
+          "count": 81,
+          "worldSpeedQuantiles": [
+            128.71548560893447,
+            223.38797550369162,
+            323.2365343873505,
+            435.7791506247835,
+            523.1873063402625
+          ]
+        },
+        {
+          "range": [
+            80,
+            83
+          ],
+          "count": 44,
+          "worldSpeedQuantiles": [
+            120.4031329670447,
+            263.86049079513253,
+            330.3956942718345,
+            442.8405573522223,
+            636.2300280556957
+          ]
+        }
+      ]
+    },
+    {
+      "file": "YTDown.com_YouTube_Media_5mDjFdetU28_Super-Hexagon-PC-All-Stages-Complete-Ending_001_720p.mp4",
+      "clockRate": 1.0417977528089883,
+      "clockSamples": [
+        [
+          10,
+          6.8
+        ],
+        [
+          15,
+          11.966666666666667
+        ],
+        [
+          25,
+          22.4
+        ],
+        [
+          40,
+          38.03333333333333
+        ],
+        [
+          60,
+          58.86666666666667
+        ],
+        [
+          80,
+          79.71666666666667
+        ],
+        [
+          100,
+          100.53333333333333
+        ]
+      ],
+      "rotation": [
+        {
+          "videoWindow": [
+            6,
+            9
+          ],
+          "samples": 27,
+          "meanDegreesPerGameSecond": 59.6125,
+          "medianDegreesPerGameSecond": 59.5572
+        },
+        {
+          "videoWindow": [
+            15,
+            18
+          ],
+          "samples": 27,
+          "meanDegreesPerGameSecond": 120.7276,
+          "medianDegreesPerGameSecond": 117.1774
+        },
+        {
+          "videoWindow": [
+            80,
+            83
+          ],
+          "samples": 23,
+          "meanDegreesPerGameSecond": 180.542,
+          "medianDegreesPerGameSecond": 174.5937
+        }
+      ],
+      "projectionQuantiles": [
+        0.9073,
+        0.9196,
+        0.9321
+      ],
+      "wallWindows": [
+        {
+          "range": [
+            6,
+            9
+          ],
+          "count": 315,
+          "worldSpeedQuantiles": [
+            181.48354011882245,
+            248.66946070754386,
+            311.2787984951888,
+            373.65500737597097,
+            449.3112417240353
+          ]
+        },
+        {
+          "range": [
+            15,
+            18
+          ],
+          "count": 199,
+          "worldSpeedQuantiles": [
+            110.68723446198912,
+            196.45713992681954,
+            297.1489250453228,
+            419.7225573728134,
+            565.84894522359
+          ]
+        },
+        {
+          "range": [
+            27,
+            30
+          ],
+          "count": 122,
+          "worldSpeedQuantiles": [
+            99.14191025920145,
+            193.0367069855006,
+            298.2439421270812,
+            451.49304959368624,
+            577.2244905572766
+          ]
+        },
+        {
+          "range": [
+            45,
+            48
+          ],
+          "count": 57,
+          "worldSpeedQuantiles": [
+            123.0113427196129,
+            159.66196187016263,
+            236.4848462049796,
+            349.6097972135845,
+            494.8066617791022
+          ]
+        },
+        {
+          "range": [
+            65,
+            68
+          ],
+          "count": 41,
+          "worldSpeedQuantiles": [
+            144.315997977777,
+            259.86426106475903,
+            382.4778095628457,
+            545.5341238429928,
+            659.0712344973874
+          ]
+        },
+        {
+          "range": [
+            80,
+            83
+          ],
+          "count": 26,
+          "worldSpeedQuantiles": [
+            118.34589583967951,
+            242.72257453815075,
+            324.35583059431536,
+            451.4185307243423,
+            634.3439699245555
+          ]
+        }
+      ]
+    },
+    {
+      "file": "YTDown.com_YouTube_Media_aD187viql4Q_Super-Hexagon-1456s-HARD-Youtube-World-Record_001_720p.mp4",
+      "clockRate": 1.041731358529111,
+      "clockSamples": [
+        [
+          10,
+          9.766666666666667
+        ],
+        [
+          15,
+          14.966666666666667
+        ],
+        [
+          25,
+          25.383333333333333
+        ],
+        [
+          40,
+          41.016666666666666
+        ],
+        [
+          60,
+          61.85
+        ],
+        [
+          80,
+          82.68333333333334
+        ],
+        [
+          100,
+          103.51666666666667
+        ]
+      ],
+      "rotation": [
+        {
+          "videoWindow": [
+            6,
+            9
+          ],
+          "samples": 28,
+          "meanDegreesPerGameSecond": 57.5798,
+          "medianDegreesPerGameSecond": 59.672
+        },
+        {
+          "videoWindow": [
+            15,
+            18
+          ],
+          "samples": 21,
+          "meanDegreesPerGameSecond": 120.1697,
+          "medianDegreesPerGameSecond": 118.0316
+        },
+        {
+          "videoWindow": [
+            80,
+            83
+          ],
+          "samples": 26,
+          "meanDegreesPerGameSecond": 179.9924,
+          "medianDegreesPerGameSecond": 174.8917
+        }
+      ],
+      "projectionQuantiles": [
+        0.8456,
+        0.9186,
+        0.9336
+      ],
+      "wallWindows": [
+        {
+          "range": [
+            6,
+            9
+          ],
+          "count": 342,
+          "worldSpeedQuantiles": [
+            163.46669047012287,
+            225.8977286119776,
+            313.68207900986863,
+            395.56296445556643,
+            485.5303885506627
+          ]
+        },
+        {
+          "range": [
+            15,
+            18
+          ],
+          "count": 117,
+          "worldSpeedQuantiles": [
+            107.87669298784958,
+            175.6848578224953,
+            295.5946288440393,
+            417.68107373651014,
+            597.9883049657545
+          ]
+        },
+        {
+          "range": [
+            27,
+            30
+          ],
+          "count": 191,
+          "worldSpeedQuantiles": [
+            119.78541899371984,
+            221.37942823902182,
+            300.27032605905646,
+            418.21469528354623,
+            557.7699581724808
+          ]
+        },
+        {
+          "range": [
+            45,
+            48
+          ],
+          "count": 105,
+          "worldSpeedQuantiles": [
+            148.89574418442024,
+            246.48120952956074,
+            326.9441242311145,
+            410.319006541782,
+            570.356243470976
+          ]
+        },
+        {
+          "range": [
+            65,
+            68
+          ],
+          "count": 78,
+          "worldSpeedQuantiles": [
+            134.22083600945732,
+            301.8809938409871,
+            426.20706968779524,
+            537.1163212110057,
+            599.2359805265278
+          ]
+        },
+        {
+          "range": [
+            80,
+            83
+          ],
+          "count": 72,
+          "worldSpeedQuantiles": [
+            173.58414953925032,
+            252.45605142240254,
+            348.63974958841686,
+            479.90007849633366,
+            663.7548194241936
+          ]
+        }
+      ]
+    }
+  ],
+  "pooled": {
+    "before60": {
+      "samples": 2250,
+      "speedQuantiles": [
+        132.6406,
+        215.9035,
+        298.746,
+        395.8617,
+        519.8726
+      ]
+    },
+    "after60": {
+      "samples": 342,
+      "speedQuantiles": [
+        129.8204,
+        248.1236,
+        364.3778,
+        487.7031,
+        609.0823
+      ]
+    }
+  },
+  "morph": {
+    "gameSeconds": 0.18,
+    "realSeconds": 0.17279999999999998,
+    "sourceVideoWindow": [
+      23.6,
+      23.8
+    ],
+    "note": "Approximate first-change visible duration in the supplied HD recording; not an original code constant."
+  }
+}
