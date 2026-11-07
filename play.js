@@ -32,12 +32,12 @@ function setControlMode(mode){
   game.setControlMode(mode);game.sampleWalls();
   if(selected===6)music.randomTrackIndex=game.timeline.musicTrack.index;
   unlockedNow=false;flash=0;music.stop();music.beginRun();
-  if(screen==='play')music.play(selected,0);
+  if(screen==='play'){last=performance.now();music.play(selected,0);}
  }
  status.textContent='조작 모드 '+mode+(mode===1?' - 연속 이동':mode===2?' - 칸 단위 이동':' - 칸에 표시된 키로 이동');
  buildControls();
 }
-function change(s){const starting=s==='play'&&screen==='select';if(!starting&&!(game?.dead&&['over','complete'].includes(s)))captureTransition();else transition=null;uiAge=0;const previous=screen;if(starting){const reference=selected===0?window.ReferenceCamera:window.StageProfiles?.[selected]?.camera;game.rotation=reference?Math.atan2(reference.frames[0][1],reference.frames[0][0]):spin;launch=settings.motion?{age:0,duration:4/30,rotation:spin}:null;}if(!['play','paused'].includes(s))launch=null;screen=s;if(['paused','over','complete','quit'].includes(s))music.stop();else if(s==='play')music.play(selected,songTime());else music.stop();keys.clear();touches.clear();document.body.classList.toggle('playing',s==='play');status.textContent={title:'메인 메뉴',select:levels[selected][0]+' '+levels[selected][1],play:'게임 시작. 모드 1: 연속 이동 / 모드 2: 방향키 한 번에 한 칸.',over:'게임 오버',options:'설정',scores:'최고 기록',credits:'크레딧',paused:'일시정지'}[s]||s;buildControls()}
+function change(s){const starting=s==='play'&&screen==='select';if(!starting&&!(game?.dead&&['over','complete'].includes(s)))captureTransition();else transition=null;uiAge=0;const previous=screen;if(starting){const reference=selected===0?window.ReferenceCamera:window.StageProfiles?.[selected]?.camera;game.rotation=reference?Math.atan2(reference.frames[0][1],reference.frames[0][0]):spin;launch=settings.motion?{age:0,duration:4/30,rotation:spin}:null;}if(!['play','paused'].includes(s))launch=null;screen=s;if(['paused','over','complete','quit'].includes(s))music.stop();else if(s==='play'){last=performance.now();music.play(selected,songTime());}else music.stop();keys.clear();touches.clear();document.body.classList.toggle('playing',s==='play');status.textContent={title:'메인 메뉴',select:levels[selected][0]+' '+levels[selected][1],play:'게임 시작. 모드 1: 연속 이동 / 모드 2: 방향키 한 번에 한 칸.',over:'게임 오버',options:'설정',scores:'최고 기록',credits:'크레딧',paused:'일시정지'}[s]||s;buildControls()}
 function choose(d){selectionSlide=1;slideDirection=d;beep();if(screen==='title')menuItem=(menuItem+d+3)%3;else if(screen==='select'){selected=(selected+d+levels.length)%levels.length;status.textContent=levels[selected][0]+' '+levels[selected][1]+(unlocked(selected)?'':' 잠김')}buildControls()}
 let musicLoading=false;let starting=false;const timelineCache=new Map();
 async function loadTimeline(level){
