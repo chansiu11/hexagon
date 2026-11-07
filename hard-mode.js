@@ -42,7 +42,7 @@ function create(seed=seedNow(),duration=3600){
  while(t<duration){n=n===5?(shapeRandom()<.5?4:6):5;schedule.push([t,n]);t+=4.3+shapeRandom()*4.5}
  const at=t=>shapeAt(t,schedule).to;
  const clock=t=>wallClock(t,schedule);
- let impact=2.3,last=null,id=0,group=0,bag=[],recent=[],partBag=[];
+ let impact=2.3,last=null,id=0,group=0,bag=[],recent=[],partBag=[],cohortClearClock=-Infinity;
  const nextClip=()=>{
   if(!partBag.length){partBag=VIDEO.parts.map((_,i)=>i);for(let k=partBag.length-1;k>0;k--){const j=pick(k+1);[partBag[k],partBag[j]]=[partBag[j],partBag[k]]}}
   return VIDEO.parts[partBag.pop()];
@@ -67,7 +67,8 @@ function create(seed=seedNow(),duration=3600){
   const pattern=bag.pop();recent.push(pattern);if(recent.length>2)recent.shift();
   const clip=nextClip(); // 1-3 contiguous, video-observed radial crossing events.
   const groupStart=impact,count=Math.max(pattern===4?2:pattern===6?3:1,clip.events.length),direction=random()<.5?-1:1;
-  let gap=pick(at(impact));
+  const lanes=at(impact),base=last?Math.floor(E.wrap(last.safeAngle)/TAU*lanes):pick(lanes);
+  let gap=last?(base+(random()<.65?0:random()<.5?1:-1)+lanes)%lanes:base;
   for(let j=0;j<count&&impact<duration;j++){
    n=at(impact);gap=((gap%n)+n)%n;
    const observed=clip.events[Math.min(j,clip.events.length-1)];
@@ -87,10 +88,17 @@ function create(seed=seedNow(),duration=3600){
     const before=impact;
     if(last){
      const turn=Math.abs(delta(last.safeAngle,safeAngle));
-     const clear=realTimeAtClock(clock(last.impact)+(66+last.thickness+(last.outerExtra||0)-59)/last.speed,schedule);
-     const changes=schedule.some(([a])=>a>last.impact&&a<=impact);
-     const travel=MOTION.CLOCK_RATE*(.22+Math.max(turn/E.PLAYER_SPEED,Math.ceil(turn/(TAU/n)-1e-9)*.18))+(changes?.36:0);
-     impact=Math.max(impact,realTimeAtClock(clock(clear+travel)+(73/.60-66+innerExtra)/speed,schedule));
+     const sameExit=last.sides===n&&turn<.02;
+     if(sameExit){
+      // Dense layers sharing an identical full-cell opening can overlap.
+      // The oldest layer is still remembered when the exit later turns.
+      impact=Math.max(impact,last.impact+.36);
+     }else{
+      const clear=realTimeAtClock(cohortClearClock,schedule);
+      const changes=schedule.some(([a])=>a>last.impact&&a<=impact);
+      const travel=MOTION.CLOCK_RATE*(.16+Math.max(turn/E.PLAYER_SPEED,Math.ceil(turn/(TAU/n)-1e-9)*.18))+(changes?.36:0);
+      impact=Math.max(impact,realTimeAtClock(clock(clear+travel)+(73/.60-66+innerExtra)/speed,schedule));
+     }
     }
     for(const [a]of schedule.slice(1)){
      if(a<impact-2)continue;if(a>impact+2)break;
@@ -115,15 +123,19 @@ function create(seed=seedNow(),duration=3600){
    for(const sector of sectors){const k=(sector-gap+n)%n;profiles[sector]={thickness:pattern===8?(k%2?thickness:thickness*.45):pattern===11?(k%2?thickness:thickness*.55):thickness,offset:pattern===10?(k%2?-32:32):0}}
    const r=1250,start=clock(impact)-(r-66)/speed;
    const wave={id:id++,group,pattern,partId:clip.id,sourceVideo:clip.source,sourceVideoSeconds:clip.videoSeconds,sides:n,sectors,profiles,innerExtra,outerExtra,safeSector:gap,safeAngle,impact,r,speed,thickness,start,end:start+(r+thickness+outerExtra-26)/speed};
-   waves.push(wave);last=wave;
+   waves.push(wave);
+   const clearClock=clock(impact)+(66+thickness+outerExtra-59)/speed;
+   const sameCorridor=last&&last.sides===n&&Math.abs(delta(last.safeAngle,safeAngle))<.02;
+   cohortClearClock=sameCorridor?Math.max(cohortClearClock,clearClock):clearClock;
+   last=wave;
    const nextEvent=clip.events[Math.min(j+1,clip.events.length-1)];
    // Shorter video-derived intervals make dense nested groups; planner above
    // delays any event that requires more travel/clearance than the player has.
-   impact+=Math.max(.43,Math.min(.78,j+1<clip.events.length?nextEvent.dt:.55));
+   impact+=Math.max(.36,Math.min(.68,j+1<clip.events.length?nextEvent.dt:.45));
   }
   const spinDirection=random()<.5?-1:1;random(); // Retain the wall RNG stream; magnitude is now time-tiered.
   groups.push({at:groupStart,pattern,partId:clip.id,sourceVideo:clip.source,sourceVideoSeconds:clip.videoSeconds,rate:spinDirection,tilt:(random()-.5)*.65});
-  group++;impact+=.12+random()*.20;
+  group++;impact+=.08+random()*.14;
  }
  return {mode:'hard-rules',kind:'hard-rules',seed:seed>>>0,duration,shapeSchedule:schedule,morphSeconds:MORPH,waves,groups};
 }
