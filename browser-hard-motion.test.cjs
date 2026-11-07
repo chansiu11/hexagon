@@ -9,6 +9,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{chromium}=requ
    const result=[];for(const hz of [10,20,60]){game=new HexHardMode.HardGame({duration:120,shapeSchedule:[[0,6]],groups:[{at:0,rate:1,tilt:0}],waves:[]});last=1000;for(let i=1;i<=hz;i++)frame(1000+i*1000/hz);result.push({hz,time:game.time,audio:songTime(),rotation:game.rotation})}return result;
   });
   for(const r of rates){assert(Math.abs(r.time-25/24)<1e-7);assert(Math.abs(r.audio-1)<1e-7);assert(Math.abs(r.rotation-Math.PI/3*25/24)<1e-7)}
+  const stale=await p.evaluate(()=>{
+   game=new HexHardMode.HardGame({duration:120,shapeSchedule:[[0,6]],groups:[{at:0,rate:1,tilt:0}],waves:[]});screen='play';settings.sound=false;last=2000;frame(1500);frame(2010);return {time:game.time,audio:songTime()};
+  });
+  assert(Math.abs(stale.time-.01*25/24)<1e-8&&Math.abs(stale.audio-.01)<1e-8,'a queued pre-start animation timestamp must never restore preparation time');
   const cues=await p.evaluate(()=>{
    settings.sound=false;selected=0;screen='play';game=new HexHardMode.HardGame({duration:6,shapeSchedule:[[0,6],[.5,5],[1.5,4],[2.5,5],[3.5,6]],groups:[{at:0,rate:1,tilt:0}],waves:[]});last=1000;music.beginRun();const calls=[],original=music.voice;music.voice=key=>{calls.push({key,sides:game.sides,progress:game.morph,time:game.time});return true};
    for(let i=1;i<=240;i++)frame(1000+i*1000/60);music.voice=original;return calls;
