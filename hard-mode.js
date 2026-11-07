@@ -57,7 +57,8 @@ function create(seed=seedNow(),duration=3600){
   // do not force an unchanged sequence between attempts.
   let available=bag.length-1;
   while(available>=0&&recent.includes(bag[available]))available--;
-  if(available>=0)[bag[available],bag[bag.length-1]]=[bag[bag.length-1],bag[available]];
+  if(available<0){bag.length=0;continue}
+  [bag[available],bag[bag.length-1]]=[bag[bag.length-1],bag[available]];
   const pattern=bag.pop();recent.push(pattern);if(recent.length>2)recent.shift();
   const groupStart=impact,count=pattern===4?2:pattern===6?3+pick(3):pattern===0?1+pick(3):2+pick(3),direction=random()<.5?-1:1;
   let gap=pick(at(impact));
