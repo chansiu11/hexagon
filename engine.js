@@ -212,6 +212,21 @@ function updateMixedPoly(w,from,to,progress){
  const a=w.renderPoly[0],b=w.renderPoly[1],c=w.renderPoly[2];
  w.collapsed=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))<1e-10;
 }
+function rememberImpact(game,player,w,poly){
+ if(game.death)return;
+ const center=[Math.cos(game.angle)*66,Math.sin(game.angle)*66];let contact=center,best=Infinity;
+ for(let i=0;i<poly.length;i++){
+  const a=poly[i],b=poly[(i+1)%poly.length],x=b[0]-a[0],y=b[1]-a[1],den=x*x+y*y;
+  const u=den?Math.max(0,Math.min(1,((center[0]-a[0])*x+(center[1]-a[1])*y)/den)):0;
+  const p=[a[0]+x*u,a[1]+y*u],d=(p[0]-center[0])**2+(p[1]-center[1])**2;if(d<best){best=d;contact=p;}
+ }
+ game.death={time:game.time,angle:game.angle,wallId:w.id,player:player.map(p=>p.slice()),wall:poly.map(p=>p.slice()),holes:(w.holes||[]).map(r=>r.map(p=>p.slice())),contact};
+}
+function observedPlayerHit(game,p,w){
+ const batch=game.timeline?.mode==='batched-wall-waves',poly=w.points||wallVisualPoly(w,batch?game.fromSides:w.sides,batch?game.sides:w.sides,batch?game.morph:1);
+ const hit=w.points?polygonOverlap(p,poly,w.holes):intersect(p,poly);
+ if(hit)rememberImpact(game,p,w,poly);return hit;
+}
 function mixedPlayerHit(game,p){
  const minX=Math.min(p[0][0],p[1][0],p[2][0]),maxX=Math.max(p[0][0],p[1][0],p[2][0]);
  const minY=Math.min(p[0][1],p[1][1],p[2][1]),maxY=Math.max(p[0][1],p[1][1],p[2][1]);
@@ -219,8 +234,8 @@ function mixedPlayerHit(game,p){
   if(w.renderPoly){
    if(w.collapsed)continue;
    if(w.maxX<minX||w.minX>maxX||w.maxY<minY||w.minY>maxY)continue;
-   if(fastIntersect(p,w.renderPoly))return true;
-  }else if(intersect(p,wallVisualPoly(w,game.fromSides,game.sides,game.morph)))return true;
+   if(fastIntersect(p,w.renderPoly)){rememberImpact(game,p,w,w.renderPoly);return true;}
+  }else{const poly=wallVisualPoly(w,game.fromSides,game.sides,game.morph);if(intersect(p,poly)){rememberImpact(game,p,w,poly);return true;}}
  }
  return false;
 }
@@ -269,8 +284,7 @@ class Game{
     });
     const actors=w.sectors.flatMap(sector=>MIXED_TRANSITION.panels(w.sides,sector).map(([a,b],part)=>actor(sector,a,b,part)));
     for(const rim of w.smallWalls||[]){
-     const panels=MIXED_TRANSITION.panels(w.sides,rim.sector),[a,b]=panels[Math.min(panels.length-1,Math.floor(rim.pick*panels.length))];
-     actors.push(actor(rim.sector,a+(b-a)*.2,a+(b-a)*.8,0,rim.band,rim.offset,rim.thickness));
+     for(const [part,[a,b]] of MIXED_TRANSITION.panels(w.sides,rim.sector).entries())actors.push(actor(rim.sector,a,b,part,rim.band,rim.offset,rim.thickness));
     }
     return {...w,spawnRadius:w.r,actors};
    });
@@ -430,7 +444,7 @@ class Game{
   if(this.level===6&&this.timeline?.kind==='mixed-pattern'&&this.morph<1){const t=MIXED_TRANSITION.sectorT(sides,sector);this.morphPlayerTrack={a:t,b:t};}
   if(Math.abs(turn)>1e-9)this.stepEffect={from,to,direction:Math.sign(turn),count:Math.abs(turn)/(TAU/sides),age:0,duration:.23};
   const p=playerPoly(to),batch=this.timeline?.mode==='batched-wall-waves';
-  if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>w.points?polygonOverlap(p,w.points,w.holes):intersect(p,wallVisualPoly(w,batch?this.fromSides:w.sides,batch?this.sides:w.sides,batch?this.morph:1))))this.dead=true;
+  if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>observedPlayerHit(this,p,w)))this.dead=true;
   return true;
  }
  // The player changes position instantly; only the decorative trail animates.
@@ -446,9 +460,7 @@ class Game{
   if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
    if(mixedPlayerHit(this,player))this.dead=true;return true;
   }
-  if(this.walls.some(w=>w.points?polygonOverlap(player,w.points,w.holes):
-    intersect(player,wallVisualPoly(w,batch?this.fromSides:w.sides,
-      batch?this.sides:w.sides,batch?this.morph:1))))this.dead=true;
+  if(this.walls.some(w=>observedPlayerHit(this,player,w)))this.dead=true;
   return true;
  }
  update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.teleportCooldown=Math.max(0,this.teleportCooldown-h);if(this.stepEffect){this.stepEffect.age+=h;if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null;}if(this.teleport){this.teleport.age+=h;if(this.teleport.age>=this.teleport.duration)this.teleport=null;}this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;if(this.controlMode===1)this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;let target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));
@@ -477,14 +489,7 @@ if(this.controlMode===3&&this.level!==6&&this.directSides!==this.sides){
  const step=TAU/this.sides;this.angle=wrap((Math.floor(wrap(this.angle)/step)+.5)*step);this.directSides=this.sides;
 }
 const p=playerPoly(this.angle,this.playerLean);
-if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>{
- if(w.points)return polygonOverlap(p,w.points,w.holes);
- const batch=this.timeline?.mode==='batched-wall-waves';
- return intersect(p,wallVisualPoly(w,
-  batch?this.fromSides:w.sides,
-  batch?this.sides:w.sides,
-  batch?this.morph:1));
-})){this.dead=true;break}
+if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>observedPlayerHit(this,p,w))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
 const API={fastIntersect,normalPatternTime,polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;

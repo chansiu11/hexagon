@@ -10,7 +10,7 @@ for(let seed=1;seed<=100;seed++){
  }
  for(const w of data.waves)for(const rim of w.smallWalls){
   assert(w.sectors.includes(rim.sector)&&rim.sector!==w.safeSector,'mini walls cannot occupy the protected opening');
-  assert(rim.thickness>=6&&rim.thickness<=11);
+  assert.equal(rim.thickness,w.thickness,'single-sector companion walls keep normal wall thickness');
   if(rim.band==='inner'){inner++;assert(rim.offset<0)}else{outer++;assert(rim.offset>w.thickness)}
  }
 }
@@ -26,5 +26,5 @@ for(const mode of [1,2,3])for(let lane=0;lane<6;lane++){
 }
 const fixture=smallWalls=>({kind:'mixed-pattern',mode:'batched-wall-waves',duration:60,sampleRate:60,shapeSchedule:[[0,6]],morphSeconds:.65,tiltEvents:[[0,.1]],waves:[{id:0,sides:6,sectors:[0],safeSector:1,r:100,speed:1,start:0,end:60,thickness:20,smallWalls}]});
 const safe=new Game(6,fixture([]));safe.setControlMode(3);safe.sampleWalls();safe.selectSector(0);assert(!safe.dead);
-const hit=new Game(6,fixture([{band:'inner',offset:-28,thickness:8,sector:0,pick:.5}]));hit.setControlMode(3);hit.sampleWalls();hit.selectSector(0);assert(hit.dead,'mini walls must have a real matching hitbox independent of the parent wall');
+const hit=new Game(6,fixture([{band:'inner',offset:-28,thickness:20,sector:0,pick:.5}]));hit.setControlMode(3);hit.sampleWalls();hit.selectSector(0);assert(hit.dead,'mini walls must have a real matching hitbox independent of the parent wall');
 console.log('PASS irregular unannounced morphs, smooth player carry in all modes, random inner/outer mini-wall hitboxes; '+closeArrivals+'/'+changes+' morphs have arrivals in their final 0.4s');

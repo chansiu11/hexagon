@@ -4,7 +4,7 @@
 const BANK=typeof module!=='undefined'?require('./pattern-bank.js'):root.HexPatternBank;
 const TRANSITION=typeof module!=='undefined'?require('./mixed-transition.js'):root.HexMixedTransition;
 const TAU=Math.PI*2,SPAWN_RADIUS=1200,DURATION=60,PLAYER_SPEED=420*TAU/360;
-const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085,difficulty:1,cadence:1.45,speedScale:.94,spinScale:.78,tiltScale:.55},{index:1,key:'otis',bpm:135,phase:.005,difficulty:2,cadence:1.2,speedScale:1,spinScale:1,tiltScale:.85},{index:2,key:'focus',bpm:174,phase:.06,difficulty:3,cadence:.72,speedScale:1.10,spinScale:1.30,tiltScale:1.4}]);
+const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085,difficulty:1,cadence:1.45,speedScale:.94,spinScale:.78,tiltScale:.55},{index:1,key:'otis',bpm:135,phase:.005,difficulty:2,cadence:1.15,speedScale:1.06,spinScale:1,tiltScale:.85},{index:2,key:'focus',bpm:174,phase:.06,difficulty:3,cadence:.65,speedScale:1.23,spinScale:1.30,tiltScale:1.4}]);
 const wrap=(a,n=TAU)=>(a%n+n)%n,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const delta=(a,b)=>wrap(b-a+Math.PI)-Math.PI;
 function makeRng(seed){let s=(seed>>>0)||0x9e3779b9;return()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return(s>>>0)/4294967296}}
@@ -30,8 +30,8 @@ function create(seed,trackIndex){
   let impact=outsideMorph(proposed),ready=null;
   if(impact>=59.3)break;
   const rimPlan=[];
-  if(rims()<.48)rimPlan.push({band:'inner',gap:14+rims()*14,thickness:6+rims()*5,pick:rims()});
-  if(rims()<.48)rimPlan.push({band:'outer',gap:10+rims()*15,thickness:6+rims()*5,pick:rims()});
+  if(rims()<.38)rimPlan.push({band:'inner',gap:10+rims()*8,pick:rims()});
+  if(rims()<.38)rimPlan.push({band:'outer',gap:10+rims()*8,pick:rims()});
   for(let retry=0;retry<5;retry++){
    const sides=atTime(impact,shapeSchedule),step=TAU/sides,prev=waves.at(-1);
    if(!pattern||gateIndex>=pattern.gates.length||patternSides!==sides){
@@ -62,9 +62,9 @@ function create(seed,trackIndex){
     if(a===b){blocked.delete((safeSector+sides-1)%sides);blocked.delete((safeSector+1)%sides);}
    }
    if(!blocked.size)blocked.add((safeSector+Math.floor(sides/2))%sides);
-   const speed=clamp(327.4529736770803*1.15*(.98+.08*impact/60)+random()*10,365,418)*track.speedScale;
+   const speed=clamp(327.4529736770803*1.15*(.98+.08*impact/60)+random()*10,365,418)*track.speedScale*1.06;
    const thickness=clamp(gate.thickness*1.05,38,58);
-   const smallWalls=rimPlan.map(r=>({...r,offset:r.band==='inner'?-r.gap:thickness+r.gap,
+   const smallWalls=rimPlan.map(r=>({...r,thickness,offset:r.band==='inner'?-(thickness+r.gap):thickness+r.gap,
     sector:[...blocked][Math.min(blocked.size-1,Math.floor(r.pick*blocked.size))]}));
    const innerExtra=Math.max(0,...smallWalls.map(r=>-r.offset));
    const outerExtra=Math.max(0,...smallWalls.map(r=>r.offset+r.thickness-thickness));
@@ -87,7 +87,7 @@ function create(seed,trackIndex){
   const motionImpact=TRANSITION.clockAt(impact,shapeSchedule);
   const start=motionImpact-(SPAWN_RADIUS-66)/ready.speed;
   waves.push({...ready,id:waves.length,impact,start,end:Math.min(TRANSITION.clockAt(60,shapeSchedule),start+(SPAWN_RADIUS+ready.thickness+ready.outerExtra-26)/ready.speed),r:SPAWN_RADIUS,openings:ready.sides-ready.sectors.length});
-  gateIndex++;proposed=impact+clamp(ready.gap,.34,.78)*track.cadence;
+  gateIndex++;proposed=impact+clamp(ready.gap,.34,.78)*track.cadence*.88;
  }
  const spinEvents=[],spin=makeRng(actualSeed^0xd31f6c29);let time=0,direction=spin()<.5?-1:1;
  while(time<60.1){
