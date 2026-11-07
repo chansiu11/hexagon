@@ -27,7 +27,7 @@ function setControlMode(mode){
  // Switching in an active attempt resets the run: times cannot be mixed
  // between different control schemes or artificially transferred.
  if(game&&['play','paused'].includes(screen)){
-  game=new Game(selected,selected===6?HexRandomWaves.create():game.timeline);
+  game=selected===0?new HexHardMode.HardGame():new Game(selected,selected===6?HexRandomWaves.create():game.timeline);
   game.setControlMode(mode);game.sampleWalls();
   if(selected===6)music.randomTrackIndex=game.timeline.musicTrack.index;
   unlockedNow=false;flash=0;music.stop();
@@ -41,6 +41,7 @@ function choose(d){selectionSlide=1;slideDirection=d;beep();if(screen==='title')
 let musicLoading=false;let starting=false;const timelineCache=new Map();
 async function loadTimeline(level){
  // Every new random-stage attempt gets a new seed and wave arrangement.
+ if(level===0)return HexHardMode.create();
  if(level===6)return HexRandomWaves.create();
  if(!timelineCache.has(level))timelineCache.set(level,fetch('assets/timelines/'+'waves-stage-'+level+'.json?v=8',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('wall timeline '+r.status);return r.json();}).catch(e=>{timelineCache.delete(level);throw e;}));
  return timelineCache.get(level);
@@ -59,7 +60,7 @@ async function start(){
   if(level!==selected||screen!==origin)return;
  }
 
- game=new Game(level,timeline);if(level===6)music.randomTrackIndex=timeline.musicTrack.index;game.setControlMode(settings.controlMode);game.sampleWalls();unlockedNow=false;paused=false;flash=0;change('play');beep(550,.1);
+ game=level===0?new HexHardMode.HardGame(timeline):new Game(level,timeline);if(level===6)music.randomTrackIndex=timeline.musicTrack.index;game.setControlMode(settings.controlMode);game.sampleWalls();unlockedNow=false;paused=false;flash=0;change('play');beep(550,.1);
  }catch(error){status.textContent='게임 또는 음악을 불러오지 못했습니다. 다시 시작해 주세요.';console.error(error);}
  finally{starting=false;musicLoading=false;}
 }
@@ -70,12 +71,12 @@ function buildControls(){hovered=null;controls.replaceChildren();if(['title','se
 function panel(label,y=435,width=380){const over=hovered&&hovered.y<=y+28&&hovered.y+hovered.h>=y+28&&hovered.x<480&&hovered.x+hovered.w>480;const down=pressed&&pressed.y<=y+28&&pressed.y+pressed.h>=y+28&&pressAge<.25;const squash=down?Math.sin(Math.min(1,pressAge/.25)*Math.PI)*.045:0;ctx.save();ctx.translate(480,y+27);ctx.scale(1+(over?hoverAmount*.018:0)-squash,1-squash);ctx.translate(-480,-y-27);polygon([[480-width/2-20,y],[480+width/2+20,y],[480+width/2-8,y+55],[480-width/2+8,y+55]],'#ffffff20','#ffffff50',4);text(label,480,y+16,24,over?'#fff':'#ddd','center',width-20);ctx.restore()}
 function arrows(){for(const [x,flip]of[[145,-1],[815,1]]){ctx.save();const over=hovered&&hovered.x<x&&hovered.x+hovered.w>x;const down=pressed&&pressed.x<x&&pressed.x+pressed.w>x&&pressAge<.25;ctx.translate(x+(over?flip*hoverAmount*5:0),472+(down?Math.sin(pressAge/.25*Math.PI)*4:0));ctx.scale(flip*(down?.96:1),down?.96:1);polygon([[-90,-42],[75,-42],[100,50],[-65,50]],'#000');polygon([[-85,-50],[80,-50],[105,42],[-60,42]],'#ffffff28','#ffffff45',5);polygon([[-53,-13],[12,-13],[12,-30],[58,0],[12,30],[12,13],[-53,13]],'#080808');ctx.restore()}}
 function header(left,right){if(left){polygon([[0,0],[400,0],[380,42],[0,42]],'#0008','#ffffff25',3);text(left,18,10,20,'#ddd','left',360)}if(right){polygon([[560,0],[960,0],[960,42],[580,42]],'#0008','#ffffff25',3);text(right,940,10,20,'#ddd','right',360)}}
-function format(n){return n.toFixed(2).padStart(5,'0')}
-function updatePalette(dt){const neutral=['title','options','credits','quit','scores'].includes(screen),mono=selected===5;let hue=levels[selected][2];if(game&&['play','over','paused','complete'].includes(screen)){const section=game.time/10,index=Math.floor(section);hue+=index*24+24*ease((section-index-.7)/.3)}const blend=1-Math.exp(-dt*5);const delta=((hue-displayedHue+540)%360)-180;displayedHue+=delta*blend;const sat=neutral||mono?0:89;displayedSat+=(sat-displayedSat)*blend;const lights=neutral?[14,19,93]:mono?[21,45,100]:[12,19,59];displayedLight=displayedLight.map((v,i)=>v+(lights[i]-v)*blend)}
+function format(n){if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const ticks=Math.floor(n*60+1e-7);return String(Math.floor(ticks/60)).padStart(2,'0')+'.'+String(ticks%60).padStart(2,'0')}return n.toFixed(2).padStart(5,'0')}
+function updatePalette(dt){if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const [h,s,l]=HexHardMode.palette(game.time);displayedHue=h;displayedSat=s;displayedLight=l;return}const neutral=['title','options','credits','quit','scores'].includes(screen),mono=selected===5;let hue=levels[selected][2];if(game&&['play','over','paused','complete'].includes(screen)){const section=game.time/10,index=Math.floor(section);hue+=index*24+24*ease((section-index-.7)/.3)}const blend=1-Math.exp(-dt*5);const delta=((hue-displayedHue+540)%360)-180;displayedHue+=delta*blend;const sat=neutral||mono?0:89;displayedSat+=(sat-displayedSat)*blend;const lights=neutral?[14,19,93]:mono?[21,45,100]:[12,19,59];displayedLight=displayedLight.map((v,i)=>v+(lights[i]-v)*blend)}
 function palette(){return displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)')}
 
 function drawBackdrop(game,dark,light,playing){
- if(playing&&game.level===6&&game.morph<1&&game.fromSides!==game.sides){
+ if(playing&&(game.level===6||game.hardMode)&&game.morph<1&&game.fromSides!==game.sides){
   const u=game.morph*game.morph*(3-2*game.morph),knots=HexMixedTransition.KNOTS;
   const point=t=>{const a=HexMixedTransition.unitAt(game.fromSides,t),b=HexMixedTransition.unitAt(game.sides,t);return [(a[0]*(1-u)+b[0]*u)*1800,(a[1]*(1-u)+b[1]*u)*1800]};
   for(let i=0;i<knots.length-1;i++){
@@ -134,6 +135,17 @@ function drawSectorStepEffect(g,color){
  }
  ctx.restore();
 }
+function drawHardResult(dark,light,accent){
+ ctx.fillStyle=dark;ctx.fillRect(0,0,960,600);ctx.save();ctx.translate(480,300);ctx.rotate(game.rotation+uiAge*.35);drawBackdrop(null,dark,light,false);hex(150,dark,accent);polygon([[161,0],[176,-7],[176,7]],accent);ctx.restore();
+ header('TAB - HIGH SCORES','ESC - STAGE SELECT');
+ ctx.fillStyle='#000';ctx.fillRect(0,200,960,125);
+ const rank=game.time<10?0:game.time<20?1:game.time<30?2:game.time<45?3:game.time<60?4:6;
+ text('LEVEL '+rank,18,207,42,'#fff','left');text(['POINT','LINE','TRIANGLE','SQUARE','PENTAGON','HEXAGON','HEXAGON'][rank],180,250,21,'#fff');
+ text('LAST',630,207,20,'#fff','left');text(format(game.time),942,204,45,'#fff','right');
+ text(game.time>=60?'STAGE COMPLETE':game.time<10?'POINT':game.time<20?'LINE':game.time<30?'TRIANGLE':game.time<45?'SQUARE':'PENTAGON',180,294,21,'#fff');
+ polygon([[590,280],[960,280],[960,321],[603,321]],'#000');text(game.time>=bestTime(selected)?'NEW RECORD':'BEST: '+format(bestTime(selected)),930,290,21,'#fff','right');
+ panel('PRESS SPACE TO RETRY',535,470);
+}
 function drawMusicLoading(color){
  const x=918,y=565,turn=clock*2.4;
  polygon([[778,542],[946,542],[938,592],[770,592]],'#0009');
@@ -145,6 +157,7 @@ function drawMusicLoading(color){
  ctx.strokeStyle=color;ctx.lineWidth=3;ctx.stroke();polygon([[5,0],[-3,-4],[-3,4]],'#fff');ctx.restore();
 }
 function drawDeathImpact(g){
+ if(g.hardMode)return;
  const hit=g.death;if(!hit)return;
  ctx.save();ctx.fillStyle='#ffffff26';ctx.strokeStyle='#fff';ctx.lineWidth=2.4;ctx.beginPath();
  for(const ring of [hit.wall,...hit.holes]){ring.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath()}
@@ -195,7 +208,7 @@ function drawTeleportEffect(g,color){
  ctx.restore();
 }
 
-function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';ctx.fillRect(0,0,canvas.width,canvas.height);const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();const [dark,light,accent]=palette();const playing=['play','over','paused','complete'].includes(screen);const launchBlend=launch?1-Math.pow(1-Math.min(1,launch.age/launch.duration),3):1;let cx=480,cy=playing?300:screen==='select'?470:600;const rotation=settings.motion?(playing?(game.level===6?(game.musicRotation??game.rotation):game.rotation):spin):0;ctx.save();ctx.translate(cx,cy);if(playing&&settings.motion&&game.level===6&&game.musicMotion)ctx.translate(game.musicMotion.shakeX,game.musicMotion.shakeY);const camera=playing&&settings.motion&&!launch?game.referenceCamera:null;if(camera){if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}else{if(playing&&settings.motion){ctx.rotate(game.tilt*.55);ctx.transform(1,0,Math.sin(game.tilt)*.3,Math.cos(game.tilt*1.65),0,0);ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const angle=game.tilt*.55,c=Math.cos(angle),s=Math.sin(angle),shear=Math.sin(game.tilt)*.3,compress=Math.cos(game.tilt*1.65),z=game.zoom,cr=Math.cos(rotation),sr=Math.sin(rotation);const a=c*z,b=s*z,d=(s*shear+c*compress)*z,k=(c*shear-s*compress)*z;game.lastDrawCamera=[a*cr+k*sr,b*cr+d*sr,-a*sr+k*cr,-b*sr+d*cr,0,0];game.cameraWasActive=false}}drawBackdrop(game,dark,light,playing);if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera?50:45.8807,dark,accent);ctx.restore();if(!game.dead){drawTeleportEffect(game,accent);drawSectorStepEffect(game,accent);}const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead?'#fff':accent);if(game.dead)drawDeathImpact(game);else if(settings.controlMode===3)drawDirectLabels(game)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
+function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';ctx.fillRect(0,0,canvas.width,canvas.height);const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();const [dark,light,accent]=palette();if(game?.hardMode&&game.dead&&uiAge>=1.2&&['over','complete'].includes(screen)){drawHardResult(dark,light,accent);ctx.restore();return}const playing=['play','over','paused','complete'].includes(screen);const launchBlend=launch?1-Math.pow(1-Math.min(1,launch.age/launch.duration),3):1;let cx=480,cy=playing?300:screen==='select'?470:600;let rotation=settings.motion?(playing?(game.level===6?(game.musicRotation??game.rotation):game.rotation):spin):0;ctx.save();ctx.translate(cx,cy);if(playing&&game.hardMode&&game.dead&&settings.motion){const u=Math.min(1,uiAge/1.2);rotation+=uiAge*2.8;ctx.scale(1+u*u*1.7,1+u*u*1.7)}if(playing&&settings.motion&&game.level===6&&game.musicMotion)ctx.translate(game.musicMotion.shakeX,game.musicMotion.shakeY);const camera=playing&&settings.motion&&!launch?game.referenceCamera:null;if(camera){if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}else{if(playing&&settings.motion){ctx.rotate(game.tilt*.55);ctx.transform(1,0,Math.sin(game.tilt)*.3,Math.cos(game.tilt*1.65),0,0);ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const angle=game.tilt*.55,c=Math.cos(angle),s=Math.sin(angle),shear=Math.sin(game.tilt)*.3,compress=Math.cos(game.tilt*1.65),z=game.zoom,cr=Math.cos(rotation),sr=Math.sin(rotation);const a=c*z,b=s*z,d=(s*shear+c*compress)*z,k=(c*shear-s*compress)*z;game.lastDrawCamera=[a*cr+k*sr,b*cr+d*sr,-a*sr+k*cr,-b*sr+d*cr,0,0];game.cameraWasActive=false}}drawBackdrop(game,dark,light,playing);if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera?50:45.8807,dark,accent);ctx.restore();if(!game.dead){drawTeleportEffect(game,accent);drawSectorStepEffect(game,accent);}const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead&&!game.hardMode?'#fff':accent);if(game.dead)drawDeathImpact(game);else if(settings.controlMode===3)drawDirectLabels(game)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
 if(screen==='title'){header('','ESC - QUIT');drawLogo('SUPER',220,160,520,100);drawLogo('HEXAGON',305,268,490,65);arrows();ctx.save();ctx.translate(selectionSlide*slideDirection*35,0);panel(['START GAME','OPTIONS','CREDITS'][menuItem]);ctx.restore();text('PRESS SPACE TO SELECT',480,565,23,'#fff')}
 if(screen==='select'){header('TAB - HIGH SCORES','MODE '+settings.controlMode+'  |  ESC - RETURN');ctx.fillStyle='#000';ctx.fillRect(0,95,960,155);text(levels[selected][0],480+selectionSlide*slideDirection*45,115,49,accent);text('DIFFICULTY: '+levels[selected][1],480,177,23,'#ddd');text('BEST TIME: '+format(bestTime(selected)),480,211,23,'#ddd');if(selected>=3&&selected<6)text('HYPER MODE',885,68,16,accent,'right');if(selected===6)text('MIXED PATTERNS / RANDOM MUSIC',900,68,16,accent,'right');panel(unlocked(selected)?'PRESS SPACE TO START':'LOCKED',270,470);if(!unlocked(selected))text('SURVIVE 60S IN '+levels[selected-3][0],480,345,17,'#ddd');arrows()}
 if(playing){ctx.save();header('BEST: '+format(bestTime(selected)),'');text('MODE '+settings.controlMode,78,54,17,'#ddd','left');if(selected===6&&game.timeline?.musicTrack){
@@ -209,14 +222,14 @@ if(screen==='play'&&settings.controlMode===2){
  text(game.doubleStepReady?'READY':'2 STEPS',96,517,game.doubleStepReady?24:21,'#fff');
  text(game.doubleStepReady?'NEXT TURN: 2 STEPS':'PRESS W / UP OR TAP 2 STEPS',215,540,15,'#ddd','left');
 }if(screen==='play'&&settings.controlMode===3){for(let i=0;i<game.sides;i++){polygon([[95+i*130,520],[210+i*130,520],[210+i*130,580],[95+i*130,580]],'#000b','#ffffff80',2);text(directKeys()[i],152+i*130,535,25,'#fff')}text('PRESS THE KEY SHOWN IN EACH SECTOR',480,493,16,'#ddd')}polygon([[670,0],[960,0],[960,65],[815,65],[800,43],[690,43]],'#000b');text(selected===6?'RANDOM':game.time>=60||selected>=3?'HYPER MODE':'TIME',695,9,18,'#fff','left',120);text(format(game.time),942,12,42,'#fff','right',140);if(screen==='play'){if(game.time>=60&&game.time<63)text('LEVEL COMPLETE',480,155,36,'#fff')}if(screen==='over'||screen==='complete'&&game.dead){
- if(uiAge>=.65){ctx.fillStyle='#000b';ctx.fillRect(0,414,960,186);text(screen==='complete'?'LEVEL COMPLETE':'GAME OVER',480,426,36);text('TIME: '+format(game.time),480,474,24,accent);text(game.time>=bestTime(selected)?'NEW RECORD':'TRY AGAIN',480,509,16);panel(screen==='complete'?'PRESS SPACE TO CONTINUE':'PRESS SPACE TO RETRY',535,470)}
+ if(!game.hardMode&&uiAge>=.65){ctx.fillStyle='#000b';ctx.fillRect(0,414,960,186);text(screen==='complete'?'LEVEL COMPLETE':'GAME OVER',480,426,36);text('TIME: '+format(game.time),480,474,24,accent);text(game.time>=bestTime(selected)?'NEW RECORD':'TRY AGAIN',480,509,16);panel(screen==='complete'?'PRESS SPACE TO CONTINUE':'PRESS SPACE TO RETRY',535,470)}
 }if(screen==='paused'){ctx.fillStyle='#0009';ctx.fillRect(0,130,960,260);text('PAUSED',480,220,65);panel('PRESS SPACE TO RESUME',435,500)}if(screen==='complete'&&!game.dead){ctx.fillStyle='#000b';ctx.fillRect(0,130,960,260);text('CONGRATULATIONS',480,180,42);text('LEVEL COMPLETE',480,245,45,accent);text('A NEW HYPER MODE IS AVAILABLE',480,325,20);panel('PRESS SPACE TO CONTINUE',435,500)}ctx.restore()}
 if(screen==='options'){ctx.fillStyle='#ffffff10';ctx.fillRect(230,155+optionIndex*65,500,60);header('','ESC - RETURN');text('OPTIONS',480,75,49);panel('MUSIC / SFX: '+(settings.sound?'ON':'OFF'),160,440);panel('ROTATION: '+(settings.motion?'ON':'OFF'),225,440);panel('FULLSCREEN',290,440);panel('CONTROL MODE: '+settings.controlMode+(settings.controlMode===1?' (FREE)':settings.controlMode===2?' (STEP)':' (KEY)'),355,440);text('1: FREE   2: STEP   3: SECTOR KEYS',480,460,17);text(settings.controlMode===3?'A-Z / 0-9 - PRESS THE SHOWN KEY':'LEFT / RIGHT OR A / D - MOVE',480,500,17)}
 if(screen==='scores'){header('','ESC - RETURN');text('HIGH SCORES - MODE '+settings.controlMode,480,85,42);text('1 / 2 / 3 - SWITCH MODE',480,137,18,'#ccc');levels.forEach((l,i)=>{text((i>=3&&i<6?'HYPER ':'')+l[0],95,185+i*53,19,'#ddd','left',540);text(format(bestTime(i)),865,185+i*53,24,'#fff','right')})}
 if(screen==='credits'){header('','ESC - RETURN');text('CREDITS',480,105,50);text('ORIGINAL GAME',480,205,21,'#aaa');text('TERRY CAVANAGH',480,250,32);text('ORIGINAL MUSIC - CHIPZEL',480,320,22);text('UNOFFICIAL WEB RECREATION',480,410,22);text('MUSIC BY CHIPZEL',480,455,17,'#aaa')}
-if(screen==='quit'){text('THANKS FOR PLAYING',480,210,40);text('CLOSE THIS TAB TO EXIT',480,300,23);panel('RETURN TO MENU',435,400)}if(musicLoading||screen==='play'&&settings.sound&&music.active&&!music.source&&!music.error)drawMusicLoading(accent);if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash*.5})`;ctx.fillRect(0,0,960,600)}ctx.restore()}
+if(screen==='quit'){text('THANKS FOR PLAYING',480,210,40);text('CLOSE THIS TAB TO EXIT',480,300,23);panel('RETURN TO MENU',435,400)}if(musicLoading||screen==='play'&&settings.sound&&music.active&&!music.source&&!music.error)drawMusicLoading(accent);if(flash>0){ctx.fillStyle=`rgba(255,255,255,${game?.hardMode?Math.min(1,flash*3):flash*.5})`;ctx.fillRect(0,0,960,600)}ctx.restore()}
 function resize(){const dpr=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;scale=Math.min(innerWidth/960,innerHeight/600);ox=(innerWidth-960*scale)/2;oy=(innerHeight-600*scale)/2;buildControls();draw()}
-function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;clock+=dt;uiAge+=dt;pressAge+=dt;hoverAmount+=(Number(!!hovered)-hoverAmount)*(1-Math.exp(-dt*16));updatePalette(dt);if(pendingAction){pendingAction.left-=dt;if(pendingAction.left<=0){const fn=pendingAction.fn;pendingAction=null;fn()}}if(launch&&screen==='play'&&(!settings.sound||music.source&&music.context?.state==='running')){launch.age+=dt;if(launch.age>=launch.duration)launch=null}if(settings.motion)spin+=dt*.18;selectionSlide=Math.max(0,selectionSlide-dt*5);flash=Math.max(0,flash-dt*3);if(transition){transition.age+=dt;if(transition.age>=.24)transition=null}
+function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;clock+=dt;uiAge+=dt;pressAge+=dt;hoverAmount+=(Number(!!hovered)-hoverAmount)*(1-Math.exp(-dt*16));updatePalette(dt);if(pendingAction){pendingAction.left-=dt;if(pendingAction.left<=0){const fn=pendingAction.fn;pendingAction=null;fn()}}if(launch&&screen==='play'&&(!settings.sound||music.source&&music.context?.state==='running')){launch.age+=dt;if(launch.age>=launch.duration)launch=null}if(settings.motion)spin+=dt*.18;selectionSlide=Math.max(0,selectionSlide-dt*5);flash=Math.max(0,flash-dt*(game?.hardMode?6:3));if(transition){transition.age+=dt;if(transition.age>=.24)transition=null}
 if(screen==='play'&&(!settings.sound||music.source&&music.context?.state==='running')){const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touches.values()].includes(-1),right=keys.has('ArrowRight')||keys.has('KeyD')||[...touches.values()].includes(1);
 // Gameplay owns the steady timebase. Never pause/jump wall movement to
  // follow fluctuating audio playback latency. Only the sound transport seeks.
@@ -225,11 +238,11 @@ if(screen==='play'&&(!settings.sound||music.source&&music.context?.state==='runn
   Math.abs(music.position-game.time-(selected===6?elapsed:0))>(selected===6?.045:.22))
    music.play(selected,game.time+(selected===6?elapsed:0));
 const baseRotation=game.rotation;
-game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);if(settings.controlMode===3&&Number(controls.dataset.directSides)!==game.sides)buildControls();game.zoom=music.visualZoom(dt);
+game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);if(settings.controlMode===3&&Number(controls.dataset.directSides)!==game.sides)buildControls();if(!game.hardMode)game.zoom=music.visualZoom(dt);
 if(selected===6)HexMusicMotion.apply(game,elapsed,game.rotation-baseRotation,music.motionFeatures(),settings.motion);// The random stage has its own music-reactive rotation and random tilt.
  // Its identity placeholder camera must not suppress the animated view.
- game.referenceCamera=selected===6?null:
-  gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();flash=.12;change(unlockedNow?'complete':'over');beep(90,.3)}}
+ game.referenceCamera=selected===6||game.hardMode?null:
+  gentleStartCamera(game.recordedCamera||music.referenceCamera(),game.time);if(music.error)status.textContent=music.error;if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3;beep(850,.2)}if(game.timelineEnded){music.stop();change('complete');}else if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();flash=game.hardMode?1:.12;change(unlockedNow?'complete':'over');beep(90,.3)}}
 draw();
 if(transition){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=(1-transition.age/.24)**2;ctx.drawImage(transition.snapshot,0,-transition.age*canvas.height*.04);ctx.restore()}
 if(clock-audioStamp>.25){audioStamp=clock;canvas.dataset.musicLoading=String(musicLoading||screen==='play'&&settings.sound&&music.active&&!music.source&&!music.error);canvas.dataset.audioState=music.context?.state||'awaiting-gesture';canvas.dataset.audioRms=music.measure().toFixed(4);canvas.dataset.musicTrack=['Courtesy','Otis','Focus'][selected===6?(music.randomTrackIndex??0):selected%3];canvas.dataset.musicDifficulty=String(game?.timeline?.musicTrack?.difficulty||'');canvas.dataset.musicLoaded=String(!!music.source);canvas.dataset.pulse=music.pulse.toFixed(4);canvas.dataset.visualMode=game?.referenceCamera?'reference-affine':music.visualMode||'inactive';canvas.dataset.zoom=game?.zoom.toFixed(4)||'1';canvas.dataset.audioError=music.error||'';canvas.dataset.screen=screen;canvas.dataset.controlMode=String(settings.controlMode);canvas.dataset.gameTime=game?.time.toFixed(3)||'0';canvas.dataset.wallSource=game?.timeline?.mode||'none';canvas.dataset.wallFrame=String(game?.wallFrame??-1);canvas.dataset.musicTime=music.position.toFixed(3);canvas.dataset.sound=settings.sound?'on':'off'}requestAnimationFrame(frame)}
@@ -285,7 +298,7 @@ function mixedCoreMesh(n){
  });
  mixedCoreUnits.set(n,points);return points;
 }
-function drawCore(g,r,fill,stroke){if(g.level===6){
+function drawCore(g,r,fill,stroke){if(g.level===6||g.hardMode){
  const a=mixedCoreMesh(g.fromSides),b=mixedCoreMesh(g.sides),u=g.morph*g.morph*(3-2*g.morph);
  const points=g.mixedCorePoints||(g.mixedCorePoints=Array.from({length:60},()=>[0,0]));
  for(let i=0;i<60;i++){points[i][0]=(a[i][0]*(1-u)+b[i][0]*u)*r;points[i][1]=(a[i][1]*(1-u)+b[i][1]*u)*r;}
@@ -303,7 +316,7 @@ function gentleStartCamera(m,time){if(!m||time>=2)return m;const angle=Math.atan
 // A single nonzero fill forms the union: overlapping sectors do not produce
 // internal seams or transparent cracks from separate antialiased draw calls.
 function drawWallField(walls,color,game){
- if(game.level===6){
+ if(game.level===6||game.hardMode){
   // Draw each connected run as one contour. Collision uses the convex
   // panels of this same mesh; internal panel edges never become fill seams.
   ctx.fillStyle=color;
