@@ -40,3 +40,12 @@ Stages 2–6 retain their timelines, camera code, movement speeds and lifecycle 
 ## Additional primary technical reference
 
 [SuperHexagonRE technical observations](https://github.com/sumguytho/SuperHexagonRE#game-mechanics) corroborate the 60-tick timer, time/wave-count/random selector, lateral angular speed, and camera state design. Its binaries and decompiled code were not copied into this project. The supplied recordings are the visual reference.
+
+
+## Feedback revision: voices, wall families and death zoom
+
+The first reconstruction omitted announcement samples, restricted most walls to 22–42px, and incorrectly enlarged the scene throughout the death pause. The revised build preloads the seven recording-derived clips documented in `assets/voice/README.md`. Announcements are separate from the music transport and survive corrective song seeks. The original death/game-over recording replaces the quiet synthesized hit when the clip is loaded.
+
+HARD now uses a twelve-family shuffle bag: alternating spokes, moving half barriers, C openings, stairs, deep tunnels, inverse bends, thin repeated rakes, broad half walls, teeth, turning spokes, radially staggered steps and mixed-depth long walls. Thin profiles are 18px; ordinary profiles 32–52px; deep walls 100–180px, with an early tunnel in each attempt. Neighboring cell depths and ±32px offsets produce actual stepped silhouettes. Planner clearance includes the complete inner/outer extents. The orbit is kept clear throughout the actual polygon hold/deformation; post-hold arrivals are calculated in wall-motion time rather than a fixed real-time delay.
+
+HD death frame measurements (video seconds): center remains near (479,300) in the 960×600 viewport. Fitted square radius remains ~49–67 until 104.95, then reaches ~89 at 104.983, ~130 at 105.017, ~170 at 105.05, ~209 at 105.083 and ~255 at 105.117. Results begin around 105.24. `hard-feedback.js` therefore leaves enlargement off through 0.933s after death, ramps rapidly to 5.1× by 1.10s, and shows results at 1.20s. The camera retains its existing spin direction and center; the collision world and score remain frozen. Pulse motion continues independently of the late enlargement. Source compression/sampling and the procedural live camera still prevent a claim of pixel-exact identity in every frame.
