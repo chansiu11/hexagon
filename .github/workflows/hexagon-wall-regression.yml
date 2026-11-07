@@ -85,7 +85,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'hard-motion-v36'; then exit 0; fi
+              grep -q 'hard-motion-v37'; then exit 0; fi
             sleep 10
           done
           exit 1
