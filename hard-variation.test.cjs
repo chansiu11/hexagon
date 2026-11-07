@@ -10,3 +10,7 @@ for(const seed of [1,2,3,19,61,99]){
  for(const w of d.waves){assert(!w.sectors.includes(w.safeSector));for(const p of Object.values(w.profiles)){assert(p.thickness<=w.thickness);assert(p.offset>=-w.innerExtra&&p.offset<=w.outerExtra)}}
 }
 console.log('PASS 12 non-repeating HARD families, early 100px+ tunnels, thin rakes, stepped and varying-depth walls with a protected full-cell opening');
+
+const d=H.create(19,120),wave=d.waves.find(w=>w.pattern===10),game=new H.HardGame(d);game.time=wave.impact-.25;game.sampleWalls();
+for(const w of game.walls.filter(w=>w.waveId===wave.id)){if(w.collapsed)continue;const a=w.renderPoly[0],b=w.renderPoly[3],unit=Math.hypot(...a)/w.r;assert(Math.abs(Math.hypot(b[0]-a[0],b[1]-a[1])/unit-w.thickness)<1e-7,'both radial faces must move by the profile offset while retaining the actual thickness')}
+console.log('PASS staggered actor profiles retain their real radial thickness');

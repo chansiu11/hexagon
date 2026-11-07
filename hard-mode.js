@@ -100,7 +100,7 @@ class HardGame extends E.Game{
   for(const w of this._active){
    const r=w.r-w.speed*(clock-w.start);this.waves.push(w);
    for(const a of w.actors){
-    a.r=r+a.offset;const p=this._units[Math.round(a.mixedStart*6)],q=this._units[Math.round(a.mixedEnd*6)],inner=Math.max(0,a.r),outer=Math.max(inner,r+a.thickness);
+    a.r=r+a.offset;const p=this._units[Math.round(a.mixedStart*6)],q=this._units[Math.round(a.mixedEnd*6)],inner=Math.max(0,a.r),outer=Math.max(inner,a.r+a.thickness);
     const v=a.renderPoly;v[0][0]=p[0]*inner;v[0][1]=p[1]*inner;v[1][0]=q[0]*inner;v[1][1]=q[1]*inner;v[2][0]=q[0]*outer;v[2][1]=q[1]*outer;v[3][0]=p[0]*outer;v[3][1]=p[1]*outer;
     a.collapsed=Math.abs((v[1][0]-v[0][0])*(v[2][1]-v[0][1])-(v[1][1]-v[0][1])*(v[2][0]-v[0][0]))<1e-8;
     this.walls.push(a);
