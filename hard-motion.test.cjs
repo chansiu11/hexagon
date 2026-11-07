@@ -8,3 +8,6 @@ const empty={duration:120,shapeSchedule:[[0,6]],groups:[{at:0,rate:1,tilt:0}],wa
 for(const dt of [1/60,1/20,1/10]){const g=new H.HardGame(empty);for(let i=0;i<Math.round(1/dt);i++)g.update(Motion.frameDelta(dt,true),1);assert(Math.abs(g.time-Motion.CLOCK_RATE)<1e-10);assert(Math.abs(Motion.audioTime(g.time)-1)<1e-10);assert(Math.abs(g.rotation-Motion.spinRate(0)*Motion.CLOCK_RATE)<1e-10);assert(Math.abs(E.wrap(g.angle+Math.PI/2)-E.wrap(E.PLAYER_SPEED))<1e-10,'real player turning rate is preserved')}
 assert.equal(Motion.frameDelta(.1,false),.05);assert.equal(Motion.frameDelta(.1,true),.1);
 console.log('PASS three-video clock/spin/projection calibration, wall-flow medians, shared non-flat camera and real-time motion at 10/20/60 FPS with unchanged turning speed');
+
+assert(H.MORPH_SECONDS>=.12&&H.MORPH_SECONDS<=.22);const schedule=[[0,6],[1,5],[4,4]];for(const t of [1,1.05,1.10,1.17])assert.equal(H.wallClock(t,schedule),1);assert(H.wallClock(1.25,schedule)>1);for(let t=0;t<8;t+=.023){const c=H.wallClock(t,schedule);assert(Math.abs(H.wallClock(H.realTimeAtClock(c,schedule),schedule)-c)<1e-8)}
+assert.equal(require('./mixed-transition').MORPH_SECONDS,.65,'random stage morph timing is preserved');console.log('PASS fast HARD-only morph/hold clock with invertible recovery; unchanged stage-seven duration');

@@ -61,3 +61,10 @@ Three recordings were remeasured without copying one video wall order. `hard-mot
 - Measured median minor/major scale ratios are 0.9194/0.9196/0.9186. The HARD world view maintains ~0.92 vertical foreshortening instead of flattening at a one-axis zero crossing. Small shear and rare stronger perspective kicks remain bounded. The rare kick selection and waveform remain procedural estimates; their hidden original rule has not been recovered.
 - One world camera transforms walls, core, arrow, trails and sector labels together. Collision polygons remain unprojected; measured death enlargement remains separate.
 - The old 50ms frame cap discarded time below 20 FPS. HARD now accepts gaps through 250ms with the same 240Hz physics substeps; 10/20/60 FPS checks advance the same real-time interval. Stages 2–7 retain their timing/camera paths. Audio synchronization includes the upcoming frame interval to avoid low-FPS music rewinds.
+
+
+## Shape narration and fast morph (v36 steering)
+
+HARD now announces the actual destination polygon (Square / Pentagon / Hexagon) at the first frame of its deformation. Independent rank words at fixed seconds are disabled for HARD so the voice cannot contradict the displayed polygon. Other stages retain their rank cues; Begin and recorded death/game-over sounds remain unchanged. Cue IDs are per morph and reset on retry, preventing repeated playback each frame.
+
+The supplied HD first-change frames around video 23.6–23.8 show a brief deformation. HARD's previous 0.65-game-second transition was visibly too slow. It now takes 0.18 game seconds (~0.173 real seconds), an approximate visual calibration rather than a recovered engine constant. Its radial wall hold is shortened to the same interval with the existing smooth restart. A separate HARD wall clock keeps stage seven's 0.65-second hold unchanged. Core, existing wall vertices and player carry still use one shared deformation parameter and are not replaced or teleported.

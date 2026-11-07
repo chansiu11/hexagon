@@ -5,11 +5,22 @@
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const M=typeof module!=='undefined'?require('./mixed-transition'):root.HexMixedTransition;
 const MOTION=typeof module!=='undefined'?require('./hard-motion'):root.HexHardMotion;
-const TAU=Math.PI*2,MORPH=.65;
+const TAU=Math.PI*2,MORPH=.18;
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
 function seedNow(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
 const delta=(a,b)=>(b-a+Math.PI*3)%TAU-Math.PI;
-function shapeAt(t,s){return E.shapeStateAt(t,s,MORPH)}
+function shapeAt(t,s){const shape=E.shapeStateAt(t,s,MORPH);shape.at=0;for(let i=1;i<s.length&&s[i][0]<=t;i++)shape.at=s[i][0];return shape}
+// HARD has its own short hold; stage seven retains its .65s clock.
+function wallClock(time,schedule){
+ let lag=0;
+ for(let i=1;i<schedule.length;i++){
+  const a=schedule[i][0],elapsed=time-a;if(elapsed<=0)break;
+  if(elapsed<=MORPH)return a-lag;
+  if(elapsed<MORPH+.18){const u=(elapsed-MORPH)/.18;return a-lag+.18*(u*u*u-.5*u*u*u*u)}
+  lag+=MORPH+.09;
+ }
+ return time-lag;
+}
 // Invert this stage's wall clock directly. A global binary search used to
 // rescan every past morph ~52 times for each generated gate.
 function realTimeAtClock(clock,schedule){
@@ -29,7 +40,7 @@ function create(seed=seedNow(),duration=3600){
  let t=21+shapeRandom()*1.3,n=6;
  while(t<duration){n=n===5?(shapeRandom()<.5?4:6):5;schedule.push([t,n]);t+=4.3+shapeRandom()*4.5}
  const at=t=>shapeAt(t,schedule).to;
- const clock=t=>M.clockAt(t,schedule);
+ const clock=t=>wallClock(t,schedule);
  let impact=2.3,last=null,id=0,lastPattern=-1,group=0,bag=[];
  while(impact<duration){
   if(!bag.length){bag=Array.from({length:12},(_,i)=>i);for(let k=bag.length-1;k>0;k--){const j=pick(k+1);[bag[k],bag[j]]=[bag[j],bag[k]]}if(group===0){const k=bag.indexOf(4);[bag[k],bag[9]]=[bag[9],bag[k]]}if(bag[bag.length-1]===lastPattern)[bag[0],bag[bag.length-1]]=[bag[bag.length-1],bag[0]]}
@@ -91,8 +102,8 @@ class HardGame extends E.Game{
  sectorAngle(s,sides=this.sides){return E.wrap(M.angleAt(this.fromSides,this.sides,this.morph,M.sectorT(sides,s)))}
  sampleWalls(){
   const data=this.timeline;if(!this._actors)return;
-  const shape=shapeAt(this.time,data.shapeSchedule),clock=M.clockAt(this.time,data.shapeSchedule);
-  this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;this.wallMotionTime=clock;this.wallFrame=Math.floor(this.time*60);
+  const shape=shapeAt(this.time,data.shapeSchedule),clock=wallClock(this.time,data.shapeSchedule);
+  this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;this.morphEventAt=shape.at;this.wallMotionTime=clock;this.wallFrame=Math.floor(this.time*60);
   this.walls.length=0;if(!this.waves)this.waves=[];this.waves.length=0;
   const key=shape.from+':'+shape.to+':'+shape.progress;
   if(this._unitKey!==key){this._unitKey=key;this._units=M.KNOTS.map(t=>M.pointAt(shape.from,shape.to,shape.progress,t))}
@@ -145,5 +156,5 @@ class HardGame extends E.Game{
  }
 }
 function palette(t){const phase=t%3.1/3.1,hue=t<60?2+48*(.5-.5*Math.cos(phase*TAU)):180+58*(.5-.5*Math.cos(phase*TAU));return [hue,90,[12,20,53]]}
-const API={create,HardGame,palette,shapeAt,realTimeAtClock};if(typeof module!=='undefined')module.exports=API;else root.HexHardMode=API;
+const API={create,HardGame,palette,shapeAt,realTimeAtClock,wallClock,MORPH_SECONDS:MORPH};if(typeof module!=='undefined')module.exports=API;else root.HexHardMode=API;
 })(typeof window!=='undefined'?window:globalThis);

@@ -485,5 +485,14 @@
         609.0823
       ]
     }
+  },
+  "morph": {
+    "gameSeconds": 0.18,
+    "realSeconds": 0.17279999999999998,
+    "sourceVideoWindow": [
+      23.6,
+      23.8
+    ],
+    "note": "Approximate first-change visible duration in the supplied HD recording; not an original code constant."
   }
 }

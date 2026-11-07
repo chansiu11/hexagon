@@ -4,7 +4,7 @@ let runs=0;
 for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
  const data=H.create(seed),g=new H.HardGame(data);g.setControlMode(mode);
  let index=0,next=0;
- const clear=data.waves.map(w=>M.timeAtClock(M.clockAt(w.impact,data.shapeSchedule)+(66+w.thickness+(w.outerExtra||0)-59)/w.speed,data.shapeSchedule));
+ const clear=data.waves.map(w=>H.realTimeAtClock(H.wallClock(w.impact,data.shapeSchedule)+(66+w.thickness+(w.outerExtra||0)-59)/w.speed,data.shapeSchedule));
  for(let f=0;f<7201;f++){
   while(index<data.waves.length-1&&g.time>clear[index]+.02)index++;
   const wave=data.waves[index],target=g.sectorAngle(wave.safeSector,wave.sides),delta=(a,b)=>E.wrap(b-a+Math.PI)-Math.PI;

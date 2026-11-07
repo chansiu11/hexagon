@@ -14,3 +14,5 @@ for(const t of [0,.2,.8,.93])assert.equal(D.deathView(g,t).zoom,1,'no death enla
 assert(D.deathView(g,1).zoom>2&&D.deathView(g,1).zoom<3);assert(D.deathView(g,1.1).zoom>=5);assert(D.deathView(g,.5).rotation<g.rotation,'keep the actual counterclockwise spin');
 assert.equal(JSON.stringify(g),before);assert.equal(D.RESULT_START,1.2);
 console.log('PASS original voice cues, one announcement per milestone, audible post-stop death source, safe retry/seek and measured late death zoom');
+
+a.beginRun();const beforeShape=sources.length;assert(!a.shape(6,0));a.shape(5,21);a.shape(5,21);a.shape(4,28);a.shape(5,35);a.shape(6,42);assert.deepEqual(sources.slice(beforeShape).map(s=>s.buffer.key),['pentagon','square','pentagon','hexagon']);a.beginRun();a.shape(5,21);assert.equal(sources.at(-1).buffer.key,'pentagon');console.log('PASS actual-shape voice dispatch exactly once per morph, including retry');

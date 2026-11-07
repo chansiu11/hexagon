@@ -245,7 +245,7 @@ if(screen==='play'&&(!settings.sound||music.source&&music.context?.state==='runn
   Math.abs(music.position-songTime()-syncAhead)>(selected===6?.045:.22))
    music.play(selected,songTime()+syncAhead);
 const baseRotation=game.rotation;
-game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);if(!game.dead)music.progress(game.time);if(settings.controlMode===3&&Number(controls.dataset.directSides)!==game.sides)buildControls();if(!game.hardMode)game.zoom=music.visualZoom(dt);
+game.update(elapsed,settings.controlMode===1?Number(right)-Number(left):0);if(!game.dead){if(game.hardMode)music.shape(game.sides,game.morphEventAt);else music.progress(game.time);}if(settings.controlMode===3&&Number(controls.dataset.directSides)!==game.sides)buildControls();if(!game.hardMode)game.zoom=music.visualZoom(dt);
 if(selected===6)HexMusicMotion.apply(game,elapsed,game.rotation-baseRotation,music.motionFeatures(),settings.motion);// The random stage has its own music-reactive rotation and random tilt.
  // Its identity placeholder camera must not suppress the animated view.
  game.referenceCamera=selected===6||game.hardMode?null:
