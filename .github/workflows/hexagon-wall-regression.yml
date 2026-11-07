@@ -8,7 +8,7 @@ on:
 jobs:
   wall-continuity:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -72,6 +72,8 @@ jobs:
         run: node browser-control-modes.test.cjs
       - name: Verify random-level navigation, replay variety and records in Chromium
         run: node browser-random-level.test.cjs
+      - name: Verify rebuilt HARD gameplay and death flow in Chromium
+        run: node browser-hard-mode.test.cjs
       - name: Verify death impact visibility in Chromium
         run: node browser-death.test.cjs
       - name: Wait for updated GitHub Pages content
@@ -79,7 +81,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'cell-wall-death-loader-v33'; then exit 0; fi
+              grep -q 'hard-rules-v34'; then exit 0; fi
             sleep 10
           done
           exit 1

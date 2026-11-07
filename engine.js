@@ -115,6 +115,7 @@ function shapeStateAt(t,schedule,duration=MORPH_SECONDS){
  return {from,to,progress:index?Math.max(0,Math.min(1,(t-schedule[index][0])/duration)):1};
 }
 function wallVisualPoly(w,fromSides=w.sides||6,toSides=fromSides,progress=1){
+ if(w.hardPanel)return w.renderPoly;
  if(w.mixedStart!==undefined){
   const u=progress*progress*(3-2*progress),inner=Math.max(0,w.r),outer=Math.max(inner,w.r+w.thickness);
   const a=MIXED_TRANSITION.unitAt(fromSides,w.mixedStart),b=MIXED_TRANSITION.unitAt(fromSides,w.mixedEnd);

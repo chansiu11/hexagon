@@ -1,0 +1,298 @@
+[
+  {
+    "file": "YTDown.com_YouTube_Media_VGkmTsx3HIw_Super-Hexagon-Hard-104-05-Courtesy-HD_001_1080p.mp4",
+    "sampleRate": 10,
+    "validSamples": 1005,
+    "transitions": [
+      {
+        "videoSeconds": 23.967,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 29.367,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 37.567,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 43.067,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 50.867,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 56.967,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 64.967,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 69.467,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 74.667,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 80.567,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 86.867,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 91.367,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 96.667,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 101.067,
+        "from": 5,
+        "to": 4
+      }
+    ]
+  },
+  {
+    "file": "YTDown.com_YouTube_Media_5mDjFdetU28_Super-Hexagon-PC-All-Stages-Complete-Ending_001_720p.mp4",
+    "sampleRate": 10,
+    "validSamples": 1081,
+    "transitions": [
+      {
+        "videoSeconds": 23.783,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 30.483,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 39.883,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 46.783,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 53.283,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 58.983,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 67.483,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 72.483,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 76.883,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 81.283,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 85.683,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 90.583,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 98.683,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 103.783,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 110.983,
+        "from": 4,
+        "to": 5
+      }
+    ]
+  },
+  {
+    "file": "YTDown.com_YouTube_Media_aD187viql4Q_Super-Hexagon-1456s-HARD-Youtube-World-Record_001_720p.mp4",
+    "sampleRate": 10,
+    "validSamples": 1784,
+    "transitions": [
+      {
+        "videoSeconds": 23.483,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 30.783,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 38.683,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 45.383,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 53.283,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 58.183,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 62.983,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 67.383,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 71.683,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 76.583,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 85.383,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 89.683,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 95.983,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 100.283,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 105.583,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 111.483,
+        "from": 5,
+        "to": 4
+      },
+      {
+        "videoSeconds": 116.583,
+        "from": 4,
+        "to": 5
+      },
+      {
+        "videoSeconds": 121.483,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 129.083,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 134.083,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 140.483,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 145.283,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 151.583,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 157.283,
+        "from": 5,
+        "to": 6
+      },
+      {
+        "videoSeconds": 166.283,
+        "from": 6,
+        "to": 5
+      },
+      {
+        "videoSeconds": 171.483,
+        "from": 5,
+        "to": 6
+      }
+    ]
+  }
+]
