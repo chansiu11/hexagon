@@ -10,11 +10,11 @@ function seedNow(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){r
 const delta=(a,b)=>(b-a+Math.PI*3)%TAU-Math.PI;
 function shapeAt(t,s){return E.shapeStateAt(t,s,MORPH)}
 function create(seed=seedNow(),duration=3600){
- const random=rng(seed),pick=n=>Math.floor(random()*n),schedule=[[0,6]],groups=[],waves=[];
+ const shapeRandom=rng(seed^0x9e3779b9),random=rng(seed),pick=n=>Math.floor(random()*n),schedule=[[0,6]],groups=[],waves=[];
  // Initial hexagon lasts approximately twenty game seconds in all clips.
  // Later changes occur at pattern boundaries, not a fixed seconds table.
- let t=21+random()*1.3,n=6;
- while(t<duration){n=n===5?(random()<.5?4:6):5;schedule.push([t,n]);t+=4.3+random()*4.5}
+ let t=21+shapeRandom()*1.3,n=6;
+ while(t<duration){n=n===5?(shapeRandom()<.5?4:6):5;schedule.push([t,n]);t+=4.3+shapeRandom()*4.5}
  const at=t=>shapeAt(t,schedule).to;
  const clock=t=>M.clockAt(t,schedule);
  let impact=2.3,last=null,id=0,lastPattern=-1,group=0;

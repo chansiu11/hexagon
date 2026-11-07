@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),H=require('./hard-mode'),E=require('./engine'),M=require('./mixed-transition');
 let runs=0;
 for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
- const data=H.create(seed,120),g=new H.HardGame(data);g.setControlMode(mode);
+ const data=H.create(seed),g=new H.HardGame(data);g.setControlMode(mode);
  let index=0,next=0;
  const clear=data.waves.map(w=>M.timeAtClock(M.clockAt(w.impact,data.shapeSchedule)+(66+w.thickness-59)/w.speed,data.shapeSchedule));
  for(let f=0;f<7201;f++){
@@ -19,7 +19,7 @@ for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
   }
   assert(!g.dead,`seed ${seed} mode ${mode} at ${g.time.toFixed(3)} wave ${index} shape ${g.sides}`);
  }
- assert(g.completed&&g.timelineEnded);runs++;
+ assert(g.completed&&!g.timelineEnded&&g.time>=120);runs++;
 }
 assert.deepEqual(H.create(42),H.create(42));assert.notDeepEqual(H.create(1).waves,H.create(2).waves);
 console.log('PASS',runs,'HARD 120-second collision replays');
