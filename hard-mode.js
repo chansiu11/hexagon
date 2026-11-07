@@ -66,21 +66,23 @@ class HardGame extends E.Game{
   const data=this.timeline;if(!this._actors)return;
   const shape=shapeAt(this.time,data.shapeSchedule),clock=M.clockAt(this.time,data.shapeSchedule);
   this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;this.wallMotionTime=clock;this.wallFrame=Math.floor(this.time*60);
-  this.walls.length=0;this.waves=[];
+  this.walls.length=0;if(!this.waves)this.waves=[];this.waves.length=0;
+  const key=shape.from+':'+shape.to+':'+shape.progress;
+  if(this._unitKey!==key){this._unitKey=key;this._units=M.KNOTS.map(t=>M.pointAt(shape.from,shape.to,shape.progress,t))}
   if(clock<this._lastClock){this._cursor=0;this._active.length=0}this._lastClock=clock;
   while(this._cursor<this._actors.length&&this._actors[this._cursor].start<=clock)this._active.push(this._actors[this._cursor++]);
   for(let i=this._active.length-1;i>=0;i--)if(clock>=this._active[i].end)this._active.splice(i,1);
   for(const w of this._active){
    const r=w.r-w.speed*(clock-w.start);this.waves.push(w);
    for(const a of w.actors){
-    a.r=r;const p=M.pointAt(shape.from,shape.to,shape.progress,a.mixedStart),q=M.pointAt(shape.from,shape.to,shape.progress,a.mixedEnd),inner=Math.max(0,r),outer=Math.max(inner,r+a.thickness);
+    a.r=r;const p=this._units[Math.round(a.mixedStart*6)],q=this._units[Math.round(a.mixedEnd*6)],inner=Math.max(0,r),outer=Math.max(inner,r+a.thickness);
     const v=a.renderPoly;v[0][0]=p[0]*inner;v[0][1]=p[1]*inner;v[1][0]=q[0]*inner;v[1][1]=q[1]*inner;v[2][0]=q[0]*outer;v[2][1]=q[1]*outer;v[3][0]=p[0]*outer;v[3][1]=p[1]*outer;
     a.collapsed=Math.abs((v[1][0]-v[0][0])*(v[2][1]-v[0][1])-(v[1][1]-v[0][1])*(v[2][0]-v[0][0]))<1e-8;
     this.walls.push(a);
    }
   }
  }
- hit(angle=this.angle){const p=E.playerPoly(angle);return this.walls.find(w=>!w.collapsed&&E.fastIntersect(p,w.renderPoly))}
+ hit(angle=this.angle){const p=E.playerPoly(angle);return this.walls.find(w=>!w.collapsed&&w.r*.60<=74&&w.r+w.thickness>=59&&E.fastIntersect(p,w.renderPoly))}
  die(w){if(!w||this.dead)return;this.dead=true;this.death={time:this.time,angle:this.angle,wallId:w.id,player:E.playerPoly(this.angle),wall:w.renderPoly.map(p=>p.slice()),holes:[],contact:[Math.cos(this.angle)*66,Math.sin(this.angle)*66]}}
  stepSector(d){if(this.controlMode!==2||this.dead||!d)return false;const current=this.currentSector(),count=this.doubleStepReady?2:1,from=this.angle;this.doubleStepReady=false;this.angle=this.sectorAngle((current+Math.sign(d)*count+this.sides)%this.sides);this._ride=null;this.stepEffect={from,to:this.angle,direction:Math.sign(d),count,age:0,duration:.23};this.die(this.hit());return true}
  selectSector(s){if(this.controlMode!==3||this.dead||s<0||s>=this.sides||!Number.isInteger(s))return false;const from=this.angle;this._ride=null;this.angle=this.sectorAngle(s);this.stepEffect={from,to:this.angle,direction:Math.sign(delta(from,this.angle)),count:1,age:0,duration:.23};this.die(this.hit());return true}
