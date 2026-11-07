@@ -21,7 +21,7 @@ The actual playing field is 16:10. The 16:9 recordings contain horizontal side m
 - First stable pentagons are detected at video times 23.967, 23.783 and 23.483 respectively. Their gameplay start times differ, so these are not interchangeable game timestamps.
 - Bright walls follow the same polygon edges as the center and background. Multiple sides of one ring are connected. A shape change must deform existing wall vertices rather than replace/discard actors.
 - Warm reds/oranges/yellows precede 60 game seconds; cyan/blue palettes follow it. The former monotonically increasing hue used in this project does not describe these recordings.
-- The timer's suffix runs in 60ths (game ticks), not hundredths. This also agrees with the public technical notes linked below.
+- The timer uses a colon separator and large whole seconds with smaller fractional digits. HARD HUD digits are vector contours measured from video seconds 4–13 of the HD recording (`hard-digits.js`); the other stages retain their original font. The timer's suffix runs in 60ths (game ticks), not hundredths. This also agrees with the public technical notes linked below.
 - HD recording: visible death flash around video 104.0, frozen time 104.33, camera rotation/enlargement through ~105.0, results arriving around 105.25. The filename's 104.05 is not the displayed death score.
 - Death does not paint a white outline around the hit wall or a circle around a computed contact point. The results show LEVEL/rank, LAST, record status, and retry over a central black band.
 

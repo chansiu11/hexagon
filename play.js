@@ -71,7 +71,7 @@ function buildControls(){hovered=null;controls.replaceChildren();if(['title','se
 function panel(label,y=435,width=380){const over=hovered&&hovered.y<=y+28&&hovered.y+hovered.h>=y+28&&hovered.x<480&&hovered.x+hovered.w>480;const down=pressed&&pressed.y<=y+28&&pressed.y+pressed.h>=y+28&&pressAge<.25;const squash=down?Math.sin(Math.min(1,pressAge/.25)*Math.PI)*.045:0;ctx.save();ctx.translate(480,y+27);ctx.scale(1+(over?hoverAmount*.018:0)-squash,1-squash);ctx.translate(-480,-y-27);polygon([[480-width/2-20,y],[480+width/2+20,y],[480+width/2-8,y+55],[480-width/2+8,y+55]],'#ffffff20','#ffffff50',4);text(label,480,y+16,24,over?'#fff':'#ddd','center',width-20);ctx.restore()}
 function arrows(){for(const [x,flip]of[[145,-1],[815,1]]){ctx.save();const over=hovered&&hovered.x<x&&hovered.x+hovered.w>x;const down=pressed&&pressed.x<x&&pressed.x+pressed.w>x&&pressAge<.25;ctx.translate(x+(over?flip*hoverAmount*5:0),472+(down?Math.sin(pressAge/.25*Math.PI)*4:0));ctx.scale(flip*(down?.96:1),down?.96:1);polygon([[-90,-42],[75,-42],[100,50],[-65,50]],'#000');polygon([[-85,-50],[80,-50],[105,42],[-60,42]],'#ffffff28','#ffffff45',5);polygon([[-53,-13],[12,-13],[12,-30],[58,0],[12,30],[12,13],[-53,13]],'#080808');ctx.restore()}}
 function header(left,right){if(left){polygon([[0,0],[400,0],[380,42],[0,42]],'#0008','#ffffff25',3);text(left,18,10,20,'#ddd','left',360)}if(right){polygon([[560,0],[960,0],[960,42],[580,42]],'#0008','#ffffff25',3);text(right,940,10,20,'#ddd','right',360)}}
-function format(n){if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const ticks=Math.floor(n*60+1e-7);return String(Math.floor(ticks/60)).padStart(2,'0')+'.'+String(ticks%60).padStart(2,'0')}return n.toFixed(2).padStart(5,'0')}
+function format(n){if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const ticks=Math.floor(n*60+1e-7);return String(Math.floor(ticks/60))+':'+String(ticks%60).padStart(2,'0')}return n.toFixed(2).padStart(5,'0')}
 function updatePalette(dt){if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const [h,s,l]=HexHardMode.palette(game.time);displayedHue=h;displayedSat=s;displayedLight=l;return}const neutral=['title','options','credits','quit','scores'].includes(screen),mono=selected===5;let hue=levels[selected][2];if(game&&['play','over','paused','complete'].includes(screen)){const section=game.time/10,index=Math.floor(section);hue+=index*24+24*ease((section-index-.7)/.3)}const blend=1-Math.exp(-dt*5);const delta=((hue-displayedHue+540)%360)-180;displayedHue+=delta*blend;const sat=neutral||mono?0:89;displayedSat+=(sat-displayedSat)*blend;const lights=neutral?[14,19,93]:mono?[21,45,100]:[12,19,59];displayedLight=displayedLight.map((v,i)=>v+(lights[i]-v)*blend)}
 function palette(){return displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)')}
 
@@ -138,8 +138,8 @@ function drawSectorStepEffect(g,color){
 function drawHardHUD(){
  polygon([[0,0],[276,0],[250,40],[0,40]],'#000');text('BEST: '+format(bestTime(0)),18,7,26,'#fff','left',230);
  polygon([[622,0],[960,0],[960,65],[782,65],[768,40],[650,40]],'#000');text('TIME',654,8,27,'#fff','left',112);
- const ticks=Math.floor(game.time*60+1e-7),whole=String(Math.floor(ticks/60)).padStart(2,'0'),part=String(ticks%60).padStart(2,'0');
- text(whole,889,8,58,'#fff','right',188);text('.'+part,944,30,30,'#fff','right',56);
+ const ticks=Math.floor(game.time*60+1e-7),whole=String(Math.floor(ticks/60)),part=String(ticks%60).padStart(2,'0');
+ HexHardDigits.draw(ctx,whole,887,8,44);HexHardDigits.draw(ctx,':'+part,944,30,22);
 }
 function drawHardResult(dark,light,accent){
  ctx.fillStyle=dark;ctx.fillRect(0,0,960,600);ctx.save();ctx.translate(480,300);ctx.rotate(game.rotation+uiAge*.35);drawBackdrop(null,dark,light,false);hex(150,dark,accent);polygon([[161,0],[176,-7],[176,7]],accent);ctx.restore();
