@@ -4,6 +4,7 @@
 (function(root){'use strict';
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const M=typeof module!=='undefined'?require('./mixed-transition'):root.HexMixedTransition;
+const MOTION=typeof module!=='undefined'?require('./hard-motion'):root.HexHardMotion;
 const TAU=Math.PI*2,MORPH=.65;
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
 function seedNow(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
@@ -39,7 +40,7 @@ function create(seed=seedNow(),duration=3600){
    n=at(impact);gap=((gap%n)+n)%n;
    if(j&&(pattern===1||pattern===3||pattern===5||pattern===9||pattern===10))gap=(gap+direction+n)%n;
    if(j&&pattern===2)gap=(gap+Math.floor(n/2))%n;
-   const speed=220+(impact>=60?65:0),thickness=pattern===4||pattern===11?100+pick(81):pattern===6?18:32+pick(21);
+   const speed=MOTION.wallSpeed(impact),thickness=pattern===4||pattern===11?100+pick(81):pattern===6?18:32+pick(21);
    const innerExtra=pattern===10?32:0,outerExtra=pattern===10?32:0;
    let safeAngle=(gap+.5)*TAU/n;
    for(let attempt=0;attempt<12;attempt++){
@@ -49,7 +50,7 @@ function create(seed=seedNow(),duration=3600){
      const turn=Math.abs(delta(last.safeAngle,safeAngle));
      const clear=realTimeAtClock(clock(last.impact)+(66+last.thickness+(last.outerExtra||0)-59)/last.speed,schedule);
      const changes=schedule.some(([a])=>a>last.impact&&a<=impact);
-     const travel=.22+Math.max(turn/E.PLAYER_SPEED,Math.ceil(turn/(TAU/n)-1e-9)*.18)+(changes?.36:0);
+     const travel=MOTION.CLOCK_RATE*(.22+Math.max(turn/E.PLAYER_SPEED,Math.ceil(turn/(TAU/n)-1e-9)*.18))+(changes?.36:0);
      impact=Math.max(impact,realTimeAtClock(clock(clear+travel)+(73/.60-66+innerExtra)/speed,schedule));
     }
     for(const [a]of schedule.slice(1)){
@@ -75,7 +76,8 @@ function create(seed=seedNow(),duration=3600){
    waves.push(wave);last=wave;
    impact+=pattern===4?.56:pattern===5?.66:.78;
   }
-  groups.push({at:groupStart,pattern,rate:(random()<.5?-1:1)*(1.8+random()*1.7),tilt:(random()-.5)*.65});
+  const spinDirection=random()<.5?-1:1;random(); // Retain the wall RNG stream; magnitude is now time-tiered.
+  groups.push({at:groupStart,pattern,rate:spinDirection,tilt:(random()-.5)*.65});
   group++;impact+=.25+random()*.35;
  }
  return {mode:'hard-rules',kind:'hard-rules',seed:seed>>>0,duration,shapeSchedule:schedule,morphSeconds:MORPH,waves,groups};
@@ -114,7 +116,7 @@ class HardGame extends E.Game{
  teleportHalfTurn(){if(this.controlMode!==1||this.dead||this.teleportCooldown>0)return false;const from=this.angle;this.angle=E.wrap(from+Math.PI);this.teleport={from,to:this.angle,age:0,duration:.30};this.teleportCooldown=.18;this.die(this.hit());return true}
  update(dt,input=0){
   if(this.dead||this.timelineEnded)return;
-  const steps=Math.max(1,Math.ceil(dt*240)),h=dt/steps;
+  const steps=Math.max(1,Math.ceil(dt*240)),h=dt/steps,clockStep=h*MOTION.CLOCK_RATE;
   for(let i=0;i<steps;i++){
    if(this.controlMode===1&&input){
     const from=this.angle,to=E.wrap(from+input*this.playerSpeed*h);
@@ -123,7 +125,7 @@ class HardGame extends E.Game{
     if(!this.hit(to))this.angle=to;else{let lo=0,hi=1;for(let k=0;k<12;k++){const u=(lo+hi)/2;if(this.hit(E.wrap(from+input*this.playerSpeed*h*u)))hi=u;else lo=u}this.angle=E.wrap(from+input*this.playerSpeed*h*lo)}
    }
    const track=M.trackAtAngle(this.fromSides,this.sides,this.morph,this.angle),oldTo=this.sides,oldProgress=this.morph;
-   this.time=Math.min(this.time+h,this.timeline.duration);this.sampleWalls();
+   this.time=Math.min(this.time+clockStep,this.timeline.duration);this.sampleWalls();
    if(this.morph!==oldProgress||this.sides!==oldTo){
     if(this.controlMode===1)this.angle=E.wrap(M.angleAt(this.fromSides,this.sides,this.morph,track));
     else{
@@ -134,9 +136,9 @@ class HardGame extends E.Game{
    this.teleportCooldown=Math.max(0,this.teleportCooldown-h);
    for(const key of ['teleport','stepEffect'])if(this[key]){this[key].age+=h;if(this[key].age>=this[key].duration)this[key]=null}
    let event=this.timeline.groups[0];for(const g of this.timeline.groups){if(g.at>this.time)break;event=g}
-   this.rotationSpeed=event.rate;this.rotation+=event.rate*h;
-   this.tilt+=(event.tilt-this.tilt)*(1-Math.exp(-h*2.5));
-   const beat=this.time*130/60;this.zoom=1.03+.085*Math.exp(-(beat%1)*9)+.09*(1+Math.sin(this.time*.48))/2;
+   this.rotationSpeed=Math.sign(event.rate)*MOTION.spinRate(this.time)*MOTION.CLOCK_RATE;this.rotation+=this.rotationSpeed*h;
+   this.tilt=Math.acos(MOTION.viewState(this.time,this.timeline.groups).compression);
+   this.zoom=MOTION.zoomAt(this.time);
    this.playerLean=0;this.completed=this.time>=60;this.die(this.hit());if(this.dead)break;
    if(this.time>=this.timeline.duration){this.timelineEnded=true;break}
   }

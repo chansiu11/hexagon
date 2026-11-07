@@ -1,5 +1,5 @@
 'use strict';
-const assert=require('node:assert/strict'),H=require('./hard-mode'),E=require('./engine'),M=require('./mixed-transition');
+const assert=require('node:assert/strict'),H=require('./hard-mode'),E=require('./engine'),M=require('./mixed-transition'),Motion=require('./hard-motion');
 let runs=0;
 for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
  const data=H.create(seed),g=new H.HardGame(data);g.setControlMode(mode);
@@ -13,7 +13,7 @@ for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
   else{
    if(g.time>=next){
     if(mode===3)g.selectSector(landing);else{const current=g.currentSector(),a=(landing-current+g.sides)%g.sides,b=(current-landing+g.sides)%g.sides;if(a||b)g.stepSector(a<=b?1:-1)}
-    next=g.time+.18;
+    next=g.time+.18*Motion.CLOCK_RATE;
    }
    g.update(1/60);
   }

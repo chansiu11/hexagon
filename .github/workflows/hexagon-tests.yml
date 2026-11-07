@@ -18,6 +18,7 @@ jobs:
           node --check hard-mode.js
           node hard-mode.test.cjs
           node hard-variation.test.cjs
+          node hard-motion.test.cjs
           node audio-feedback.test.cjs
           node --check play.js
           node --check engine.js
