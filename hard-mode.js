@@ -41,17 +41,34 @@ function create(seed=seedNow(),duration=3600){
  while(t<duration){n=n===5?(shapeRandom()<.5?4:6):5;schedule.push([t,n]);t+=4.3+shapeRandom()*4.5}
  const at=t=>shapeAt(t,schedule).to;
  const clock=t=>wallClock(t,schedule);
- let impact=2.3,last=null,id=0,lastPattern=-1,group=0,bag=[];
+ let impact=2.3,last=null,id=0,group=0,bag=[],recent=[];
  while(impact<duration){
-  if(!bag.length){bag=Array.from({length:12},(_,i)=>i);for(let k=bag.length-1;k>0;k--){const j=pick(k+1);[bag[k],bag[j]]=[bag[j],bag[k]]}if(group===0){const k=bag.indexOf(4);[bag[k],bag[9]]=[bag[9],bag[k]]}if(bag[bag.length-1]===lastPattern)[bag[0],bag[bag.length-1]]=[bag[bag.length-1],bag[0]]}
-  const pattern=bag.pop();lastPattern=pattern;
-  const groupStart=impact,count=pattern===4?2:pattern===6?4:2+pick(3),direction=random()<.5?-1:1;
+  // A weighted shuffle bag preserves a broad vocabulary without a rigid
+  // twelve-family cycle. Common small bars/half-walls/rakes can recur; all
+  // families remain available in every bag. These weights are reconstructions,
+  // not recovered original RNG probabilities.
+  if(!bag.length){
+   bag=[0,0,1,1,2,3,3,4,5,6,6,7,8,9,10,11];
+   for(let k=bag.length-1;k>0;k--){const j=pick(k+1);[bag[k],bag[j]]=[bag[j],bag[k]]}
+   // Include an early broad tunnel, as in the three reference openings.
+   if(group===0){const k=bag.indexOf(4),j=bag.length-3;[bag[k],bag[j]]=[bag[j],bag[k]]}
+  }
+  // Avoid immediate or one-group-separated repeats when the bag permits it;
+  // do not force an unchanged sequence between attempts.
+  let available=bag.length-1;
+  while(available>=0&&recent.includes(bag[available]))available--;
+  if(available>=0)[bag[available],bag[bag.length-1]]=[bag[bag.length-1],bag[available]];
+  const pattern=bag.pop();recent.push(pattern);if(recent.length>2)recent.shift();
+  const groupStart=impact,count=pattern===4?2:pattern===6?3+pick(3):pattern===0?1+pick(3):2+pick(3),direction=random()<.5?-1:1;
   let gap=pick(at(impact));
   for(let j=0;j<count&&impact<duration;j++){
    n=at(impact);gap=((gap%n)+n)%n;
    if(j&&(pattern===1||pattern===3||pattern===5||pattern===9||pattern===10))gap=(gap+direction+n)%n;
    if(j&&pattern===2)gap=(gap+Math.floor(n/2))%n;
-   const speed=MOTION.wallSpeed(impact),thickness=pattern===4||pattern===11?100+pick(81):pattern===6?18:32+pick(21);
+   // Isolated one-cell walls and thin rakes sometimes stay in one lane and
+   // sometimes step sideways, creating recognizable small-bar groups.
+   if(j&&(pattern===0||pattern===6)&&random()<.55)gap=(gap+direction+n)%n;
+   const speed=MOTION.wallSpeed(impact),thickness=pattern===4||pattern===11?100+pick(81):pattern===6?18:pattern===0?24+pick(17):32+pick(21);
    const innerExtra=pattern===10?32:0,outerExtra=pattern===10?32:0;
    let safeAngle=(gap+.5)*TAU/n;
    for(let attempt=0;attempt<12;attempt++){
@@ -72,10 +89,12 @@ function create(seed=seedNow(),duration=3600){
     if(Math.abs(impact-before)<1e-9)break;
    }
    // Whole-cell silhouettes, rotated around a real, protected opening.
-   // A shuffle bag exposes all families rather than choosing endless rings.
+   // Weighted, anti-repeat pattern groups; the protected opening remains clear.
    const relative=Array.from({length:n-1},(_,k)=>k+1);
    let blocked=relative;
-   if(pattern===0||pattern===9)blocked=relative.filter(k=>(k+j)%2===1);
+   if(pattern===0)blocked=[1+j%(n-1)]; // Truly isolated, one-sector short wall.
+   if(pattern===6)blocked=relative.filter(k=>(k+j)%2===0); // Thin, separated rake.
+   if(pattern===9)blocked=relative.filter(k=>(k+j)%2===1); // Alternating spokes.
    if(pattern===1||pattern===7)blocked=relative.filter(k=>k<=Math.ceil(n/2));
    if(pattern===2||pattern===5)blocked=relative.filter(k=>k!==n-1);
    if(pattern===3)blocked=relative.filter(k=>k!==Math.floor(n/2));
