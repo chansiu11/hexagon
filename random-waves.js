@@ -3,7 +3,7 @@
 (function(root){'use strict';
 const BANK=typeof module!=='undefined'?require('./pattern-bank.js'):root.HexPatternBank;
 const TRANSITION=typeof module!=='undefined'?require('./mixed-transition.js'):root.HexMixedTransition;
-const TAU=Math.PI*2,SPAWN_RADIUS=1200,DURATION=60,PLAYER_SPEED=420*TAU/360;
+const TAU=Math.PI*2,SPAWN_RADIUS=1320,DURATION=60,PLAYER_SPEED=420*TAU/360;
 const TRACKS=Object.freeze([{index:0,key:'courtesy',bpm:130,phase:.085,difficulty:1,cadence:1.45,speedScale:.94,spinScale:.78,tiltScale:.55},{index:1,key:'otis',bpm:135,phase:.005,difficulty:2,cadence:1.15,speedScale:1.06,spinScale:1,tiltScale:.85},{index:2,key:'focus',bpm:174,phase:.06,difficulty:3,cadence:.65,speedScale:1.23,spinScale:1.30,tiltScale:1.4}]);
 const wrap=(a,n=TAU)=>(a%n+n)%n,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const delta=(a,b)=>wrap(b-a+Math.PI)-Math.PI;
