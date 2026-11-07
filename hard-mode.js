@@ -5,6 +5,7 @@
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const M=typeof module!=='undefined'?require('./mixed-transition'):root.HexMixedTransition;
 const MOTION=typeof module!=='undefined'?require('./hard-motion'):root.HexHardMotion;
+const VIDEO=typeof module!=='undefined'?require('./hard-video-parts'):root.HexHardVideoParts;
 const TAU=Math.PI*2,MORPH=.18;
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
 function seedNow(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
@@ -41,7 +42,11 @@ function create(seed=seedNow(),duration=3600){
  while(t<duration){n=n===5?(shapeRandom()<.5?4:6):5;schedule.push([t,n]);t+=4.3+shapeRandom()*4.5}
  const at=t=>shapeAt(t,schedule).to;
  const clock=t=>wallClock(t,schedule);
- let impact=2.3,last=null,id=0,group=0,bag=[],recent=[];
+ let impact=2.3,last=null,id=0,group=0,bag=[],recent=[],partBag=[];
+ const nextClip=()=>{
+  if(!partBag.length){partBag=VIDEO.parts.map((_,i)=>i);for(let k=partBag.length-1;k>0;k--){const j=pick(k+1);[partBag[k],partBag[j]]=[partBag[j],partBag[k]]}}
+  return VIDEO.parts[partBag.pop()];
+ };
  while(impact<duration){
   // A weighted shuffle bag preserves a broad vocabulary without a rigid
   // twelve-family cycle. Common small bars/half-walls/rakes can recur; all
@@ -60,16 +65,21 @@ function create(seed=seedNow(),duration=3600){
   if(available<0){bag.length=0;continue}
   [bag[available],bag[bag.length-1]]=[bag[bag.length-1],bag[available]];
   const pattern=bag.pop();recent.push(pattern);if(recent.length>2)recent.shift();
-  const groupStart=impact,count=pattern===4?2:pattern===6?3+pick(3):pattern===0?1+pick(3):2+pick(3),direction=random()<.5?-1:1;
+  const clip=nextClip(); // 1-3 contiguous, video-observed radial crossing events.
+  const groupStart=impact,count=Math.max(pattern===4?2:pattern===6?3:1,clip.events.length),direction=random()<.5?-1:1;
   let gap=pick(at(impact));
   for(let j=0;j<count&&impact<duration;j++){
    n=at(impact);gap=((gap%n)+n)%n;
-   if(j&&(pattern===1||pattern===3||pattern===5||pattern===9||pattern===10))gap=(gap+direction+n)%n;
-   if(j&&pattern===2)gap=(gap+Math.floor(n/2))%n;
-   // Isolated one-cell walls and thin rakes sometimes stay in one lane and
-   // sometimes step sideways, creating recognizable small-bar groups.
-   if(j&&(pattern===0||pattern===6)&&random()<.55)gap=(gap+direction+n)%n;
-   const speed=MOTION.wallSpeed(impact),thickness=pattern===4||pattern===11?100+pick(81):pattern===6?18:pattern===0?24+pick(17):32+pick(21);
+   const observed=clip.events[Math.min(j,clip.events.length-1)];
+   // Retain short source-snippet lane changes and randomly mirror the group.
+   if(j){
+    if(observed.shift)gap=(gap+direction*observed.shift+n*3)%n;
+    else if(pattern===1||pattern===3||pattern===5||pattern===9||pattern===10)gap=(gap+direction+n)%n;
+   }
+   const speed=MOTION.wallSpeed(impact);
+   const thickness=pattern===4?Math.max(110,Math.min(180,observed.width)):
+    pattern===11?Math.max(160,Math.min(180,observed.width)):
+    pattern===6?18:pattern===0?24+pick(17):Math.max(24,Math.min(135,observed.width));
    const innerExtra=pattern===10?32:0,outerExtra=pattern===10?32:0;
    let safeAngle=(gap+.5)*TAU/n;
    for(let attempt=0;attempt<12;attempt++){
@@ -89,27 +99,31 @@ function create(seed=seedNow(),duration=3600){
     }
     if(Math.abs(impact-before)<1e-9)break;
    }
-   // Whole-cell silhouettes, rotated around a real, protected opening.
-   // Weighted, anti-repeat pattern groups; the protected opening remains clear.
+   // Project the source-observed angular mask onto the current polygon.
+   // Actor IDs, radial motion and all morph geometry continue unchanged.
    const relative=Array.from({length:n-1},(_,k)=>k+1);
-   let blocked=relative;
-   if(pattern===0)blocked=[1+j%(n-1)]; // Truly isolated, one-sector short wall.
-   if(pattern===6)blocked=relative.filter(k=>(k+j)%2===0); // Thin, separated rake.
-   if(pattern===9)blocked=relative.filter(k=>(k+j)%2===1); // Alternating spokes.
-   if(pattern===1||pattern===7)blocked=relative.filter(k=>k<=Math.ceil(n/2));
-   if(pattern===2||pattern===5)blocked=relative.filter(k=>k!==n-1);
-   if(pattern===3)blocked=relative.filter(k=>k!==Math.floor(n/2));
-   if(pattern===8)blocked=relative.filter(k=>k%2===1||k===n-1);
+   let blocked=[...new Set(observed.blocked.map(k=>{
+    const p=Math.round((k+.5)*n/observed.sides-.5);
+    return Math.max(1,Math.min(n-1,direction===1?p:n-p));
+   }))].sort((a,b)=>a-b);
+   if(pattern===0)blocked=[1+j%(n-1)]; // Single-cell emphasis.
+   if(pattern===6)blocked=relative.filter(k=>(k+j)%2===0); // Thin rakes.
+   if(pattern===9)blocked=relative.filter(k=>(k+j)%2===1); // Spokes.
+   if(pattern===4||pattern===11)blocked=relative; // Deep, full corridors.
+   if(!blocked.length)blocked=[1];
    const sectors=blocked.map(k=>(gap+k)%n).sort((a,b)=>a-b),profiles={};
    for(const sector of sectors){const k=(sector-gap+n)%n;profiles[sector]={thickness:pattern===8?(k%2?thickness:thickness*.45):pattern===11?(k%2?thickness:thickness*.55):thickness,offset:pattern===10?(k%2?-32:32):0}}
    const r=1250,start=clock(impact)-(r-66)/speed;
-   const wave={id:id++,group,pattern,sides:n,sectors,profiles,innerExtra,outerExtra,safeSector:gap,safeAngle,impact,r,speed,thickness,start,end:start+(r+thickness+outerExtra-26)/speed};
+   const wave={id:id++,group,pattern,partId:clip.id,sourceVideo:clip.source,sourceVideoSeconds:clip.videoSeconds,sides:n,sectors,profiles,innerExtra,outerExtra,safeSector:gap,safeAngle,impact,r,speed,thickness,start,end:start+(r+thickness+outerExtra-26)/speed};
    waves.push(wave);last=wave;
-   impact+=pattern===4?.56:pattern===5?.66:.78;
+   const nextEvent=clip.events[Math.min(j+1,clip.events.length-1)];
+   // Shorter video-derived intervals make dense nested groups; planner above
+   // delays any event that requires more travel/clearance than the player has.
+   impact+=Math.max(.43,Math.min(.78,j+1<clip.events.length?nextEvent.dt:.55));
   }
   const spinDirection=random()<.5?-1:1;random(); // Retain the wall RNG stream; magnitude is now time-tiered.
-  groups.push({at:groupStart,pattern,rate:spinDirection,tilt:(random()-.5)*.65});
-  group++;impact+=.25+random()*.35;
+  groups.push({at:groupStart,pattern,partId:clip.id,sourceVideo:clip.source,sourceVideoSeconds:clip.videoSeconds,rate:spinDirection,tilt:(random()-.5)*.65});
+  group++;impact+=.12+random()*.20;
  }
  return {mode:'hard-rules',kind:'hard-rules',seed:seed>>>0,duration,shapeSchedule:schedule,morphSeconds:MORPH,waves,groups};
 }
