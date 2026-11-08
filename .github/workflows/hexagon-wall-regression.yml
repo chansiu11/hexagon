@@ -76,6 +76,8 @@ jobs:
         run: node browser-hard-mode.test.cjs
       - name: Verify audible original voice cues and HARD wall/death feedback
         run: node browser-hard-feedback.test.cjs
+      - name: Verify cleaned dialogue files and live BGM ducking in every stage
+        run: node browser-voice-isolation.test.cjs
       - name: Verify calibrated HARD motion and low-frame-rate timing
         run: node browser-hard-motion.test.cjs
       - name: Verify death impact visibility in Chromium
