@@ -80,6 +80,8 @@ jobs:
         run: node browser-hard-motion.test.cjs
       - name: Verify death impact visibility in Chromium
         run: node browser-death.test.cjs
+      - name: Verify 317-second Hexagonest canvas and three controls
+        run: node browser-hexagonest.test.cjs
       - name: Wait for updated GitHub Pages content
         if: github.event_name == 'push'
         run: |
