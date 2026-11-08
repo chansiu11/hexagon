@@ -63,10 +63,20 @@ function create(seed=newSeed(),duration=3600){
  while(impact<duration){
   const era=impact<60?0:impact<120?1:2;
   const part=pickPart(era);
-  const first=part.events[0],sourceOpen=[];
-  for(let i=0;i<6;i++)if(!(first.mask&(1<<i)))sourceOpen.push(i);
-  const targetSafe=last?mod6(previousSafe+(random()<.72?0:random()<.5?-1:1)):4;
-  const rotation=mod6(targetSafe-sourceOpen[pick(sourceOpen.length)]);
+  const first=part.events[0];
+  const targetSafe=last?mod6(previousSafe+(random()<.82?0:random()<.5?-1:1)):4;
+  // Rotate the entire incoming source part, not its individual waves.
+  // Prefer a matching exit corridor and similar first wall at each join.
+  let rotation=0,bestCost=Infinity;
+  for(let candidate=0;candidate<6;candidate++){
+   const incoming=rotateMask(first.mask,candidate,false),openings=[];
+   for(let sector=0;sector<6;sector++)if(!(incoming&(1<<sector)))openings.push(sector);
+   const nearest=openings.reduce((best,s)=>distance(s,previousSafe)<distance(best,previousSafe)?s:best,openings[0]);
+   const changed=last?Array.from({length:6},(_,s)=>!!((incoming^last.pattern)&(1<<s))).filter(Boolean).length:0;
+   const cost=distance(nearest,targetSafe)*5+distance(nearest,previousSafe)*4+
+    changed*.32+random()*.12;
+   if(cost<bestCost){bestCost=cost;rotation=candidate}
+  }
   let anchor=null,played=0,partDelayMax=0;
   for(let j=0;j<part.events.length&&impact<duration;j++){
    const source=part.events[j],sourceOffset=source.videoSeconds-part.sourceStart;
@@ -113,7 +123,11 @@ function create(seed=newSeed(),duration=3600){
    sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
    observedEvents:part.events.length,played,rotation,maxDelay:partDelayMax});
   groups.push({at:anchor,rate:0,tilt:0,partId:part.id,group:groupId});
-  groupId++;impact=last.impact+part.gapAfter;
+  // Shuffle changes the next source part: very long pauses recorded before
+  // a different source chain do not need to create several seconds of dead air.
+  const joinGap=Math.min(part.gapAfter,2.6);
+  partOrder.at(-1).joinGap=joinGap;
+  groupId++;impact=last.impact+joinGap;
  }
  // The reference stage reverses world rotation roughly every 5-6s.
  // Wall fragments are selected about every 1s; their boundaries are NOT
@@ -158,6 +172,6 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'continuous-dodge-v6'};
+const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'continuous-dodge-v7'};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);
