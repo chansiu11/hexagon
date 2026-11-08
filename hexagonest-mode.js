@@ -187,6 +187,6 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.clips.length,COLOR_EVENTS};
+const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.clips.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4'};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);
