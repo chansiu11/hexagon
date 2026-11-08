@@ -91,6 +91,13 @@ function create(seed=newSeed(),duration=3600){
 class HexagonestGame extends HARD.HardGame{
  constructor(data=create()){
   super(data);this.level=2;this.hexagonestMode=true;this.hardMode=false;
+  // HARD's internal physics scans all spin groups at each 240Hz step.
+  // Hexagonest has hundreds of groups over the longer recording, so keep a
+  // single neutral event for the inherited collision/mesh loop and advance
+  // video-inspired spin events once per rendered update.
+  this.spinEvents=data.groups;
+  this.timeline={...data,groups:[data.groups[0]]};
+  this.spinIndex=0;
   this.recordedCamera=null;this.profile=null;this.rotation=0;this.rotationSpeed=2.5;
  }
  get playerSpeed(){return 9*Math.PI/180*60*CLOCK}
@@ -99,8 +106,9 @@ class HexagonestGame extends HARD.HardGame{
   // HARD physics uses a 25/24 game clock. Hexagonest is video-time 1:1.
   super.update(dt/CLOCK,input);
   const elapsed=this.time-t0;if(elapsed<=0)return;
-  let direction=this.timeline.groups[0].rate;
-  for(const event of this.timeline.groups){if(event.at>this.time)break;direction=event.rate}
+  while(this.spinIndex>0&&this.spinEvents[this.spinIndex].at>this.time)this.spinIndex--;
+  while(this.spinIndex+1<this.spinEvents.length&&this.spinEvents[this.spinIndex+1].at<=this.time)this.spinIndex++;
+  const direction=this.spinEvents[this.spinIndex].rate;
   const target=direction*(this.time<60?2.55:this.time<120?3.5:4.1);
   const k=1-Math.exp(-elapsed*3);
   this.rotationSpeed=rs0+(target-rs0)*k;
