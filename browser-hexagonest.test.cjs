@@ -10,6 +10,10 @@ const {chromium}=require('playwright');
   await page.goto(process.env.HEXAGON_URL||'http://127.0.0.1:4173/',{waitUntil:'load'});
   await page.evaluate(()=>{window.requestAnimationFrame=()=>0});
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
+  const rendererUrl=await page.evaluate(()=>
+   Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src||'');
+  assert(rendererUrl.includes('hexest-seamless-v5'),
+    'public Pages must load the updated Hexagonest continuous-contour renderer');
   // The real deployed Pages build must load the NEW calibration, not cached v1.
   const calibrated=await page.evaluate(()=>({
    velocities:[HexHexagonest.speedAt(20),HexHexagonest.speedAt(80),HexHexagonest.speedAt(180)],
