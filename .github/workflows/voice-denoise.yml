@@ -44,5 +44,7 @@ jobs:
           git add assets/voice/clean/
           if ! git diff --cached --quiet; then
             git commit -m "Audio: regenerate 7 speech-focused gameplay voice assets"
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase FETCH_HEAD
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
