@@ -7,7 +7,7 @@ assert.equal(V.events.length,360);
 assert.equal(V.parts.length,33,'source should be split into full dodge sequences');
 assert.equal(V.clips.length,33,'no overlapping sliding source fragments');
 assert.equal(X.VIDEO_PART_COUNT,33);
-assert.equal(X.PART_REPLAY_VERSION,'continuous-dodge-v6');
+assert.equal(X.PART_REPLAY_VERSION,'continuous-dodge-v7');
 assert.equal(V.DODGE_BREAK_SECONDS,1.75);
 assert.deepEqual([0,1,2].map(e=>V.parts.filter(p=>p.era===e).length),[6,6,21]);
 assert.equal(V.parts.reduce((sum,p)=>sum+p.events.length,0),360,
@@ -92,6 +92,16 @@ for(let seed=1;seed<=100;seed++){
  for(let i=0;i<d.partOrder.length;i++){
   const replay=d.partOrder[i],part=V.parts[replay.partId],walls=byGroup.get(i);
   assert.equal(replay.played,walls.length);
+  assert(replay.joinGap>0&&replay.joinGap<=2.6,
+   'random part stitching must keep natural pauses without long dead air');
+  if(i+1<d.partOrder.length){
+   const next=byGroup.get(i+1)[0],last=walls.at(-1);
+   const distance=Math.min((next.safeSector-last.safeSector+6)%6,
+    (last.safeSector-next.safeSector+6)%6);
+   assert(distance<=1,'next complete part must connect to the previous escape corridor');
+   assert(next.impact-last.impact+1e-8>=replay.joinGap,
+    'joining may add safety clearance but cannot overlap source chains');
+  }
   assert.equal(walls[0].sourceEventIndex,part.firstEventIndex);
   for(let j=0;j<walls.length;j++){
    assert.equal(walls[j].partId,replay.partId);
