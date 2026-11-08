@@ -15,10 +15,12 @@ const {chromium}=require('playwright');
    velocities:[HexHexagonest.speedAt(20),HexHexagonest.speedAt(80),HexHexagonest.speedAt(180)],
    colors:HexHexagonest.COLOR_EVENTS?.length,
    openingHues:[3,5,7,11].map(t=>HexHexagonest.palette(t)[0]),
-   spinEvents:HexHexagonest.create(19,30).spinEvents?.length
+   spinEvents:HexHexagonest.create(19,30).spinEvents?.length,
+   familyVersion:HexHexagonest.PATTERN_TRANSITION_VERSION
   }));
   assert.deepEqual(calibrated,{velocities:[460,515,505],colors:31,
-   openingHues:[260,18,194,58],spinEvents:6},'new video-calibrated Hexagonest script must be deployed');
+   openingHues:[260,18,194,58],spinEvents:6,
+   familyVersion:'video-family-v4'},'new video-calibrated pattern-continuity script must be deployed');
   const init=await page.evaluate(async()=>{
    settings.sound=false;settings.motion=true;selected=2;screen='select';launch=null;
    await start();
