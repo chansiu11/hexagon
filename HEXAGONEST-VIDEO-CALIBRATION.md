@@ -45,3 +45,24 @@ Now, at the end of a clip, the generator samples an actual **consecutive source-
 Across 250 deterministic 320-second seeds, generated averages in the same 0–60 / 60–120 / 120–305 bands became **72.6 / 77.8 / 233.5**, compared with video observations of **71 / 71 / 217**. The 320-second generated total ranged from 358 to 440 walls; 100-seed tests check this distribution and verify that both short clusters and longer pauses remain. Also corrected a boundary issue where a delayed wave could incorrectly retain the prior 60/120-second speed tier.
 
 At a valid long pause, an empty playfield is intentional; browser tests now permit sparse screenshots, while requiring walls to appear in the majority of sampled frames. The stage-only JavaScript asset is versioned as `hexest-rhythm-v3` so old cached code cannot obscure the new timing on GitHub Pages. HARD, RANDOM HEXAGON and the other stages retain their previous generators and speeds.
+
+## Pattern-family continuity (follow-up, 2026-11-08)
+
+The previous cadence-focused update fixed clip-to-clip timing, but independently selected video snippets could still make the same six-bit wall mask repeat too often while breaking the video’s longer corridor/spoke families.
+
+We classify each six-lane mask independently of camera orientation, using (1) the number of blocked sectors and (2) the number of contiguous blocked runs. Examples: a **5/1** mask is a single open corridor, while **3/3** is the alternating-spoke wall. The clip sampler now sometimes prefers a snippet whose first wall belongs to the same structural family as the last wall (24% weighted continuation for 0–60s and 120s+, 6% for 60–120s). If a new clip would present the *exact same* six-bit mask, it sometimes rotates that first structure by one sector; the existing reachability planner may delay the following wave for safe angular movement.
+
+Measurements from the 360 approximate ring-crossing observations, compared with a 150-seed pre-merge simulation (reference is an imperfect video extraction, not original game RNG):
+
+| Time window | Metric | Video extraction | Prior generator | Generator after change |
+|---|---|---:|---:|---:|
+| 0–60s | Exact adjacent masks identical | 10.0% | 15.8% | 11.7% |
+| 60–120s | Exact adjacent masks identical | 14.3% | 18.9% | 13.1% |
+| 120–305s | Exact adjacent masks identical | 12.0% | 16.6% | 13.6% |
+| 0–60s | Adjacent wall families identical | 47.1% | 39.3% | 47.7% |
+| 60–120s | Adjacent wall families identical | 35.7% | 33.4% | 35.9% |
+| 120–305s | Adjacent wall families identical | 50.5% | 41.2% | 49.6% |
+
+The wall arrival timing, source-width conversion, screen-space velocity, all three color eras and camera rotation were not intentionally changed. The Hexagonest-only JS cache is marked `hexest-patterns-v4`; the deployed-site browser test verifies the matching `video-family-v4` runtime marker and earlier calibration values. Existing HARD, RANDOM HEXAGON, and other stage generators remain unchanged.
+
+100-seed regression tests independently compute the source family taxonomy, matching both exact-mask repetition and family continuity to the observed video within small tolerances. Collision-aware 3-mode replay tests still require safe traversal.

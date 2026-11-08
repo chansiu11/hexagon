@@ -11,6 +11,16 @@ function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.im
 function newSeed(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
 const mod6=n=>(n%6+6)%6;
 const distance=(a,b)=>Math.min(mod6(a-b),mod6(b-a));
+// Rotation-invariant six-lane wall family: blocked-lane count + number of
+// contiguous runs (e.g. 5/1 corridor versus 3/3 alternating spokes).
+function family(mask){
+ let count=0,runs=0;
+ for(let i=0;i<6;i++)if(mask&(1<<i)){
+  count++;
+  if(!(mask&(1<<((i+5)%6))))runs++;
+ }
+ return 8*count+runs;
+}
 function rotateMask(mask,shift,flip){
  let result=0;for(let k=0;k<6;k++)if(mask&(1<<k))result|=1<<mod6((flip?-k:k)+shift);
  return result;
@@ -66,14 +76,29 @@ function create(seed=newSeed(),duration=3600){
  while(impact<duration){
   const era=impact<60?0:impact<120?1:2;
   const bank=bins[era],allowed=bank.filter(c=>!recent.includes(c.id));
-  const clip=(allowed.length?allowed:bank)[pick((allowed.length?allowed:bank).length)];
+  const pool=allowed.length?allowed:bank;
+  // Video crossings retain the same structural family across a boundary
+  // more often than independently sampled 1-3-wall snippets. In most
+  // transitions retain the regular video sample distribution; sometimes
+  // prefer a clip beginning with the prior family. Era-specific weights
+  // were calibrated against adjacent source crossing statistics.
+  const continuation=last&&random()<(era===1?.06:.24)?
+   pool.filter(c=>family(c.events[0].mask)===family(last.pattern)):null;
+  const choices=continuation?.length?continuation:pool;
+  const clip=choices[pick(choices.length)];
   recent.push(clip.id);if(recent.length>9)recent.shift();
   const flip=random()<.5,source0=clip.events[0];
   const sourceMask=rotateMask(source0.mask,0,flip);
   const sourceOpen=Array.from({length:6},(_,i)=>i).filter(i=>!(sourceMask&(1<<i)));
   const sourceGap=sourceOpen[pick(sourceOpen.length)];
   const startSafe=last?mod6(previousSafe+(random()<.72?0:random()<.5?-1:1)):4;
-  const rotation=mod6(startSafe-sourceGap);
+  let rotation=mod6(startSafe-sourceGap);
+  // Avoid repeating the identical six-bit wall mask too often. Rotating a
+  // duplicate by one sector keeps its structural family (e.g. a corridor)
+  // while offering the visual lane-to-lane progression in the recording.
+  // The clearance planner below still ensures the new safe lane is reachable.
+  if(last&&rotateMask(source0.mask,rotation,flip)===last.pattern&&random()<.53)
+   rotation=mod6(rotation+(random()<.5?1:-1));
   const groupAt=impact;
   for(let j=0;j<clip.events.length&&impact<duration;j++){
    const source=clip.events[j],mask=rotateMask(source.mask,rotation,flip);
@@ -162,6 +187,6 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.clips.length,COLOR_EVENTS};
+const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.clips.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4'};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);
