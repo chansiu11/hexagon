@@ -6,6 +6,7 @@ const X=require('./hexagonest-mode');
 assert.equal(V.events.length,360);
 assert.equal(V.clips.length,984);
 assert.equal(X.VIDEO_PART_COUNT,984);
+assert.equal(X.PATTERN_TRANSITION_VERSION,'video-family-v4');
 assert(V.events.every(e=>e.mask>0&&e.mask<63&&e.width>=22&&e.videoSeconds<317));
 assert.equal(X.palette(30)[1],92,'bright early palette');
 assert.equal(X.palette(61)[1],0,'desaturation after 60 seconds');
@@ -27,7 +28,18 @@ assert.equal(X.COLOR_EVENTS.length,31,'all measured opening color changes record
 
 assert.notEqual(X.speedAt(40),X.speedAt(70));
 assert.equal(X.rotateMask(0b000011,2,false),0b001100);
+// Independent family counter: number of blocked sectors and disconnected
+// blocked runs around the 6-lane hexagon, invariant under rotation/mirror.
+function patternClass(mask){
+ let blocked=0,runs=0;
+ for(let i=0;i<6;i++)if(mask&(1<<i)){
+  blocked++;
+  if(!(mask&(1<<((i+5)%6))))runs++;
+ }
+ return 8*blocked+runs;
+}
 const eraTotal=[0,0,0];let denseIntervals=0,quietIntervals=0;
+const generatedTransitions=[0,1,2].map(()=>({pairs:0,identical:0,sameFamily:0}));
 for(let seed=1;seed<=100;seed++){
  const d=X.create(seed,320),parts=new Set(d.waves.map(w=>w.partId));
  assert.equal(d.mode,'hexagonest-video');
@@ -41,6 +53,14 @@ for(let seed=1;seed<=100;seed++){
   if(gap<.52)denseIntervals++;
   if(gap>1.6)quietIntervals++;
   assert(gap>0,'strictly chronological pattern arrivals');
+  const before=d.waves[i-1],after=d.waves[i];
+  const era=t=>t<60?0:t<120?1:t<305?2:3;
+  if(era(before.impact)===era(after.impact)&&era(after.impact)<3){
+   const stats=generatedTransitions[era(after.impact)];
+   stats.pairs++;
+   if(before.pattern===after.pattern)stats.identical++;
+   if(patternClass(before.pattern)===patternClass(after.pattern))stats.sameFamily++;
+  }
  }
  assert(parts.size>=150,'should combine many short observed fragments');
  assert(d.waves.at(-1).impact>315,'extend beyond the old 60s wall track');
@@ -74,6 +94,25 @@ for(let i=0;i<3;i++){
 }
 assert(denseIntervals>10000,'retain the observed quick wall clusters');
 assert(quietIntervals>1000,'retain rare longer pauses between source wall crossings');
+const sourceTransitions=[0,1,2].map(()=>({pairs:0,identical:0,sameFamily:0}));
+for(let i=1;i<V.events.length;i++){
+ const a=V.events[i-1],b=V.events[i];
+ const era=t=>t<60?0:t<120?1:t<305?2:3;
+ if(era(a.videoSeconds)!==era(b.videoSeconds)||era(a.videoSeconds)>2)continue;
+ const stats=sourceTransitions[era(a.videoSeconds)];
+ stats.pairs++;
+ if(a.mask===b.mask)stats.identical++;
+ if(patternClass(a.mask)===patternClass(b.mask))stats.sameFamily++;
+}
+for(let i=0;i<3;i++){
+ const source=sourceTransitions[i],game=generatedTransitions[i];
+ assert(game.pairs>3000,'adequate multi-seed sample');
+ assert(Math.abs(game.identical/game.pairs-source.identical/source.pairs)<.045,
+   'avoid repetitive exact masks in video era '+i);
+ assert(Math.abs(game.sameFamily/game.pairs-source.sameFamily/source.pairs)<.055,
+   'retain observed multi-wall structural-family runs in video era '+i);
+}
+console.log('PASS Hexagonest family transitions: fewer duplicate masks and video-like corridor/spoke continuity');
 console.log('PASS 100 Hexagonest seeds: measured 360-event source cadence, quick clusters, sparse stretches, 315+ seconds and open polygon masks');
 
 const delta=(a,b)=>E.wrap(b-a+Math.PI)-Math.PI;
