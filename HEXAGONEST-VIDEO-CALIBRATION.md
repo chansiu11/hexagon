@@ -66,3 +66,13 @@ Measurements from the 360 approximate ring-crossing observations, compared with 
 The wall arrival timing, source-width conversion, screen-space velocity, all three color eras and camera rotation were not intentionally changed. The Hexagonest-only JS cache is marked `hexest-patterns-v4`; the deployed-site browser test verifies the matching `video-family-v4` runtime marker and earlier calibration values. Existing HARD, RANDOM HEXAGON, and other stage generators remain unchanged.
 
 100-seed regression tests independently compute the source family taxonomy, matching both exact-mask repetition and family continuity to the observed video within small tolerances. Collision-aware 3-mode replay tests still require safe traversal.
+
+## Connected wall-contour rendering (follow-up, 2026-11-08)
+
+The Hexagonest game reuses HARD's six-sided mesh and collision actors while intentionally setting `hardMode=false` to keep its own stage behavior. As a result, the generic renderer previously drew **each Hexagonest panel using an independent Canvas fill**. For abutting panels, the antialiasing of each independent fill can reveal thin gaps or make a thick continuous ring look segmented even when its collision geometry is intact.
+
+A diagnostic sample of eight deterministic Hexagonest seeds across twelve instants each (96 states) contained **1,142 individual wall panels but only 676 connected, on-screen wall runs**, representing **466 unnecessary interior draw boundaries** (~40.8% of fills). The revised Hexagonest-only renderer joins panels belonging to the same wave, radial band, radius and thickness into a single contour. Crucially, it also treats sectors **5 and 0** as neighbors across the 360°/0° angular wrap, rotating each wave's drawing order to begin after an actual unblocked sector. Disjoint walls remain separate; different waves never merge. HARD and RANDOM HEXAGON continue using their existing renderer paths unchanged.
+
+The new Chromium regression records real Canvas `fill()` call counts for a dozen deterministic Hexagonest time samples, compares them with the number of connected wall runs independently calculated from actual six-sector occupancy, and verifies both the wall meshes and current collision result remain unmodified by rendering. It requires at least one tested wall that crosses the 360° wrap and demonstrates fewer fills than raw panel counts. The public Pages browser smoke asserts `play.js?v=hexest-seamless-v5` is loaded, preventing an outdated renderer from passing the new tests.
+
+This is a *rendering continuity* fix only. Wall arrival cadence, family choices, thickness, motion, camera, player physics and source-video content are unchanged.
