@@ -10,6 +10,10 @@ const {chromium}=require('playwright');
   await page.goto(process.env.HEXAGON_URL||'http://127.0.0.1:4173/',{waitUntil:'load'});
   await page.evaluate(()=>{window.requestAnimationFrame=()=>0});
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
+  const rendererUrl=await page.evaluate(()=>
+   Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src||'');
+  assert(rendererUrl.includes('hexest-seamless-v5'),
+    'public Pages must load the updated Hexagonest continuous-contour renderer');
   // The real deployed Pages build must load the NEW calibration, not cached v1.
   const calibrated=await page.evaluate(()=>({
    velocities:[HexHexagonest.speedAt(20),HexHexagonest.speedAt(80),HexHexagonest.speedAt(180)],
@@ -59,6 +63,46 @@ const {chromium}=require('playwright');
    await page.screenshot({path:'wall-browser-screenshots/hexagonest-'+t+'s.png'});
   }
   assert(nonempty>=6,'source-paced walls should appear in most sampled frames');
+  // Count the actual Canvas fill() calls, not just a fabricated geometry
+  // prediction: every contiguous six-sided run should become one painted
+  // contour, including the 5->0 cyclic seam. Collision geometry is read-only.
+  const joinedWalls=await page.evaluate(()=>{
+   const g=new HexHexagonest.HexagonestGame(HexHexagonest.create(1,318));
+   const saved=ctx.fill,results=[];let wrapped=0,merged=0,distinct=0;
+   for(const t of [3,5,10,25,45,70,90,110,150,190,240,305]){
+    g.time=t;g.sampleWalls();
+    const waves=new Map();
+    for(const w of g.walls){
+     if(!waves.has(w.waveId))waves.set(w.waveId,[]);
+     waves.get(w.waveId).push(w);
+    }
+    let expected=0;
+    for(const panels of waves.values()){
+     const sectors=new Set(panels.map(w=>w.sector));
+     for(let k=0;k<6;k++)
+      if(sectors.has(k)&&!sectors.has((k+5)%6))expected++;
+     if(sectors.has(0)&&sectors.has(5))wrapped++;
+     if(sectors.size>1)merged++;
+    }
+    const snapshot=JSON.stringify(g.walls.map(w=>[w.r,w.thickness,w.renderPoly]));
+    const collision=g.hit(g.angle)?.id||null;
+    let painted=0;
+    ctx.fill=function(...args){painted++;return saved.apply(this,args)};
+    try{drawWallField(g.walls,'#fff',g)}
+    finally{ctx.fill=saved}
+    if(painted!==expected)throw Error('Hexagonest run fill mismatch at '+t+': '+painted+' vs '+expected);
+    if(snapshot!==JSON.stringify(g.walls.map(w=>[w.r,w.thickness,w.renderPoly]))||
+       collision!==(g.hit(g.angle)?.id||null))
+     throw Error('Hexagonest rendering mutated collision state at '+t);
+    if(painted<g.walls.length)distinct++;
+    results.push({t,panels:g.walls.length,painted,expected});
+   }
+   return {results,wrapped,merged,distinct};
+  });
+  assert(joinedWalls.wrapped>0,'check wall continuity across the 360-degree sector seam');
+  assert(joinedWalls.merged>0&&joinedWalls.distinct>=6,
+    'adjacent panels should reduce fill calls without losing collision geometry');
+  assert(joinedWalls.results.every(r=>r.painted===r.expected));
   const controls=await page.evaluate(()=>{
    const results=[];
    for(const mode of [1,2,3]){
@@ -77,6 +121,6 @@ const {chromium}=require('playwright');
   });
   assert(sources.different&&sources.hard==='hard-rules');
   assert.deepEqual(errors,[],'browser console JavaScript errors');
-  console.log('PASS Hexagonest 317s launch, video-paced density, ten canvas captures with natural quiet gaps, three control modes and stage isolation in Chromium');
+  console.log('PASS Hexagonest 317s launch, video-paced density, 360-degree seamless joined wall contours, unchanged collision mesh, ten canvas captures and three control modes');
  }finally{await b.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

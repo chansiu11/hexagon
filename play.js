@@ -323,7 +323,49 @@ function gentleStartCamera(m,time){if(!m||time>=2)return m;const angle=Math.atan
 
 // A single nonzero fill forms the union: overlapping sectors do not produce
 // internal seams or transparent cracks from separate antialiased draw calls.
+// Hexagonest uses HARD's continuous, six-sided collision panels, but is a
+// separate level with hardMode=false. Paint adjoining panels as ONE outline
+// instead of separately filling every sector (which antialiases interior
+// edges and can make the original wall look split into thin strips).
+// Also join sectors 5 -> 0 across the angular wrap when they belong to
+// the same source wave; keep disjoint runs and different waves separate.
+function drawHexagonestWalls(walls,color){
+ const joined=(a,b)=>a&&b&&a.waveId===b.waveId&&a.band===b.band&&
+  a.r===b.r&&a.thickness===b.thickness&&
+  (a.mixedEnd===b.mixedStart||(a.mixedEnd===1&&b.mixedStart===0));
+ ctx.fillStyle=color;
+ for(let i=0;i<walls.length;){
+  let end=i+1;
+  while(end<walls.length&&walls[end].waveId===walls[i].waveId)end++;
+  const panels=walls.slice(i,end);
+  // Active panels arrive in sector order. If panels near 0° and 360° are
+  // joined, begin just after the first unblocked gap so the wrap is internal.
+  if(panels.length>1&&joined(panels[panels.length-1],panels[0])){
+   let start=1;
+   while(start<panels.length&&joined(panels[start-1],panels[start]))start++;
+   if(start<panels.length)panels.push(...panels.splice(0,start));
+  }
+  for(let j=0;j<panels.length;){
+   let k=j+1;
+   while(k<panels.length&&joined(panels[k-1],panels[k]))k++;
+   const first=panels[j].renderPoly[0];
+   ctx.beginPath();ctx.moveTo(first[0],first[1]);
+   for(let t=j;t<k;t++){
+    const p=panels[t].renderPoly[1];ctx.lineTo(p[0],p[1]);
+   }
+   const outer=panels[k-1].renderPoly[2];ctx.lineTo(outer[0],outer[1]);
+   for(let t=k-1;t>=j;t--){
+    const p=panels[t].renderPoly[3];ctx.lineTo(p[0],p[1]);
+   }
+   ctx.closePath();ctx.fill();
+   j=k;
+  }
+  i=end;
+ }
+}
+
 function drawWallField(walls,color,game){
+ if(game.hexagonestMode){drawHexagonestWalls(walls,color);return}
  if(game.level===6||game.hardMode){
   // Draw each connected run as one contour. Collision uses the convex
   // panels of this same mesh; internal panel edges never become fill seams.
