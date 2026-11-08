@@ -101,8 +101,16 @@ function create(seed=newSeed(),duration=3600){
   groupId++;
   impact+=.07+random()*.16;
  }
+ // The reference stage reverses world rotation roughly every 5-6s.
+ // Wall fragments are selected about every 1s; their boundaries are NOT
+ // camera-reversal cues. Keep a separate, gently jittered spin timeline.
+ const spinEvents=[{at:0,rate:-1}];let spinAt=5.5,direction=1;
+ while(spinAt<duration){
+  spinEvents.push({at:spinAt,rate:direction});
+  direction=-direction;spinAt+=5.35+(random()-.5)*.65;
+ }
  return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,duration,
-   shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,source:VIDEO.source};
+   shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,spinEvents,source:VIDEO.source};
 }
 class HexagonestGame extends HARD.HardGame{
  constructor(data=create()){
@@ -111,10 +119,10 @@ class HexagonestGame extends HARD.HardGame{
   // Hexagonest has hundreds of groups over the longer recording, so keep a
   // single neutral event for the inherited collision/mesh loop and advance
   // video-inspired spin events once per rendered update.
-  this.spinEvents=data.groups;
-  this.timeline={...data,groups:[data.groups[0]]};
+  this.spinEvents=data.spinEvents||data.groups;
+  this.timeline={...data,groups:[{at:0,rate:0,tilt:0}]};
   this.spinIndex=0;
-  this.recordedCamera=null;this.profile=null;this.rotation=0;this.rotationSpeed=2.5;
+  this.recordedCamera=null;this.profile=null;this.rotation=0;this.rotationSpeed=-2.2;
  }
  get playerSpeed(){return 9*Math.PI/180*60*CLOCK}
  update(dt,input=0){
@@ -125,7 +133,9 @@ class HexagonestGame extends HARD.HardGame{
   while(this.spinIndex>0&&this.spinEvents[this.spinIndex].at>this.time)this.spinIndex--;
   while(this.spinIndex+1<this.spinEvents.length&&this.spinEvents[this.spinIndex+1].at<=this.time)this.spinIndex++;
   const direction=this.spinEvents[this.spinIndex].rate;
-  const target=direction*(this.time<60?2.55:this.time<120?3.5:4.1);
+  // Source core tracking: ~2.2 rad/s early, ~3.25 before 60s,
+  // ~4.3 from 60-120s. Post-120 observations are more uncertain.
+  const target=direction*(this.time<10?2.2:this.time<60?3.25:this.time<120?4.3:4.4);
   const k=1-Math.exp(-elapsed*3);
   this.rotationSpeed=rs0+(target-rs0)*k;
   this.rotation=r0+(rs0+this.rotationSpeed)*.5*elapsed;
