@@ -26,6 +26,10 @@ jobs:
           python-version: '3.11'
       - name: Install signal-processing requirements
         run: python -m pip install --quiet numpy scipy
+      - name: Install audio codec tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
       - name: Check FFmpeg and produce 7 improved source clips
         run: |
           ffmpeg -version | head -n 1
