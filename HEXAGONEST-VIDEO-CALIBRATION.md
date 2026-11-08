@@ -76,3 +76,30 @@ A diagnostic sample of eight deterministic Hexagonest seeds across twelve instan
 The new Chromium regression records real Canvas `fill()` call counts for a dozen deterministic Hexagonest time samples, compares them with the number of connected wall runs independently calculated from actual six-sector occupancy, and verifies both the wall meshes and current collision result remain unmodified by rendering. It requires at least one tested wall that crosses the 360° wrap and demonstrates fewer fills than raw panel counts. The public Pages browser smoke asserts `play.js?v=hexest-seamless-v5` is loaded, preventing an outdated renderer from passing the new tests.
 
 This is a *rendering continuity* fix only. Wall arrival cadence, family choices, thickness, motion, camera, player physics and source-video content are unchanged.
+
+## Whole, continuous-dodge parts from the supplied video (2026-11-08, v6)
+
+### Re-examining the source recording
+
+The supplied `UrPXBSh4mqU` MP4 was inspected directly (768×480, 30 fps, about 316.02 seconds). Gameplay lasts only to approximately **video time 307s**; the remaining frames are score/result and menu screens. The 360 existing numerical ring-crossing observations span **2.0–305.2 seconds of video**, with masks and widths estimated from rendered frames at finite resolution. They are not original wall-entity data; occlusion, video compression, perspective/camera rotation and 0.1s timing quantization make **pixel-perfect extraction impossible to certify** from these observations alone.
+
+The previous implementation chose from **984 overlapping 1–3-event excerpts**. It destroyed longer sequences where the player must continually change escape lanes, even though its overall wall density had been calibrated. The new implementation replaces *all* of those excerpts with **33 non-overlapping source parts**. Starting from the video event stream, a part continues as long as the next observed wall crosses within **1.75 video seconds**, and ends only at an observed recovery gap (≥1.75s) or the original stage difficulty transition (60s or 120s). There is **no artificial fixed-duration or fixed-wall-count cap**; real connected stretches of 20–37 crossings remain intact. Single-wall parts are retained when the source really has a solitary isolated wall.
+
+| Source section | Complete dodge parts | Source events |
+|---|---:|---:|
+| Vivid color, 0–60s | 6 | 71 |
+| Gray, 60–120s | 6 | 71 |
+| Black/white, 120–305.2s | 21 | 218 |
+| **Total** | **33** | **360** |
+
+### Replay semantics
+
+For each seeded run, choose and shuffle **complete parts**, not individual wall actors. An era-specific shuffle bag guarantees that the same part will not be chosen a second time before all parts from that era have been considered. The full video event list is represented exactly once in the part inventory; parts never overlap or omit a recorded crossing.
+
+Inside a part, keep **every source event's original six-bit mask, source width, source order and time offset**. Only a *single uniform six-sector rotation per part* is allowed at the stitch, to connect it to the current escape lane. Do not mirror, re-roll, replace, separately rotate or reorder individual source walls. Preserve the measured time gap **after** the part, rather than inserting an arbitrary tiny artificial join.
+
+Existing collision safety remains a necessity: noisy six-sector masks from a captured rotating screen can imply impossible player turns. If a safe escape route requires longer clearance, the generator may **delay** that crossing, but now always starts from the event's *absolute original offset within the part*, so such delays cannot cumulatively destroy the later event timestamps. The adjusted time and source event index/mask/width are recorded separately in every wave for transparency. The stage's previously measured speeds, width scale, colors, camera motion, three control modes, other maps, audio and rendering remain unchanged.
+
+In a 100-seed analysis of 320-second replays, the reconstructed stage averaged about **364.6 walls** (range 360–368), compared with 360 observed source video events. Each replay now exposes `partOrder` including the source part ID/range and whole-part rotation. The unit test verifies exact event coverage, part boundaries, wall masks/widths/ordering, source timestamps, shuffle-bag diversity and collision-aware control-mode replays. The browser test asserts v6 source/engine cache markers and confirms that source part metadata corresponds to what the canvas is actually rendering.
+
+**What is and is not exact:** The replay now uses complete, continuous source-observed patterns as atomic parts, whereas the previous implementation synthesized short fragments. Within each selected part, *the observed event data* is preserved aside from a whole-part rotation and limited safety timing adjustments. This is still **not** a pixel-identical reconstruction of every original video frame or the game's original internal RNG.
