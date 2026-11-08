@@ -27,12 +27,22 @@ assert.equal(X.COLOR_EVENTS.length,31,'all measured opening color changes record
 
 assert.notEqual(X.speedAt(40),X.speedAt(70));
 assert.equal(X.rotateMask(0b000011,2,false),0b001100);
+const eraTotal=[0,0,0];let denseIntervals=0,quietIntervals=0;
 for(let seed=1;seed<=100;seed++){
  const d=X.create(seed,320),parts=new Set(d.waves.map(w=>w.partId));
  assert.equal(d.mode,'hexagonest-video');
  assert.deepEqual(d.shapeSchedule,[[0,6]],'Hexagonest footage retains six sides');
- assert(d.waves.length>490&&d.waves.length<1000);
- assert(parts.size>=120,'should combine many short observed fragments');
+ // There are 360 estimated source-video ring crossings in ~305 seconds.
+ // Avoid the former 50%-denser, artificial .12-.30s joins.
+ assert(d.waves.length>320&&d.waves.length<470,'video-like number of waves');
+ for(const w of d.waves)eraTotal[w.impact<60?0:w.impact<120?1:2]++;
+ for(let i=1;i<d.waves.length;i++){
+  const gap=d.waves[i].impact-d.waves[i-1].impact;
+  if(gap<.52)denseIntervals++;
+  if(gap>1.6)quietIntervals++;
+  assert(gap>0,'strictly chronological pattern arrivals');
+ }
+ assert(parts.size>=150,'should combine many short observed fragments');
  assert(d.waves.at(-1).impact>315,'extend beyond the old 60s wall track');
  assert(d.spinEvents.length>50,'camera should keep rotating throughout the recording');
  assert.equal(d.spinEvents[0].rate,-1,'reference opening turns in the observed initial direction');
@@ -52,7 +62,19 @@ for(let seed=1;seed<=100;seed++){
 }
 assert.deepEqual(X.create(42,125),X.create(42,125),'seed determinism');
 assert.notDeepEqual(X.create(1,125).waves,X.create(2,125).waves,'replay variety');
-console.log('PASS 100 Hexagonest seeds: 360 source observations, 984 parts, open polygon masks, 315+ seconds, three palette/speed eras');
+// Reconstructed source video crossing statistics are a sampling benchmark,
+// not a claim to know every unobserved original wall. Check multi-seed means.
+const observed=[V.events.filter(e=>e.videoSeconds<60).length,
+ V.events.filter(e=>e.videoSeconds>=60&&e.videoSeconds<120).length,
+ V.events.filter(e=>e.videoSeconds>=120).length];
+for(let i=0;i<3;i++){
+ const mean=eraTotal[i]/100;
+ assert(Math.abs(mean-observed[i])/observed[i]<.25,
+  'seed-averaged video-era wall rhythm should match '+i);
+}
+assert(denseIntervals>10000,'retain the observed quick wall clusters');
+assert(quietIntervals>1000,'retain rare longer pauses between source wall crossings');
+console.log('PASS 100 Hexagonest seeds: measured 360-event source cadence, quick clusters, sparse stretches, 315+ seconds and open polygon masks');
 
 const delta=(a,b)=>E.wrap(b-a+Math.PI)-Math.PI;
 let replays=0;
