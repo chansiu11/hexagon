@@ -82,12 +82,14 @@ jobs:
         run: node browser-death.test.cjs
       - name: Verify 317-second Hexagonest canvas and three controls
         run: node browser-hexagonest.test.cjs
+      - name: Verify Hexagonest collision death camera, result and decoded voice cues
+        run: node browser-hexagonest-feedback.test.cjs
       - name: Wait for updated GitHub Pages content
         if: github.event_name == 'push'
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'hexest-fullparts-v6'; then exit 0; fi
+              grep -q 'hexest-death-feedback-v7'; then exit 0; fi
             sleep 10
           done
           exit 1
@@ -96,6 +98,7 @@ jobs:
         run: |
           node browser-wall-visual.test.cjs
           node browser-hexagonest.test.cjs
+          node browser-hexagonest-feedback.test.cjs
         env:
           HEXAGON_URL: https://chansiu11.github.io/hexagon/
       - name: Archive browser screenshots

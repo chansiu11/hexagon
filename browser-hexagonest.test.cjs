@@ -12,7 +12,7 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
   const rendererUrl=await page.evaluate(()=>
    Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src||'');
-  assert(rendererUrl.includes('hexest-seamless-v5'),
+  assert(rendererUrl.includes('hexest-death-feedback-v7'),
     'public Pages must load the updated Hexagonest continuous-contour renderer');
   const sourceVersions=await page.evaluate(()=>
    Array.from(document.scripts).filter(s=>s.src.includes('hexagonest-')).map(s=>s.src));
