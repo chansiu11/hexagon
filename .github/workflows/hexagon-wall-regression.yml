@@ -87,13 +87,15 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'hexest317-v1'; then exit 0; fi
+              grep -q 'hexest-calibrated-v2'; then exit 0; fi
             sleep 10
           done
           exit 1
       - name: Check the deployed GitHub Pages canvas
         if: github.event_name == 'push'
-        run: node browser-wall-visual.test.cjs
+        run: |
+          node browser-wall-visual.test.cjs
+          node browser-hexagonest.test.cjs
         env:
           HEXAGON_URL: https://chansiu11.github.io/hexagon/
       - name: Archive browser screenshots
