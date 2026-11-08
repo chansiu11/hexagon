@@ -15,16 +15,29 @@ function rotateMask(mask,shift,flip){
  let result=0;for(let k=0;k<6;k++)if(mask&(1<<k))result|=1<<mod6((flip?-k:k)+shift);
  return result;
 }
-function speedAt(t){return t<60?570:t<120?640:630}
+// 15Hz source-video radial bands: median ~307,345,337 px/s across
+// 1-59 / 60-119 / 120-305 s. The Hexagonest-only viewport is scaled to
+// 0.67, giving ~460/515/505 pre-projection game units per second.
+// Observations of screen flow, not original internal game constants.
+function speedAt(t){return t<60?460:t<120?515:505}
 function sceneScale(){return .67}
+// Source video vivid-wall hue measurements (HSV, 0.25s samples).
+// The recording cycles six hues at ~1.9s intervals, not 2.6s; the
+// transitions drift, so keep measured entry times.
+const COLOR_EVENTS=[
+ [0,106],[2.75,260],[4.75,18],[6.50,194],[8.50,310],[10.50,58],
+ [12.25,106],[14.25,260],[16.25,18],[18,194],[20.25,310],[22,58],
+ [23.75,106],[25.75,260],[27.75,18],[29.50,194],[31.75,310],[33.50,58],
+ [35.25,106],[37.25,260],[39.25,18],[41,194],[43.25,310],[45,58],
+ [46.75,106],[48.75,260],[50.75,18],[52.75,194],[54.75,310],[56.50,58],
+ [58.25,106]
+];
 function palette(time){
  if(time>=120)return [0,0,[0,0,100]];
  if(time>=60)return [0,0,[18,39,96]];
- const hues=[120,268,18,193,315,55,128,304,184,46,270,14,199,62,110,283,25,192,310,55,20,43,260,312];
- // Video shows frequent discrete palette changes, rather than a continuous
- // color-wheel gradient. Approximate the observed order and interval.
- const key=Math.floor(time/2.6),hue=hues[key%hues.length];
- return [hue,92,[10,22,73]];
+ let index=0;
+ for(let i=1;i<COLOR_EVENTS.length&&COLOR_EVENTS[i][0]<=time;i++)index=i;
+ return [COLOR_EVENTS[index][1],92,[10,22,73]];
 }
 function create(seed=newSeed(),duration=3600){
  const random=rng(seed),pick=n=>Math.floor(random()*n);
@@ -53,7 +66,10 @@ function create(seed=newSeed(),duration=3600){
    possible.sort((a,b)=>distance(a,previousSafe)-distance(b,previousSafe));
    const safe=possible[0];
    const speed=speedAt(impact);
-   const thickness=Math.max(18,Math.min(154,source.width*(source.width>=85?1.05:.92)));
+   // Packed video widths were quantized at 4 source pixels and decoded
+   // in 5-unit steps. Compensate for the .67 viewport scale so the painted
+   // wall thickness matches the observed radial source measurements.
+   const thickness=Math.max(22,Math.min(180,source.width*1.22));
    if(last){
     if(safe===previousSafe){
      impact=Math.max(impact,last.impact+.36);
@@ -85,8 +101,16 @@ function create(seed=newSeed(),duration=3600){
   groupId++;
   impact+=.07+random()*.16;
  }
+ // The reference stage reverses world rotation roughly every 5-6s.
+ // Wall fragments are selected about every 1s; their boundaries are NOT
+ // camera-reversal cues. Keep a separate, gently jittered spin timeline.
+ const spinEvents=[{at:0,rate:-1}];let spinAt=5.5,direction=1;
+ while(spinAt<duration){
+  spinEvents.push({at:spinAt,rate:direction});
+  direction=-direction;spinAt+=5.35+(random()-.5)*.65;
+ }
  return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,duration,
-   shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,source:VIDEO.source};
+   shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,spinEvents,source:VIDEO.source};
 }
 class HexagonestGame extends HARD.HardGame{
  constructor(data=create()){
@@ -95,10 +119,10 @@ class HexagonestGame extends HARD.HardGame{
   // Hexagonest has hundreds of groups over the longer recording, so keep a
   // single neutral event for the inherited collision/mesh loop and advance
   // video-inspired spin events once per rendered update.
-  this.spinEvents=data.groups;
-  this.timeline={...data,groups:[data.groups[0]]};
+  this.spinEvents=data.spinEvents||data.groups;
+  this.timeline={...data,groups:[{at:0,rate:0,tilt:0}]};
   this.spinIndex=0;
-  this.recordedCamera=null;this.profile=null;this.rotation=0;this.rotationSpeed=2.5;
+  this.recordedCamera=null;this.profile=null;this.rotation=0;this.rotationSpeed=-2.2;
  }
  get playerSpeed(){return 9*Math.PI/180*60*CLOCK}
  update(dt,input=0){
@@ -109,7 +133,9 @@ class HexagonestGame extends HARD.HardGame{
   while(this.spinIndex>0&&this.spinEvents[this.spinIndex].at>this.time)this.spinIndex--;
   while(this.spinIndex+1<this.spinEvents.length&&this.spinEvents[this.spinIndex+1].at<=this.time)this.spinIndex++;
   const direction=this.spinEvents[this.spinIndex].rate;
-  const target=direction*(this.time<60?2.55:this.time<120?3.5:4.1);
+  // Source core tracking: ~2.2 rad/s early, ~3.25 before 60s,
+  // ~4.3 from 60-120s. Post-120 observations are more uncertain.
+  const target=direction*(this.time<10?2.2:this.time<60?3.25:this.time<120?4.3:4.4);
   const k=1-Math.exp(-elapsed*3);
   this.rotationSpeed=rs0+(target-rs0)*k;
   this.rotation=r0+(rs0+this.rotationSpeed)*.5*elapsed;
@@ -118,6 +144,6 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.clips.length};
+const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.clips.length,COLOR_EVENTS};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);
