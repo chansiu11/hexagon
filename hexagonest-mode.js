@@ -39,9 +39,24 @@ function palette(time){
  for(let i=1;i<COLOR_EVENTS.length&&COLOR_EVENTS[i][0]<=time;i++)index=i;
  return [COLOR_EVENTS[index][1],92,[10,22,73]];
 }
+// Consecutive ring crossings from the supplied video supply an empirical
+// inter-wall gap distribution in each era. Preserve both fast clusters and
+// genuine sparse stretches, rather than inventing a .12-.30s clip boundary.
+const VIDEO_GAPS=[[],[],[]];
+for(let i=1;i<VIDEO.events.length;i++){
+ const prev=VIDEO.events[i-1],next=VIDEO.events[i],
+  e0=prev.videoSeconds<60?0:prev.videoSeconds<120?1:2,
+  e1=next.videoSeconds<60?0:next.videoSeconds<120?1:2;
+ const gap=next.videoSeconds-prev.videoSeconds;
+ if(e0===e1&&gap>=.15&&gap<8)VIDEO_GAPS[e0].push(gap);
+}
 function create(seed=newSeed(),duration=3600){
  const random=rng(seed),pick=n=>Math.floor(random()*n);
  const waves=[],groups=[{at:0,rate:1,tilt:0}],recent=[],bins={};
+ const nextObservedGap=t=>{
+  const era=t<60?0:t<120?1:2,bank=VIDEO_GAPS[era];
+  return Math.max(.18,bank[pick(bank.length)]+(random()-.5)*.08);
+ };
  for(const clip of VIDEO.clips){
   const era=clip.sourceStart<60?0:clip.sourceStart<120?1:2;
   (bins[era]||= []).push(clip);
@@ -65,7 +80,6 @@ function create(seed=newSeed(),duration=3600){
    const possible=Array.from({length:6},(_,i)=>i).filter(k=>!(mask&(1<<k)));
    possible.sort((a,b)=>distance(a,previousSafe)-distance(b,previousSafe));
    const safe=possible[0];
-   const speed=speedAt(impact);
    // Packed video widths were quantized at 4 source pixels and decoded
    // in 5-unit steps. Compensate for the .67 viewport scale so the painted
    // wall thickness matches the observed radial source measurements.
@@ -80,6 +94,10 @@ function create(seed=newSeed(),duration=3600){
      impact=Math.max(impact,cohortClear+travel);
     }
    }
+   // Safe-corridor planning can push an impact across a speed-era boundary.
+   // Resolve that wave's speed from its final planned impact, not an earlier
+   // candidate timestamp.
+   const speed=speedAt(impact);
    const sectors=Array.from({length:6},(_,k)=>k).filter(k=>mask&(1<<k));
    if(sectors.length===0||sectors.length===6||sectors.includes(safe))throw Error('Bad Hexagonest wall mask');
    const r=1180,start=impact-(r-66)/speed,profiles={};
@@ -94,12 +112,12 @@ function create(seed=newSeed(),duration=3600){
    previousSafe=safe;last=wave;
    if(j+1<clip.events.length){
     const observedGap=clip.events[j+1].videoSeconds-source.videoSeconds;
-    impact+=Math.max(.38,Math.min(1.10,observedGap));
-   }else impact+=.12+random()*.18;
+    impact+=Math.max(.20,observedGap);
+   }else impact+=nextObservedGap(impact);
   }
   groups.push({at:groupAt,rate:random()<.5?-1:1,tilt:(random()-.5)*.35});
   groupId++;
-  impact+=.07+random()*.16;
+  // Inter-group dwell is already the sampled source event gap above.
  }
  // The reference stage reverses world rotation roughly every 5-6s.
  // Wall fragments are selected about every 1s; their boundaries are NOT

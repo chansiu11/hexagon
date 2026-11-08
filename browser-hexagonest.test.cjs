@@ -27,7 +27,18 @@ const {chromium}=require('playwright');
   });
   assert.equal(init.screen,'play');assert.equal(init.level,2);
   assert(init.flag&&init.kind==='hexagonest-video');
-  assert(init.duration>=317&&init.waves>500,'317s source should extend the stage past 60s');
+  assert(init.duration>=317&&init.waves>300,'317s source should extend the stage past 60s');
+  // Source-informed pauses are real: a particular screenshot can be empty.
+  // Verify rhythm on a deterministic 320s excerpt; the user session remains
+  // randomly seeded as normal.
+  const sourceRhythm=await page.evaluate(()=>{
+   const d=HexHexagonest.create(137,320);
+   return {count:d.waves.length,opening:d.waves.filter(w=>w.impact<60).length,
+    middle:d.waves.filter(w=>w.impact>=60&&w.impact<120).length,
+    late:d.waves.filter(w=>w.impact>=120).length};
+  });
+  assert(sourceRhythm.count>320&&sourceRhythm.count<470,'video-informed density');
+  let nonempty=0;
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
   for(const t of [4,10,25,59,61,110,121,180,240,305]){
    const state=await page.evaluate(t=>{
@@ -38,12 +49,14 @@ const {chromium}=require('playwright');
       finite:game.walls.every(w=>w.renderPoly&&w.renderPoly.every(p=>p.every(Number.isFinite)))};
    },t);
    assert(state.finite&&state.sides===6,'valid six-sided wall mesh at '+t+'s');
-   assert(state.walls>=1,'visible walls must continue at '+t+'s');
+   if(state.walls>=1)nonempty++;
+   // Sparse source-video intervals can legitimately show an empty arena.
    if(t>=120)assert.equal(state.saturation,0,'late monochrome mode');
    else if(t>=60)assert.equal(state.saturation,0,'grayscale after 60s');
    else assert(state.saturation>0,'colored opening');
    await page.screenshot({path:'wall-browser-screenshots/hexagonest-'+t+'s.png'});
   }
+  assert(nonempty>=6,'source-paced walls should appear in most sampled frames');
   const controls=await page.evaluate(()=>{
    const results=[];
    for(const mode of [1,2,3]){
@@ -62,6 +75,6 @@ const {chromium}=require('playwright');
   });
   assert(sources.different&&sources.hard==='hard-rules');
   assert.deepEqual(errors,[],'browser console JavaScript errors');
-  console.log('PASS Hexagonest 317s launch, ten canvas captures, color era boundaries, three control modes and stage isolation in Chromium');
+  console.log('PASS Hexagonest 317s launch, video-paced density, ten canvas captures with natural quiet gaps, three control modes and stage isolation in Chromium');
  }finally{await b.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

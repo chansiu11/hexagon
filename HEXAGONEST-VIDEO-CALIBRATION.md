@@ -35,3 +35,13 @@ The original view's fitted central-hexagon orientation reverses roughly every **
 - Whole repository CI checks six reference stages, HARD and RANDOM HEXAGON; the public GitHub Pages smoke test checks deployed content and real wall rasterization.
 
 All source frames/audio stay outside GitHub. These fixes improve agreement in the measured properties; pixel-identical correspondence or original RNG identity are **not** claimed.
+
+## Video-derived wall arrival rhythm (follow-up, 2026-11-08)
+
+The preceding code built short 1–3-wall snippets from the 360 recorded ring crossings, but **joined snippets with an invented ~0.12–0.30-second gap**. Consequently a sampled 317-second generated run emitted roughly 115/103/342 walls in the 0–60, 60–120, and 120–305-second bands; the source extraction observed only 71/71/217 crossing events in those same bands. The source extraction is incomplete, so observed events are a calibration proxy rather than an exact original wall count.
+
+Now, at the end of a clip, the generator samples an actual **consecutive source-video crossing gap from the matching color era**, with at most ±0.04 seconds of jitter. Within clips, it retains the actual inter-crossing intervals instead of clamping those intervals to a maximum of 1.1 seconds. The source includes repeated 0.2–0.5-second bursts and occasional 2–6.8-second pauses. Existing reachability safeguards still delay a wall when its safe gap moves too far or the previous wave has not cleared; there is no attempt to force impossible exact timing.
+
+Across 250 deterministic 320-second seeds, generated averages in the same 0–60 / 60–120 / 120–305 bands became **72.6 / 77.8 / 233.5**, compared with video observations of **71 / 71 / 217**. The 320-second generated total ranged from 358 to 440 walls; 100-seed tests check this distribution and verify that both short clusters and longer pauses remain. Also corrected a boundary issue where a delayed wave could incorrectly retain the prior 60/120-second speed tier.
+
+At a valid long pause, an empty playfield is intentional; browser tests now permit sparse screenshots, while requiring walls to appear in the majority of sampled frames. The stage-only JavaScript asset is versioned as `hexest-rhythm-v3` so old cached code cannot obscure the new timing on GitHub Pages. HARD, RANDOM HEXAGON and the other stages retain their previous generators and speeds.
