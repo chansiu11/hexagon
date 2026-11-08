@@ -34,6 +34,14 @@ for(let seed=1;seed<=100;seed++){
  assert(d.waves.length>490&&d.waves.length<1000);
  assert(parts.size>=120,'should combine many short observed fragments');
  assert(d.waves.at(-1).impact>315,'extend beyond the old 60s wall track');
+ assert(d.spinEvents.length>50,'camera should keep rotating throughout the recording');
+ assert.equal(d.spinEvents[0].rate,-1,'reference opening turns in the observed initial direction');
+ for(let i=1;i<d.spinEvents.length;i++){
+  const dwell=d.spinEvents[i].at-d.spinEvents[i-1].at;
+  assert(dwell>=5.0&&dwell<=5.75,'spins reverse every ~5-6s, not on each short wall fragment');
+  assert.equal(d.spinEvents[i].rate,-d.spinEvents[i-1].rate);
+ }
+ assert(d.groups.length>d.spinEvents.length*3,'camera and wall group cadences must be independent');
  for(const w of d.waves){
   assert(w.sectors.length>0&&w.sectors.length<6);
   assert(!w.sectors.includes(w.safeSector),'every wave has a real passable lane');
