@@ -18,7 +18,7 @@ const {chromium}=require('playwright');
    Array.from(document.scripts).filter(s=>s.src.includes('hexagonest-')).map(s=>s.src));
   assert(sourceVersions.some(u=>u.includes('hexagonest-video.js?v=hexest-parts-v6')),
     'the source-video part inventory must bypass the old cache');
-  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=hexest-fullparts-v6')),
+  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=hexest-smooth-stitch-v7')),
     'the whole-part replay engine must bypass the old cache');
   // The deployed site must load the complete-video dodge-part generator.
   const calibrated=await page.evaluate(()=>({
@@ -34,7 +34,7 @@ const {chromium}=require('playwright');
   }));
   assert.deepEqual(calibrated,{velocities:[460,515,505],colors:31,
    openingHues:[260,18,194,58],spinEvents:6,
-   familyVersion:'video-family-v4',partVersion:'continuous-dodge-v6',
+   familyVersion:'video-family-v4',partVersion:'continuous-dodge-v7',
    observedParts:33,longestPart:37,coverage:360},
    'new unbroken-video-dodge-part script must be deployed');
   const init=await page.evaluate(async()=>{
