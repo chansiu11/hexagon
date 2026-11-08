@@ -10,6 +10,15 @@ const {chromium}=require('playwright');
   await page.goto(process.env.HEXAGON_URL||'http://127.0.0.1:4173/',{waitUntil:'load'});
   await page.evaluate(()=>{window.requestAnimationFrame=()=>0});
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
+  // The real deployed Pages build must load the NEW calibration, not cached v1.
+  const calibrated=await page.evaluate(()=>({
+   velocities:[HexHexagonest.speedAt(20),HexHexagonest.speedAt(80),HexHexagonest.speedAt(180)],
+   colors:HexHexagonest.COLOR_EVENTS?.length,
+   openingHues:[3,5,7,11].map(t=>HexHexagonest.palette(t)[0]),
+   spinEvents:HexHexagonest.create(19,30).spinEvents?.length
+  }));
+  assert.deepEqual(calibrated,{velocities:[460,515,505],colors:31,
+   openingHues:[260,18,194,58],spinEvents:6},'new video-calibrated Hexagonest script must be deployed');
   const init=await page.evaluate(async()=>{
    settings.sound=false;settings.motion=true;selected=2;screen='select';launch=null;
    await start();
