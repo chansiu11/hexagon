@@ -10,7 +10,21 @@ assert(V.events.every(e=>e.mask>0&&e.mask<63&&e.width>=22&&e.videoSeconds<317));
 assert.equal(X.palette(30)[1],92,'bright early palette');
 assert.equal(X.palette(61)[1],0,'desaturation after 60 seconds');
 assert.deepEqual(X.palette(125),[0,0,[0,0,100]],'monochrome later footage');
-for(const t of [0,59,60,119,120,300])assert(X.speedAt(t)>=570);
+// Independent source-video radial tracking: medians of roughly
+// 307 / 345 / 337 px/s. The sole Hexagonest canvas scale is .67;
+// compare the physical wall speed at that scale with a 3px/s tolerance.
+for(const [t,observed] of [[12,307],[75,345],[165,337],[280,337]]){
+ assert(Math.abs(X.speedAt(t)*X.sceneScale()-observed)<3,
+  'video-calibrated screen flow '+t+'s');
+}
+const hues=[[1,106],[3,260],[5,18],[7,194],[9,310],[11,58],
+ [13,106],[15,260],[17,18],[19,194],[21,310],[23,58],
+ [24,106],[26,260],[28,18],[30,194],[32,310],[34,58],
+ [36,106],[38,260],[40,18],[42,194],[44,310],[46,58],
+ [47,106],[49,260],[51,18],[53,194],[55,310],[57,58],[59,106]];
+for(const [t,hue] of hues)assert.equal(X.palette(t)[0],hue,'video-derived hue at '+t+'s');
+assert.equal(X.COLOR_EVENTS.length,31,'all measured opening color changes recorded');
+
 assert.notEqual(X.speedAt(40),X.speedAt(70));
 assert.equal(X.rotateMask(0b000011,2,false),0b001100);
 for(let seed=1;seed<=100;seed++){
