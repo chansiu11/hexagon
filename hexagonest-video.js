@@ -1,9 +1,9 @@
-/* Compact numerical observations from user-provided Hexagonest 317s video.
- * 360 visually estimated ring-crossing events sampled at 15Hz, not the
- * original game's wall RNG or frames. Timestamp: 0.1s; sector mask: 6 bits;
- * width: approximately 4 source-video pixels per unit.
- * Imperfect camera-phase fitting and compression may introduce false hits.
- * No audio or video is embedded or redistributed.
+/* Observed wall-crossing traces from the user-provided 317s Hexagonest MP4.
+ * 360 video-derived events, ~0.1s time quantization, approximate six-sector
+ * masks and wall thickness. Not the original game's wall RNG or source code.
+ * Continuous player-dodge stretches are WHOLE replay parts: never arbitrarily
+ * cut a live chain into overlapping 1-3-wall fragments.
+ * No video, music, gameplay images or sound are embedded or redistributed.
  */
 (function(root){'use strict';
 const ABC='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -16,15 +16,38 @@ for(let i=0;i<packed.length;i+=4){
  if(mask===0||mask===63)continue;
  events.push({videoSeconds,mask,width});
 }
-const clips=[];
-for(let i=0;i<events.length;i++){
- for(let length=1;length<=3&&i+length<=events.length;length++){
-  const excerpt=events.slice(i,i+length);
-  if(excerpt.at(-1).videoSeconds-excerpt[0].videoSeconds>3.3)break;
-  if(excerpt.slice(1).some((e,j)=>e.videoSeconds-excerpt[j].videoSeconds>1.65))break;
-  clips.push({id:clips.length,sourceStart:excerpt[0].videoSeconds,events:excerpt});
- }
+// A dodge chain continues while successive walls arrive within 1.75s.
+// Longer lulls give the player a clear recovery window. A source difficulty
+// era boundary starts a new part because the stage's speed/color semantics
+// change at 60 and 120 seconds. There is NO arbitrary fixed-length cap:
+// long sequences of 20-37 crossings are retained as a single source part.
+const DODGE_BREAK_SECONDS=1.75;
+const eraOf=t=>t<60?0:t<120?1:2;
+const parts=[];
+let first=0;
+for(let i=1;i<=events.length;i++){
+ const prior=events[i-1],next=events[i];
+ const eraChange=i<events.length&&eraOf(prior.videoSeconds)!==eraOf(next.videoSeconds);
+ const recovery=i<events.length&&(next.videoSeconds-prior.videoSeconds)>=DODGE_BREAK_SECONDS;
+ if(i<events.length&&!eraChange&&!recovery)continue;
+ const trace=events.slice(first,i),sourceStart=trace[0].videoSeconds,
+   sourceEnd=trace[trace.length-1].videoSeconds;
+ // The real observed pause between THIS part and the next part is also
+ // preserved as an offset, rather than a separately invented tiny join.
+ const gapAfter=i<events.length?Math.max(.2,next.videoSeconds-prior.videoSeconds):2;
+ parts.push({
+  id:parts.length,era:eraOf(sourceStart),
+  firstEventIndex:first,lastEventIndex:i-1,
+  sourceStart,sourceEnd,duration:sourceEnd-sourceStart,
+  gapAfter,boundary:eraChange?'era':recovery?'recovery':'end',
+  events:trace
+ });
+ first=i;
 }
-const API={events,clips,source:'UrPXBSh4mqU',videoLength:316.023583};
+// Compatibility identifier for existing diagnostics; this is now precisely
+// the same NON-OVERLAPPING set of full dodge runs, never 984 sliding snippets.
+const clips=parts;
+const API={events,parts,clips,DODGE_BREAK_SECONDS,
+ source:'UrPXBSh4mqU',videoLength:316.023583};
 if(typeof module!=='undefined')module.exports=API;else root.HexagonestVideo=API;
 })(typeof window!=='undefined'?window:globalThis);

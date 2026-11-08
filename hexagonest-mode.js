@@ -11,16 +11,6 @@ function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.im
 function newSeed(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
 const mod6=n=>(n%6+6)%6;
 const distance=(a,b)=>Math.min(mod6(a-b),mod6(b-a));
-// Rotation-invariant six-lane wall family: blocked-lane count + number of
-// contiguous runs (e.g. 5/1 corridor versus 3/3 alternating spokes).
-function family(mask){
- let count=0,runs=0;
- for(let i=0;i<6;i++)if(mask&(1<<i)){
-  count++;
-  if(!(mask&(1<<((i+5)%6))))runs++;
- }
- return 8*count+runs;
-}
 function rotateMask(mask,shift,flip){
  let result=0;for(let k=0;k<6;k++)if(mask&(1<<k))result|=1<<mod6((flip?-k:k)+shift);
  return result;
@@ -49,100 +39,81 @@ function palette(time){
  for(let i=1;i<COLOR_EVENTS.length&&COLOR_EVENTS[i][0]<=time;i++)index=i;
  return [COLOR_EVENTS[index][1],92,[10,22,73]];
 }
-// Consecutive ring crossings from the supplied video supply an empirical
-// inter-wall gap distribution in each era. Preserve both fast clusters and
-// genuine sparse stretches, rather than inventing a .12-.30s clip boundary.
-const VIDEO_GAPS=[[],[],[]];
-for(let i=1;i<VIDEO.events.length;i++){
- const prev=VIDEO.events[i-1],next=VIDEO.events[i],
-  e0=prev.videoSeconds<60?0:prev.videoSeconds<120?1:2,
-  e1=next.videoSeconds<60?0:next.videoSeconds<120?1:2;
- const gap=next.videoSeconds-prev.videoSeconds;
- if(e0===e1&&gap>=.15&&gap<8)VIDEO_GAPS[e0].push(gap);
-}
+// Replay the recorded source events as full, non-overlapping dodge parts.
+// One seeded shuffle bag per original difficulty era preserves vocabulary,
+// and one constant rotation per part retains its wall geometry and ordering.
 function create(seed=newSeed(),duration=3600){
  const random=rng(seed),pick=n=>Math.floor(random()*n);
- const waves=[],groups=[{at:0,rate:1,tilt:0}],recent=[],bins={};
- const nextObservedGap=t=>{
-  const era=t<60?0:t<120?1:2,bank=VIDEO_GAPS[era];
-  return Math.max(.18,bank[pick(bank.length)]+(random()-.5)*.08);
- };
- for(const clip of VIDEO.clips){
-  const era=clip.sourceStart<60?0:clip.sourceStart<120?1:2;
-  (bins[era]||= []).push(clip);
+ const waves=[],groups=[{at:0,rate:1,tilt:0}],partOrder=[],bins=[[],[],[]],
+  bags=[[],[],[]],lastPartId=[-1,-1,-1];
+ for(const part of VIDEO.parts)bins[part.era].push(part);
+ function pickPart(era){
+  if(!bags[era].length){
+   bags[era]=bins[era].slice();
+   for(let i=bags[era].length-1;i>0;i--){
+    const j=pick(i+1);[bags[era][i],bags[era][j]]=[bags[era][j],bags[era][i]];
+   }
+   if(bags[era].length>1&&bags[era].at(-1).id===lastPartId[era])
+    [bags[era][0],bags[era][bags[era].length-1]]=
+     [bags[era].at(-1),bags[era][0]];
+  }
+  const part=bags[era].pop();lastPartId[era]=part.id;return part;
  }
- let impact=1.85,last=null,cohortClear=-Infinity,id=0,groupId=0;
- let previousSafe=4;
+ let impact=2,last=null,cohortClear=-Infinity,id=0,groupId=0,previousSafe=4;
  while(impact<duration){
   const era=impact<60?0:impact<120?1:2;
-  const bank=bins[era],allowed=bank.filter(c=>!recent.includes(c.id));
-  const pool=allowed.length?allowed:bank;
-  // Video crossings retain the same structural family across a boundary
-  // more often than independently sampled 1-3-wall snippets. In most
-  // transitions retain the regular video sample distribution; sometimes
-  // prefer a clip beginning with the prior family. Era-specific weights
-  // were calibrated against adjacent source crossing statistics.
-  const continuation=last&&random()<(era===1?.06:.24)?
-   pool.filter(c=>family(c.events[0].mask)===family(last.pattern)):null;
-  const choices=continuation?.length?continuation:pool;
-  const clip=choices[pick(choices.length)];
-  recent.push(clip.id);if(recent.length>9)recent.shift();
-  const flip=random()<.5,source0=clip.events[0];
-  const sourceMask=rotateMask(source0.mask,0,flip);
-  const sourceOpen=Array.from({length:6},(_,i)=>i).filter(i=>!(sourceMask&(1<<i)));
-  const sourceGap=sourceOpen[pick(sourceOpen.length)];
-  const startSafe=last?mod6(previousSafe+(random()<.72?0:random()<.5?-1:1)):4;
-  let rotation=mod6(startSafe-sourceGap);
-  // Avoid repeating the identical six-bit wall mask too often. Rotating a
-  // duplicate by one sector keeps its structural family (e.g. a corridor)
-  // while offering the visual lane-to-lane progression in the recording.
-  // The clearance planner below still ensures the new safe lane is reachable.
-  if(last&&rotateMask(source0.mask,rotation,flip)===last.pattern&&random()<.53)
-   rotation=mod6(rotation+(random()<.5?1:-1));
-  const groupAt=impact;
-  for(let j=0;j<clip.events.length&&impact<duration;j++){
-   const source=clip.events[j],mask=rotateMask(source.mask,rotation,flip);
-   const possible=Array.from({length:6},(_,i)=>i).filter(k=>!(mask&(1<<k)));
+  const part=pickPart(era);
+  const first=part.events[0],sourceOpen=[];
+  for(let i=0;i<6;i++)if(!(first.mask&(1<<i)))sourceOpen.push(i);
+  const targetSafe=last?mod6(previousSafe+(random()<.72?0:random()<.5?-1:1)):4;
+  const rotation=mod6(targetSafe-sourceOpen[pick(sourceOpen.length)]);
+  let anchor=null,played=0,partDelayMax=0;
+  for(let j=0;j<part.events.length&&impact<duration;j++){
+   const source=part.events[j],sourceOffset=source.videoSeconds-part.sourceStart;
+   // Absolute source event offsets keep later crossings from accumulating
+   // earlier collision-clearance delays inside a long dodge sequence.
+   if(anchor!==null)impact=anchor+sourceOffset;
+   const mask=rotateMask(source.mask,rotation,false),possible=[];
+   for(let sector=0;sector<6;sector++)if(!(mask&(1<<sector)))possible.push(sector);
    possible.sort((a,b)=>distance(a,previousSafe)-distance(b,previousSafe));
    const safe=possible[0];
-   // Packed video widths were quantized at 4 source pixels and decoded
-   // in 5-unit steps. Compensate for the .67 viewport scale so the painted
-   // wall thickness matches the observed radial source measurements.
    const thickness=Math.max(22,Math.min(180,source.width*1.22));
    if(last){
-    if(safe===previousSafe){
-     impact=Math.max(impact,last.impact+.36);
-    }else{
+    if(safe===previousSafe)impact=Math.max(impact,last.impact+.36);
+    else{
      const turn=distance(safe,previousSafe)*SIXTH;
-     // 9° per 60Hz frame, compared with 7° in the existing shared controls.
      const travel=Math.max(turn/(9*Math.PI/180*60),distance(safe,previousSafe)*.18)+.21;
      impact=Math.max(impact,cohortClear+travel);
     }
    }
-   // Safe-corridor planning can push an impact across a speed-era boundary.
-   // Resolve that wave's speed from its final planned impact, not an earlier
-   // candidate timestamp.
-   const speed=speedAt(impact);
-   const sectors=Array.from({length:6},(_,k)=>k).filter(k=>mask&(1<<k));
-   if(sectors.length===0||sectors.length===6||sectors.includes(safe))throw Error('Bad Hexagonest wall mask');
+   if(anchor===null)anchor=impact;
+   const delay=Math.max(0,impact-anchor-sourceOffset);
+   partDelayMax=Math.max(partDelayMax,delay);
+   const speed=speedAt(impact),sectors=[];
+   for(let k=0;k<6;k++)if(mask&(1<<k))sectors.push(k);
+   if(!sectors.length||sectors.length===6||sectors.includes(safe))
+    throw Error('Bad source Hexagonest wall mask');
    const r=1180,start=impact-(r-66)/speed,profiles={};
-   for(const s of sectors)profiles[s]={thickness,offset:0};
-   const wave={id:id++,group:groupId,partId:clip.id,sourceVideoSeconds:source.videoSeconds,pattern:mask,
-    sides:6,sectors,profiles,innerExtra:0,outerExtra:0,safeSector:safe,
-    safeAngle:(safe+.5)*SIXTH,impact,r,speed,thickness,
+   for(const sector of sectors)profiles[sector]={thickness,offset:0};
+   const wave={id:id++,group:groupId,partId:part.id,
+    sourceEventIndex:part.firstEventIndex+j,
+    sourceVideoSeconds:source.videoSeconds,sourceOffset,sourceMask:source.mask,
+    sourceWidth:source.width,partRotation:rotation,sourceDelay:delay,
+    pattern:mask,sides:6,sectors,profiles,innerExtra:0,outerExtra:0,
+    safeSector:safe,safeAngle:(safe+.5)*SIXTH,impact,r,speed,thickness,
     start,end:start+(r+thickness-26)/speed};
-   waves.push(wave);
+   waves.push(wave);played++;
    const clear=impact+(66+thickness-59)/speed;
    cohortClear=safe===previousSafe?Math.max(cohortClear,clear):clear;
    previousSafe=safe;last=wave;
-   if(j+1<clip.events.length){
-    const observedGap=clip.events[j+1].videoSeconds-source.videoSeconds;
-    impact+=Math.max(.20,observedGap);
-   }else impact+=nextObservedGap(impact);
   }
-  groups.push({at:groupAt,rate:random()<.5?-1:1,tilt:(random()-.5)*.35});
-  groupId++;
-  // Inter-group dwell is already the sampled source event gap above.
+  // Retain the pause following the source chain, not an invented .12s join.
+  if(!played)break;
+  partOrder.push({partId:part.id,era,at:anchor,end:last.impact,
+   sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
+   observedEvents:part.events.length,played,rotation,maxDelay:partDelayMax});
+  groups.push({at:anchor,rate:0,tilt:0,partId:part.id,group:groupId});
+  groupId++;impact=last.impact+part.gapAfter;
  }
  // The reference stage reverses world rotation roughly every 5-6s.
  // Wall fragments are selected about every 1s; their boundaries are NOT
@@ -153,7 +124,7 @@ function create(seed=newSeed(),duration=3600){
   direction=-direction;spinAt+=5.35+(random()-.5)*.65;
  }
  return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,duration,
-   shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,spinEvents,source:VIDEO.source};
+   shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,partOrder,spinEvents,source:VIDEO.source};
 }
 class HexagonestGame extends HARD.HardGame{
  constructor(data=create()){
@@ -187,6 +158,6 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.clips.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4'};
+const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'continuous-dodge-v6'};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);

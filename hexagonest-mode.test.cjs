@@ -4,8 +4,32 @@ const E=require('./engine');
 const V=require('./hexagonest-video');
 const X=require('./hexagonest-mode');
 assert.equal(V.events.length,360);
-assert.equal(V.clips.length,984);
-assert.equal(X.VIDEO_PART_COUNT,984);
+assert.equal(V.parts.length,33,'source should be split into full dodge sequences');
+assert.equal(V.clips.length,33,'no overlapping sliding source fragments');
+assert.equal(X.VIDEO_PART_COUNT,33);
+assert.equal(X.PART_REPLAY_VERSION,'continuous-dodge-v6');
+assert.equal(V.DODGE_BREAK_SECONDS,1.75);
+assert.deepEqual([0,1,2].map(e=>V.parts.filter(p=>p.era===e).length),[6,6,21]);
+assert.equal(V.parts.reduce((sum,p)=>sum+p.events.length,0),360,
+ 'every observed wall must belong to exactly one full replay part');
+assert(V.parts.some(p=>p.events.length>=30),'long uninterrupted dodge chains remain intact');
+let cursor=0;
+for(const part of V.parts){
+ assert.equal(part.firstEventIndex,cursor,'parts do not overlap or skip events');
+ assert.equal(part.lastEventIndex,cursor+part.events.length-1);
+ assert.deepEqual(part.events,V.events.slice(cursor,cursor+part.events.length));
+ for(let j=1;j<part.events.length;j++){
+  const gap=part.events[j].videoSeconds-part.events[j-1].videoSeconds;
+  assert(gap<V.DODGE_BREAK_SECONDS+1e-8,'a recovery pause must split a part');
+ }
+ if(part.id<V.parts.length-1){
+  const next=V.parts[part.id+1],gap=next.sourceStart-part.sourceEnd;
+  assert(gap>=V.DODGE_BREAK_SECONDS-1e-8||next.era!==part.era,
+   'part boundary only follows recovery or change of difficulty era');
+  assert(Math.abs(part.gapAfter-gap)<1e-8,'preserve observed pause between source parts');
+ }
+ cursor+=part.events.length;
+}
 assert.equal(X.PATTERN_TRANSITION_VERSION,'video-family-v4');
 assert(V.events.every(e=>e.mask>0&&e.mask<63&&e.width>=22&&e.videoSeconds<317));
 assert.equal(X.palette(30)[1],92,'bright early palette');
@@ -28,18 +52,8 @@ assert.equal(X.COLOR_EVENTS.length,31,'all measured opening color changes record
 
 assert.notEqual(X.speedAt(40),X.speedAt(70));
 assert.equal(X.rotateMask(0b000011,2,false),0b001100);
-// Independent family counter: number of blocked sectors and disconnected
-// blocked runs around the 6-lane hexagon, invariant under rotation/mirror.
-function patternClass(mask){
- let blocked=0,runs=0;
- for(let i=0;i<6;i++)if(mask&(1<<i)){
-  blocked++;
-  if(!(mask&(1<<((i+5)%6))))runs++;
- }
- return 8*blocked+runs;
-}
 const eraTotal=[0,0,0];let denseIntervals=0,quietIntervals=0;
-const generatedTransitions=[0,1,2].map(()=>({pairs:0,identical:0,sameFamily:0}));
+let fullPartReplays=0,sourceWallChecks=0;
 for(let seed=1;seed<=100;seed++){
  const d=X.create(seed,320),parts=new Set(d.waves.map(w=>w.partId));
  assert.equal(d.mode,'hexagonest-video');
@@ -53,16 +67,43 @@ for(let seed=1;seed<=100;seed++){
   if(gap<.52)denseIntervals++;
   if(gap>1.6)quietIntervals++;
   assert(gap>0,'strictly chronological pattern arrivals');
-  const before=d.waves[i-1],after=d.waves[i];
-  const era=t=>t<60?0:t<120?1:t<305?2:3;
-  if(era(before.impact)===era(after.impact)&&era(after.impact)<3){
-   const stats=generatedTransitions[era(after.impact)];
-   stats.pairs++;
-   if(before.pattern===after.pattern)stats.identical++;
-   if(patternClass(before.pattern)===patternClass(after.pattern))stats.sameFamily++;
-  }
  }
- assert(parts.size>=150,'should combine many short observed fragments');
+ assert(parts.size>=20,'random replay should use many distinct full video parts');
+ assert.equal(d.groups.length,d.partOrder.length+1,
+   'each emitted group must represent exactly one entire dodge part');
+ const byGroup=new Map();
+ for(const w of d.waves){
+  if(!byGroup.has(w.group))byGroup.set(w.group,[]);
+  byGroup.get(w.group).push(w);
+  const src=V.events[w.sourceEventIndex],part=V.parts[w.partId];
+  assert(src&&part,'every wall must trace back to the source MP4 event');
+  assert.equal(w.sourceVideoSeconds,src.videoSeconds);
+  assert.equal(w.sourceMask,src.mask);
+  assert.equal(w.sourceWidth,src.width);
+  assert.equal(w.sourceOffset,src.videoSeconds-part.sourceStart);
+  assert.equal(w.pattern,X.rotateMask(src.mask,w.partRotation,false),
+   'preserve ALL original source six-sector masks by a single part rotation');
+  assert(Math.abs(w.thickness-Math.max(22,Math.min(180,src.width*1.22)))<1e-7,
+   'preserve source wall thickness conversion');
+  assert(w.sourceDelay>=0&&w.sourceDelay<3,
+   'only delay a source crossing when needed for safe traversal');
+  sourceWallChecks++;
+ }
+ for(let i=0;i<d.partOrder.length;i++){
+  const replay=d.partOrder[i],part=V.parts[replay.partId],walls=byGroup.get(i);
+  assert.equal(replay.played,walls.length);
+  assert.equal(walls[0].sourceEventIndex,part.firstEventIndex);
+  for(let j=0;j<walls.length;j++){
+   assert.equal(walls[j].partId,replay.partId);
+   assert.equal(walls[j].partRotation,replay.rotation);
+   assert.equal(walls[j].sourceEventIndex,part.firstEventIndex+j,
+    'never reorder or drop walls inside a dodge part');
+  }
+  if(replay.played===part.events.length)fullPartReplays++;
+ }
+ const late=d.partOrder.filter(p=>p.era===2).slice(0,21);
+ if(late.length===21)assert.equal(new Set(late.map(p=>p.partId)).size,21,
+   'shuffle bag plays all 21 late-era parts before repeating any one');
  assert(d.waves.at(-1).impact>315,'extend beyond the old 60s wall track');
  assert(d.spinEvents.length>50,'camera should keep rotating throughout the recording');
  assert.equal(d.spinEvents[0].rate,-1,'reference opening turns in the observed initial direction');
@@ -71,7 +112,7 @@ for(let seed=1;seed<=100;seed++){
   assert(dwell>=5.0&&dwell<=5.75,'spins reverse every ~5-6s, not on each short wall fragment');
   assert.equal(d.spinEvents[i].rate,-d.spinEvents[i-1].rate);
  }
- assert(d.groups.length>d.spinEvents.length*3,'camera and wall group cadences must be independent');
+ assert(d.groups.length<d.spinEvents.length,'whole dodge parts and camera spin have independent timelines');
  for(const w of d.waves){
   assert(w.sectors.length>0&&w.sectors.length<6);
   assert(!w.sectors.includes(w.safeSector),'every wave has a real passable lane');
@@ -94,26 +135,10 @@ for(let i=0;i<3;i++){
 }
 assert(denseIntervals>10000,'retain the observed quick wall clusters');
 assert(quietIntervals>1000,'retain rare longer pauses between source wall crossings');
-const sourceTransitions=[0,1,2].map(()=>({pairs:0,identical:0,sameFamily:0}));
-for(let i=1;i<V.events.length;i++){
- const a=V.events[i-1],b=V.events[i];
- const era=t=>t<60?0:t<120?1:t<305?2:3;
- if(era(a.videoSeconds)!==era(b.videoSeconds)||era(a.videoSeconds)>2)continue;
- const stats=sourceTransitions[era(a.videoSeconds)];
- stats.pairs++;
- if(a.mask===b.mask)stats.identical++;
- if(patternClass(a.mask)===patternClass(b.mask))stats.sameFamily++;
-}
-for(let i=0;i<3;i++){
- const source=sourceTransitions[i],game=generatedTransitions[i];
- assert(game.pairs>3000,'adequate multi-seed sample');
- assert(Math.abs(game.identical/game.pairs-source.identical/source.pairs)<.045,
-   'avoid repetitive exact masks in video era '+i);
- assert(Math.abs(game.sameFamily/game.pairs-source.sameFamily/source.pairs)<.055,
-   'retain observed multi-wall structural-family runs in video era '+i);
-}
-console.log('PASS Hexagonest family transitions: fewer duplicate masks and video-like corridor/spoke continuity');
-console.log('PASS 100 Hexagonest seeds: measured 360-event source cadence, quick clusters, sparse stretches, 315+ seconds and open polygon masks');
+assert(fullPartReplays>2000,'full source-video dodge chains must replay intact');
+assert(sourceWallChecks>32000,'verify every observed event identity across 100 seeded replays');
+console.log('PASS 100 Hexagonest seeds: 33 whole source dodge parts, seeded shuffle bags, original mask/width/order/offset integrity');
+console.log('PASS source-derived wall rhythm, long continuous dodge chains, color/speed eras and playable masks');
 
 const delta=(a,b)=>E.wrap(b-a+Math.PI)-Math.PI;
 let replays=0;
