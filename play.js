@@ -1,6 +1,10 @@
 'use strict';
 const {Game,levels,wallVisualPoly,playerPoly}=HexEngine;
-const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),controls=document.querySelector('#controls'),status=document.querySelector('#status');
+const canvas=document.querySelector('#game'),displayCtx=canvas.getContext('2d'),controls=document.querySelector('#controls'),status=document.querySelector('#status');
+let ctx=displayCtx;
+const perspectiveWorld=document.createElement('canvas'),
+ perspectiveWorldCtx=perspectiveWorld.getContext('2d',{alpha:false}),
+ perspectiveRenderer=HexPerspective.create();
 let W=960,H=600,scale=1,ox=0,oy=0,screen='title',selected=0,menuItem=0,game=null,last=0,clock=0,spin=0,paused=false,flash=0,unlockedNow=false,audio;
 const music=new BeatAudio();
 function directKeys(g=game){return g.directKeys||(g.directKeys=HexDirectControls.createKeys())}
@@ -118,18 +122,7 @@ function drawBackdrop(game,dark,light,playing){
   layer(from,from,1,from,1);layer(to,to,1,to,u);
  }else layer(to,to,1,to,1);
 }
-// Unified view transform applied to floor, walls, core, and player together.
-// Collision geometry itself remains in unprojected world coordinates.
-function tiltProjection(tilt){
- const v=Number.isFinite(tilt)?tilt:0;
- const t=Math.min(1,Math.abs(v)/.24),strength=t*t*(3-2*t),sign=Math.sign(v);
- return {roll:sign*.24*strength,shear:sign*.34*strength,compression:1-.70*strength};
-}
-function applyTiltProjection(tilt){
- const p=tiltProjection(tilt);
- ctx.rotate(p.roll);ctx.transform(1,0,p.shear,p.compression,0,0);
-}
-
+// The projective camera is applied to the world layer only, not HUD text.
 function drawSectorStepEffect(g,color){
  const fx=g.stepEffect;
  if(!fx||![2,3].includes(g.controlMode)||!settings.motion)return;
@@ -238,7 +231,44 @@ function drawTeleportEffect(g,color){
  ctx.restore();
 }
 
-function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';ctx.fillRect(0,0,canvas.width,canvas.height);const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();const [dark,light,accent]=palette();if((game?.hardMode||game?.hexagonestMode)&&game.dead&&uiAge>=HexHardFeedback.RESULT_START&&['over','complete'].includes(screen)){drawHardResult(dark,light,accent);ctx.restore();return}const playing=['play','over','paused','complete'].includes(screen);const launchBlend=launch?1-Math.pow(1-Math.min(1,launch.age/launch.duration),3):1;let cx=480,cy=playing?300:screen==='select'?470:600;let rotation=settings.motion?(playing?(game.level===6?(game.musicRotation??game.rotation):game.rotation):spin):0;ctx.save();ctx.translate(cx,cy);if(playing&&game.hexagonestMode)ctx.scale(HexHexagonest.sceneScale(),HexHexagonest.sceneScale());if(playing&&(game.hardMode||game.hexagonestMode)&&game.dead&&settings.motion){const view=HexHardFeedback.deathView(game,uiAge);rotation=view.rotation;ctx.scale(view.scale,view.scale)}if(playing&&settings.motion&&game.level===6&&game.musicMotion)ctx.translate(game.musicMotion.shakeX,game.musicMotion.shakeY);const camera=playing&&settings.motion?game.hardMode?HexHardMotion.cameraAt(game.time+(game.dead?uiAge*HexHardMotion.CLOCK_RATE:0),rotation,game.zoom,game.timeline.groups):!launch?game.referenceCamera:null:null;if(camera){if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);if(playing&&!game.hardMode)applyTiltProjection(game.tilt);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}else{if(playing&&settings.motion){applyTiltProjection(game.tilt);ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const p=tiltProjection(settings.motion?game.tilt:0),c=Math.cos(p.roll),si=Math.sin(p.roll),z=settings.motion?game.zoom:1,cr=Math.cos(rotation),sr=Math.sin(rotation);const a=c*z,b=si*z,k=(c*p.shear-si*p.compression)*z,d=(si*p.shear+c*p.compression)*z;game.lastDrawCamera=[a*cr+k*sr,b*cr+d*sr,-a*sr+k*cr,-b*sr+d*cr,0,0];game.cameraWasActive=false}}drawBackdrop(game,dark,light,playing);if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera||game.hardMode?50:45.8807,dark,accent);ctx.restore();if(!game.dead){drawTeleportEffect(game,accent);drawSectorStepEffect(game,accent);}const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead&&(game.hardMode||game.hexagonestMode)?null:game.dead?'#fff':accent,game.dead&&(game.hardMode||game.hexagonestMode)?accent:null,1.2);if(game.dead)drawDeathImpact(game);else if(settings.controlMode===3)drawDirectLabels(game)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
+function draw(){
+ const params=HexPerspective.parameters(game);
+ const perspectiveActive=!!(game&&settings.motion&&
+  ['play','over','paused','complete'].includes(screen)&&params.strength>.035&&
+  !((game.hardMode||game.hexagonestMode)&&game.dead&&
+   uiAge>=HexHardFeedback.RESULT_START&&['over','complete'].includes(screen)));
+ let padX=0,padY=0;
+ if(perspectiveActive){
+  const margin=HexPerspective.SOURCE_MARGIN;
+  const w=Math.ceil(canvas.width*(1+2*margin)),h=Math.ceil(canvas.height*(1+2*margin));
+  if(perspectiveWorld.width!==w)perspectiveWorld.width=w;
+  if(perspectiveWorld.height!==h)perspectiveWorld.height=h;
+  padX=(w-canvas.width)*.5;padY=(h-canvas.height)*.5;
+  ctx=perspectiveWorldCtx;
+ }else ctx=displayCtx;
+ ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';
+ ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+ const dpr=Math.min(devicePixelRatio||1,2);
+ ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox+padX,dpr*oy+padY);
+ ctx.save();ctx.beginPath();
+ if(perspectiveActive)ctx.rect(-480,-300,1920,1200);
+ else ctx.rect(0,0,960,600);
+ ctx.clip();const [dark,light,accent]=palette();if((game?.hardMode||game?.hexagonestMode)&&game.dead&&uiAge>=HexHardFeedback.RESULT_START&&['over','complete'].includes(screen)){drawHardResult(dark,light,accent);ctx.restore();return}const playing=['play','over','paused','complete'].includes(screen);const launchBlend=launch?1-Math.pow(1-Math.min(1,launch.age/launch.duration),3):1;let cx=480,cy=playing?300:screen==='select'?470:600;let rotation=settings.motion?(playing?(game.level===6?(game.musicRotation??game.rotation):game.rotation):spin):0;ctx.save();ctx.translate(cx,cy);if(playing&&game.hexagonestMode)ctx.scale(HexHexagonest.sceneScale(),HexHexagonest.sceneScale());if(playing&&(game.hardMode||game.hexagonestMode)&&game.dead&&settings.motion){const view=HexHardFeedback.deathView(game,uiAge);rotation=view.rotation;ctx.scale(view.scale,view.scale)}if(playing&&settings.motion&&game.level===6&&game.musicMotion)ctx.translate(game.musicMotion.shakeX,game.musicMotion.shakeY);const camera=playing&&settings.motion?game.hardMode?HexHardMotion.cameraAt(game.time+(game.dead?uiAge*HexHardMotion.CLOCK_RATE:0),rotation,game.zoom,game.timeline.groups):!launch?game.referenceCamera:null:null;if(camera){if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}else{if(playing&&settings.motion){ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const z=settings.motion?game.zoom:1,cr=Math.cos(rotation),sr=Math.sin(rotation);game.lastDrawCamera=[z*cr,z*sr,-z*sr,z*cr,0,0];game.cameraWasActive=false}}drawBackdrop(game,dark,light,playing);if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera||game.hardMode?50:45.8807,dark,accent);ctx.restore();if(!game.dead){drawTeleportEffect(game,accent);drawSectorStepEffect(game,accent);}const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead&&(game.hardMode||game.hexagonestMode)?null:game.dead?'#fff':accent,game.dead&&(game.hardMode||game.hexagonestMode)?accent:null,1.2);if(game.dead)drawDeathImpact(game);else if(settings.controlMode===3)drawDirectLabels(game)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
+ if(perspectiveActive){
+  // The world is projected through a pinhole plane; the HUD remains flat.
+  ctx.restore();
+  const projected=perspectiveRenderer.render(perspectiveWorld,canvas.width,canvas.height,params);
+  ctx=displayCtx;ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(projected,0,0);
+  if(settings.controlMode===3&&Array.isArray(game.directTargets)){
+   for(const target of game.directTargets){
+    const x=target.x*dpr-padX,y=target.y*dpr-padY;
+    const mapped=HexPerspective.forwardPixel(x,y,canvas.width,canvas.height,params);
+    target.x=mapped[0]/dpr;target.y=mapped[1]/dpr;
+   }
+  }
+  ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+  ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();
+ }
 if(screen==='title'){header('','ESC - QUIT');drawLogo('SUPER',220,160,520,100);drawLogo('HEXAGON',305,268,490,65);arrows();ctx.save();ctx.translate(selectionSlide*slideDirection*35,0);panel(['START GAME','OPTIONS','CREDITS'][menuItem]);ctx.restore();text('PRESS SPACE TO SELECT',480,565,23,'#fff')}
 if(screen==='select'){header('TAB - HIGH SCORES','MODE '+settings.controlMode+'  |  ESC - RETURN');ctx.fillStyle='#000';ctx.fillRect(0,95,960,155);text(levels[selected][0],480+selectionSlide*slideDirection*45,115,49,accent);text('DIFFICULTY: '+levels[selected][1],480,177,23,'#ddd');text('BEST TIME: '+format(bestTime(selected)),480,211,23,'#ddd');if(selected>=3&&selected<6)text('HYPER MODE',885,68,16,accent,'right');if(selected===6)text('MIXED PATTERNS / RANDOM MUSIC',900,68,16,accent,'right');panel(unlocked(selected)?'PRESS SPACE TO START':'LOCKED',270,470);if(!unlocked(selected))text('SURVIVE 60S IN '+levels[selected-3][0],480,345,17,'#ddd');arrows()}
 if(playing){ctx.save();if(game.hardMode)drawHardHUD();else header('BEST: '+format(bestTime(selected)),'');text('MODE '+settings.controlMode,78,54,17,'#ddd','left');if(selected===6&&game.timeline?.musicTrack){
