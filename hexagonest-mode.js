@@ -161,7 +161,7 @@ function create(seed=newSeed(),duration=3600){
    sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
    observedEvents:part.events.length,played,rotation,maxDelay:partDelayMax,
    entryOpenings:part.entryOpenings.map(s=>mod6(s+rotation)),
-   exitOpenings:part.exitOpenings.map(s=>mod6(s+rotation)),
+   exitOpenings:Array.from({length:6},(_,s)=>s).filter(s=>!(last.pattern&(1<<s))),
    exitSector:previousSafe});
   groups.push({at:anchor,rate:0,tilt:0,partId:part.id,group:groupId});
   // Shuffle changes the next source part: very long pauses recorded before
