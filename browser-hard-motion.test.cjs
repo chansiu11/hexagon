@@ -29,17 +29,38 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{chromium}=requ
    await p.screenshot({path:`wall-browser-screenshots/hard-fast-morph-${offset}.png`});
   }
   const perspective=await p.evaluate(()=>{
-   const a=tiltProjection(0),b=tiltProjection(.24),c=tiltProjection(-.24);
-   return {flat:a.compression,side:b.compression,back:c.compression,
-    shear:b.shear,odd:backdropStripeCount(5),even:backdropStripeCount(6),
-    mono:HexHexagonest.palette(125)};
+   const flat=HexPerspective.parameters({tilt:0}),
+    side=HexPerspective.parameters({tilt:.24}),
+    opposite=HexPerspective.parameters({tilt:-.24});
+   const near=HexPerspective.forwardPixel(480,530,960,600,side),
+    far=HexPerspective.forwardPixel(480,70,960,600,side);
+   settings.motion=true;settings.sound=false;selected=0;
+   game=new HexEngine.Game(0);game.tilt=.24;game.time=12;
+   game.walls=[{id:'perspective-preview',sector:2,sides:6,r:110,thickness:28}];
+   screen='play';launch=null;transition=null;flash=0;uiAge=2;
+   updatePalette(.05);draw();
+   return {flat:flat.strength,compression:side.compression,beta:side.beta,
+    oppositeBeta:opposite.beta,near,far,
+    odd:backdropStripeCount(5),even:backdropStripeCount(6),
+    mono:HexHexagonest.palette(125),
+    worldWidth:perspectiveWorld.width,screenWidth:canvas.width,
+    hudContext:ctx===displayCtx,
+    bounds:perspectiveWorld.height>canvas.height};
   });
-  assert.equal(perspective.flat,1);
-  assert(perspective.side<=.31&&perspective.back<=.31,'tilt should look clearly side-on');
-  assert(perspective.shear>.3,'tilt should also display an obvious slant');
-  assert.equal(perspective.odd,10,'pentagon floor uses alternating ten rays');
-  assert.equal(perspective.even,6,'hexagon floor keeps six broad stripes');
-  assert.deepEqual(perspective.mono,[0,0,[0,24,100]],'late Hexagonest floor has two distinct colors');
+  assert.equal(perspective.flat,0);
+  assert(perspective.compression>.85,
+   'polygon center must not be crushed into a pancake');
+  assert(perspective.beta>.20&&perspective.oppositeBeta<-.20,
+   'near/far wall projection must change with tilt direction');
+  assert(perspective.near[1]<530&&perspective.far[1]<70,
+   'near and distant bands must use unequal perspective factors');
+  assert(perspective.worldWidth>perspective.screenWidth&&perspective.bounds,
+   'world texture requires overscan to cover the perspective camera edges');
+  assert(perspective.hudContext,'HUD must be drawn on the unwarped display canvas');
+  assert.equal(perspective.odd,10);
+  assert.equal(perspective.even,6);
+  assert.deepEqual(perspective.mono,[0,0,[0,24,100]]);
+  await p.screenshot({path:'wall-browser-screenshots/projective-tilt-all-levels.png'});
   assert.deepEqual(errors,[]);console.log('PASS first-frame shape/voice sync and fast whole-world morph;');console.log('PASS measured HARD motion tiers, no lost time at 10/20/60 FPS, independent audio clock and shared stable world projection');
  }finally{await b.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
