@@ -28,6 +28,18 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{chromium}=requ
    await p.evaluate(offset=>{settings.controlMode=2;game=new HexHardMode.HardGame({duration:5,shapeSchedule:[[0,6],[1,5]],groups:[{at:0,rate:0,tilt:0}],waves:[{id:'morph-preview',start:0,end:5,r:180,speed:0,thickness:30,sides:6,sectors:[0,1,2,4]}]});game.setControlMode(2);game.update((1+offset)/HexHardMotion.CLOCK_RATE,0);screen='play';launch=null;transition=null;flash=0;updatePalette(.1);draw()},offset);
    await p.screenshot({path:`wall-browser-screenshots/hard-fast-morph-${offset}.png`});
   }
+  const perspective=await p.evaluate(()=>{
+   const a=tiltProjection(0),b=tiltProjection(.24),c=tiltProjection(-.24);
+   return {flat:a.compression,side:b.compression,back:c.compression,
+    shear:b.shear,odd:backdropStripeCount(5),even:backdropStripeCount(6),
+    mono:HexHexagonest.palette(125)};
+  });
+  assert.equal(perspective.flat,1);
+  assert(perspective.side<=.31&&perspective.back<=.31,'tilt should look clearly side-on');
+  assert(perspective.shear>.3,'tilt should also display an obvious slant');
+  assert.equal(perspective.odd,10,'pentagon floor uses alternating ten rays');
+  assert.equal(perspective.even,6,'hexagon floor keeps six broad stripes');
+  assert.deepEqual(perspective.mono,[0,0,[0,24,100]],'late Hexagonest floor has two distinct colors');
   assert.deepEqual(errors,[]);console.log('PASS first-frame shape/voice sync and fast whole-world morph;');console.log('PASS measured HARD motion tiers, no lost time at 10/20/60 FPS, independent audio clock and shared stable world projection');
  }finally{await b.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
