@@ -25,12 +25,16 @@ function rotateMask(mask,shift,flip){
  let result=0;for(let k=0;k<6;k++)if(mask&(1<<k))result|=1<<mod6((flip?-k:k)+shift);
  return result;
 }
-// 15Hz source-video radial bands: median ~307,345,337 px/s across
-// 1-59 / 60-119 / 120-305 s. The Hexagonest-only viewport is scaled to
-// 0.67, giving ~460/515/505 pre-projection game units per second.
-// Observations of screen flow, not original internal game constants.
-function speedAt(t){return t<60?460:t<120?515:505}
-function sceneScale(){return .67}
+// Video viewport 768x480 (16:10), game space 960x600 (also 16:10).
+// Measured central hexagon ~84-90 px across and thin mono wall ~28 px.
+// The old 0.67 shrink made BOTH the center and walls far too small.
+// With 1.08 scene scale the 50-unit central hex appears ~86px wide,
+// and the 66-unit player orbit is ~57px, as seen in the provided MP4.
+// Source wall-flow medians ~307/345/337 pixels per real second.
+const SOURCE_VIEW={width:768,height:480,coreDiameter:[80,90],thinWallWidth:28};
+const SCENE_SCALE=1.08,WALL_WIDTH_SCALE=.92;
+function speedAt(t){return t<60?355:t<120?400:390}
+function sceneScale(){return SCENE_SCALE}
 // Source video vivid-wall hue measurements (HSV, 0.25s samples).
 // The recording cycles six hues at ~1.9s intervals, not 2.6s; the
 // transitions drift, so keep measured entry times.
@@ -57,22 +61,43 @@ function create(seed=newSeed(),duration=3600){
  const waves=[],groups=[{at:0,rate:1,tilt:0}],partOrder=[],bins=[[],[],[]],
   bags=[[],[],[]],lastPartId=[-1,-1,-1];
  for(const part of VIDEO.parts)bins[part.era].push(part);
- function pickPart(era){
+ // Randomized shuffle bag, but choose among several compatible whole
+ // chains. This is the seam correction: the NEXT clip is chosen with the
+ // previous exit still on screen, rather than splicing a random hard cut.
+ function pickPart(era,lastWave,exitSector){
   if(!bags[era].length){
    bags[era]=bins[era].slice();
    for(let i=bags[era].length-1;i>0;i--){
     const j=pick(i+1);[bags[era][i],bags[era][j]]=[bags[era][j],bags[era][i]];
    }
-   if(bags[era].length>1&&bags[era].at(-1).id===lastPartId[era])
-    [bags[era][0],bags[era][bags[era].length-1]]=
-     [bags[era].at(-1),bags[era][0]];
   }
-  const part=bags[era].pop();lastPartId[era]=part.id;return part;
+  if(!lastWave){
+   const part=bags[era].pop();lastPartId[era]=part.id;return part;
+  }
+  const compatible=bags[era].map((part,index)=>{
+   let seam=Infinity;
+   for(let turn=0;turn<6;turn++){
+    const incoming=rotateMask(part.events[0].mask,turn,false);
+    const options=part.entryOpenings.map(x=>mod6(x+turn));
+    const lane=options.reduce((best,x)=>distance(x,exitSector)<distance(best,exitSector)?x:best,options[0]);
+    const wallChange=Array.from({length:6},(_,i)=>i)
+     .filter(i=>!!(incoming&(1<<i))!==!!(lastWave.pattern&(1<<i))).length;
+    const widthChange=Math.abs(Math.log(part.entryWidth/lastWave.sourceWidth));
+    const score=distance(lane,exitSector)*5+wallChange*.30+widthChange*.38;
+    if(score<seam)seam=score;
+   }
+   if(part.id===lastPartId[era]&&bags[era].length>1)seam+=20;
+   return {index,seam};
+  }).sort((a,b)=>a.seam-b.seam);
+  const pool=Math.min(3,compatible.length);
+  const chosen=compatible[pick(pool)];
+  const [part]=bags[era].splice(chosen.index,1);
+  lastPartId[era]=part.id;return part;
  }
  let impact=2,last=null,cohortClear=-Infinity,id=0,groupId=0,previousSafe=4;
  while(impact<duration){
   const era=impact<60?0:impact<120?1:2;
-  const part=pickPart(era);
+  const part=pickPart(era,last,previousSafe);
   const first=part.events[0];
   const targetSafe=last?mod6(previousSafe+(random()<.82?0:random()<.5?-1:1)):4;
   // Rotate the entire incoming source part, not its individual waves.
@@ -97,9 +122,10 @@ function create(seed=newSeed(),duration=3600){
    for(let sector=0;sector<6;sector++)if(!(mask&(1<<sector)))possible.push(sector);
    possible.sort((a,b)=>distance(a,previousSafe)-distance(b,previousSafe));
    const safe=possible[0];
-   // Preserve the visibly deep slabs in the gray section: the old 180-unit
-   // cap cut recorded 195–250px walls in half after viewport scaling.
-   const thickness=Math.max(22,source.width*1.22);
+   // The MP4's 35px nominal bands are actually ~28px on screen.
+   // 35 * .92 (world width) * 1.08 (scene) * .8 (video viewport) = 27.8px.
+   // Thick grayscale slabs retain the very same physical scaling.
+   const thickness=Math.max(22,source.width*WALL_WIDTH_SCALE);
    if(last){
     if(safe===previousSafe)impact=Math.max(impact,last.impact+.36);
     else{
@@ -133,7 +159,10 @@ function create(seed=newSeed(),duration=3600){
   if(!played)break;
   partOrder.push({partId:part.id,era,at:anchor,end:last.impact,
    sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
-   observedEvents:part.events.length,played,rotation,maxDelay:partDelayMax});
+   observedEvents:part.events.length,played,rotation,maxDelay:partDelayMax,
+   entryOpenings:part.entryOpenings.map(s=>mod6(s+rotation)),
+   exitOpenings:part.exitOpenings.map(s=>mod6(s+rotation)),
+   exitSector:previousSafe});
   groups.push({at:anchor,rate:0,tilt:0,partId:part.id,group:groupId});
   // Shuffle changes the next source part: very long pauses recorded before
   // a different source chain do not need to create several seconds of dead air.
@@ -185,6 +214,6 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'continuous-dodge-v8',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
+const API={create,HexagonestGame,palette,speedAt,sceneScale,SOURCE_VIEW,WALL_WIDTH_SCALE,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'seamless-dodge-v9',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);
