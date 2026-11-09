@@ -1,6 +1,14 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const {Game,polygonOverlap,intersect,wallPoly,playerPoly}=require('./engine');
 assert(intersect(playerPoly(.5),wallPoly(60,0)));
+const {playerHitPoint,pointInPolygon}=require('./engine');
+const center=playerHitPoint(Math.PI/6),tri=playerPoly(Math.PI/6);
+assert(Math.abs(center[0]-(tri[0][0]+tri[1][0]+tri[2][0])/3)<1e-9);
+assert(Math.abs(center[1]-(tri[0][1]+tri[1][1]+tri[2][1])/3)<1e-9);
+assert(!pointInPolygon(center,wallPoly(70,0,6)),
+ 'triangle tip contact alone must not kill when center point is clear');
+assert(pointInPolygon(center,wallPoly(62,0,10)),
+ 'wall crossing center point must still kill');
 assert(!intersect(playerPoly(.5),wallPoly(150,0)));
 const square=(x,y,r)=>[[x-r,y-r],[x+r,y-r],[x+r,y+r],[x-r,y+r]];
 assert(polygonOverlap(square(0,0,1),square(0,0,10)));
