@@ -4,12 +4,20 @@ const E=require('./engine');
 const V=require('./hexagonest-video');
 const X=require('./hexagonest-mode');
 assert.equal(V.events.length,360);
-assert.equal(V.parts.length,33,'source should be split into full dodge sequences');
-assert.equal(V.clips.length,33,'no overlapping sliding source fragments');
-assert.equal(X.VIDEO_PART_COUNT,33);
-assert.equal(X.PART_REPLAY_VERSION,'continuous-dodge-v8');
+assert.equal(V.parts.length,31,'thick slabs extend continuous dodge chains across brief pauses');
+assert.equal(V.clips.length,31,'no overlapping sliding source fragments');
+assert.equal(X.VIDEO_PART_COUNT,31);
+assert.equal(X.PART_REPLAY_VERSION,'seamless-dodge-v9');
 assert.equal(V.DODGE_BREAK_SECONDS,1.75);
-assert.deepEqual([0,1,2].map(e=>V.parts.filter(p=>p.era===e).length),[6,6,21]);
+assert.deepEqual([0,1,2].map(e=>V.parts.filter(p=>p.era===e).length),[6,4,21]);
+assert.equal(X.SOURCE_VIEW.width/X.SOURCE_VIEW.height,960/600,
+ 'video 768x480 and game 960x600 use identical 16:10 framing');
+assert(Math.abs(2*50*X.sceneScale()*768/960-86.4)<1e-8,
+ '50 unit reference core appears 86.4px across, within the video 80-90px');
+assert(Math.abs(35*X.WALL_WIDTH_SCALE*X.sceneScale()*768/960-27.8208)<.01,
+ '35px nominal trace draws as a ~28px band in the source MP4');
+assert.equal(V.THICK_DODGE_BREAK_SECONDS,2.3);
+assert.equal(V.THICK_WALL_WIDTH,100);
 assert.equal(V.parts.reduce((sum,p)=>sum+p.events.length,0),360,
  'every observed wall must belong to exactly one full replay part');
 assert(V.parts.some(p=>p.events.length>=30),'long uninterrupted dodge chains remain intact');
@@ -17,14 +25,18 @@ let cursor=0;
 for(const part of V.parts){
  assert.equal(part.firstEventIndex,cursor,'parts do not overlap or skip events');
  assert.equal(part.lastEventIndex,cursor+part.events.length-1);
+ assert.deepEqual(part.entryOpenings,Array.from({length:6},(_,i)=>i)
+  .filter(i=>!(part.events[0].mask&(1<<i))));
+ assert.deepEqual(part.exitOpenings,Array.from({length:6},(_,i)=>i)
+  .filter(i=>!(part.events.at(-1).mask&(1<<i))));
  assert.deepEqual(part.events,V.events.slice(cursor,cursor+part.events.length));
  for(let j=1;j<part.events.length;j++){
   const gap=part.events[j].videoSeconds-part.events[j-1].videoSeconds;
-  assert(gap<V.DODGE_BREAK_SECONDS+1e-8,'a recovery pause must split a part');
+  assert(gap<V.breakAfter(part.events[j-1],part.events[j])+1e-8,'a recovery pause must split a part');
  }
  if(part.id<V.parts.length-1){
   const next=V.parts[part.id+1],gap=next.sourceStart-part.sourceEnd;
-  assert(gap>=V.DODGE_BREAK_SECONDS-1e-8||next.era!==part.era,
+  assert(gap>=V.breakAfter(part.events.at(-1),next.events[0])-1e-8||next.era!==part.era,
    'part boundary only follows recovery or change of difficulty era');
   assert(Math.abs(part.gapAfter-gap)<1e-8,'preserve observed pause between source parts');
  }
@@ -43,11 +55,11 @@ assert.equal(X.referenceSpinRate(7,1),3.25);
 assert.equal(X.referenceSpinRate(68,1),4.3);
 assert.equal(X.referenceSpinRate(117,1),0);
 assert.deepEqual(X.palette(125),[0,0,[0,0,100]],'monochrome later footage');
-// Independent source-video radial tracking: medians of roughly
-// 307 / 345 / 337 px/s. The sole Hexagonest canvas scale is .67;
-// compare the physical wall speed at that scale with a 3px/s tolerance.
+// The native gameplay frame is 960x600 and the supplied MP4 is 768x480.
+// Compare measured on-screen speed after BOTH the game scene scale and
+// the 768/960 viewport factor, not one scale without the other.
 for(const [t,observed] of [[12,307],[75,345],[165,337],[280,337]]){
- assert(Math.abs(X.speedAt(t)*X.sceneScale()-observed)<3,
+ assert(Math.abs(X.speedAt(t)*X.sceneScale()*768/960-observed)<3,
   'video-calibrated screen flow '+t+'s');
 }
 const hues=[[1,106],[3,260],[5,18],[7,194],[9,310],[11,58],
@@ -91,7 +103,7 @@ for(let seed=1;seed<=100;seed++){
   assert.equal(w.sourceOffset,src.videoSeconds-part.sourceStart);
   assert.equal(w.pattern,X.rotateMask(src.mask,w.partRotation,false),
    'preserve ALL original source six-sector masks by a single part rotation');
-  assert(Math.abs(w.thickness-Math.max(22,src.width*1.22))<1e-7,
+  assert(Math.abs(w.thickness-Math.max(22,src.width*X.WALL_WIDTH_SCALE))<1e-7,
    'preserve source wall thickness conversion');
   assert(w.sourceDelay>=0&&w.sourceDelay<3,
    'only delay a source crossing when needed for safe traversal');
@@ -99,6 +111,9 @@ for(let seed=1;seed<=100;seed++){
  }
  for(let i=0;i<d.partOrder.length;i++){
   const replay=d.partOrder[i],part=V.parts[replay.partId],walls=byGroup.get(i);
+  assert(replay.entryOpenings.length>0&&replay.exitOpenings.length>0);
+  assert(replay.exitOpenings.includes(replay.exitSector),
+   'a full source part must end in its declared escape corridor');
   assert.equal(replay.played,walls.length);
   assert(replay.joinGap>0&&replay.joinGap<=2.6,
    'random part stitching must keep natural pauses without long dead air');
@@ -156,7 +171,7 @@ assert(denseIntervals>10000,'retain the observed quick wall clusters');
 assert(quietIntervals>1000,'retain rare longer pauses between source wall crossings');
 assert(fullPartReplays>2000,'full source-video dodge chains must replay intact');
 assert(sourceWallChecks>32000,'verify every observed event identity across 100 seeded replays');
-console.log('PASS 100 Hexagonest seeds: 33 whole source dodge parts, seeded shuffle bags, original mask/width/order/offset integrity');
+console.log('PASS 100 Hexagonest seeds: 31 whole source dodge parts, seeded compatible shuffle bags, mask/width/order/offset integrity');
 console.log('PASS source-derived wall rhythm, long continuous dodge chains, color/speed eras and playable masks');
 
 // The video is still from the black/white transition onwards.
