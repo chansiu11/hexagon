@@ -17,8 +17,8 @@ function viewState(time,events=[]){
  }
  // Preserve the measured base constant but exaggerate the side-on plane.
  // Perspective kicks bring the floor almost edge-on without flipping it.
- return {compression:Math.max(.30,BASE_COMPRESSION-.17+.008*Math.sin(time*.67)-.43*Math.abs(kick)),
-  shear:.014*Math.sin(time*.83)+.30*kick};
+ return {compression:BASE_COMPRESSION+.006*Math.sin(time*.67)-.06*Math.abs(kick),
+  shear:.010*Math.sin(time*.83)+.16*kick};
 }
 function cameraAt(time,rotation,zoom=zoomAt(time),events=[]){
  const {compression,shear}=viewState(time,events),c=Math.cos(rotation),s=Math.sin(rotation);
