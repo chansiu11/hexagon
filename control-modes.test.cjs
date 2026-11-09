@@ -62,7 +62,15 @@ for(const sides of [6,5,4]){
 const effect=new Game();effect.setControlMode(2);
 effect.stepSector(1);assert(effect.stepEffect);
 effect.update(.25,0);assert.equal(effect.stepEffect,null,'step visuals must expire');
-const originalFlip=new Game();
-assert(originalFlip.teleportHalfTurn(),'mode-one flip remains enabled');
-assert.equal(originalFlip.doubleStepReady,false,'mode one cannot activate bonus');
-console.log('PASS mode 1 unchanged, mode 2 one sector per press for hexagon/pentagon/square, wraparound and switching');
+const {HardGame,create:createHard}=require('./hard-mode');
+const {HexagonestGame,create:createHexagonest}=require('./hexagonest-mode');
+for(const g of [new Game(),new HardGame(createHard(7,5)),
+ new HexagonestGame(createHexagonest(7,5))]){
+ const oldAngle=g.angle;
+ assert.equal(g.controlMode,1);
+ assert.equal(g.teleportHalfTurn(),false,'mode 1 must reject half-turn');
+ assert(eq(g.angle,oldAngle),'failed half-turn must not rotate player');
+ assert.equal(g.teleport,null,'failed half-turn must not create visual effects');
+ assert.equal(g.armDoubleStep(),false,'mode 1 cannot arm mode 2 boost');
+}
+console.log('PASS mode 1 no half-turn on all engines, continuous rotation and mode 2 preserved');

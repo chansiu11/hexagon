@@ -449,21 +449,8 @@ class Game{
   return true;
  }
  // The player changes position instantly; only the decorative trail animates.
- // The short cooldown rejects held-key auto-repeat and accidental double inputs.
- teleportHalfTurn(){
-  if(this.controlMode!==1||this.dead||this.timelineEnded||this.teleportCooldown>0)return false;
-  const from=this.angle,to=wrap(from+Math.PI);
-  this.angle=to;
-  this.teleport={from,to,age:0,duration:.30};
-  this.teleportCooldown=.18;
-  const player=playerPoly(this.angle,this.playerLean);
-  const batch=this.timeline?.mode==='batched-wall-waves';
-  if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
-   if(mixedPlayerHit(this,player))this.dead=true;return true;
-  }
-  if(this.walls.some(w=>observedPlayerHit(this,player,w)))this.dead=true;
-  return true;
- }
+ // Keep a harmless no-op for any old callers; half-turn is disabled.
+ teleportHalfTurn(){return false;}
  update(dt,input=0){if(this.dead||this.timelineEnded)return;const steps=Math.max(1,Math.ceil(dt/(1/240))),h=dt/steps;for(let n=0;n<steps;n++){this.teleportCooldown=Math.max(0,this.teleportCooldown-h);if(this.stepEffect){this.stepEffect.age+=h;if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null;}if(this.teleport){this.teleport.age+=h;if(this.teleport.age>=this.teleport.duration)this.teleport=null;}this.time+=h;if(this.timeline&&this.time>=this.timeline.duration){this.time=this.timeline.duration;this.completed=true;this.timelineEnded=true;break;}this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));this.completed=this.time>=60;if(this.controlMode===1)this.angle=wrap(this.angle+input*this.playerSpeed*h);const beat=this.time*this.bpm/60;const direction=Math.floor(beat/16)%2?-1:1;let target=direction*(.9+this.level*.19)*(1+.15*Math.sin(beat*Math.PI/16));
 if(this.level===6&&this.timeline?.kind==='mixed-pattern'){
  // New target every few seconds, changing direction unpredictably, with

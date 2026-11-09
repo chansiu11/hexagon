@@ -85,6 +85,21 @@ const {chromium}=require('playwright');
   assert(switched.time<.2,'switch must restart the active run without transferring time');
   assert.equal(switched.old,12.34);
   assert.equal(switched.second,19.5);
+  for(const level of [0,2,6]){
+   await page.evaluate(level=>{
+    selected=level;settings.sound=false;screen='play';settings.controlMode=1;
+    game=level===0?new HexHardMode.HardGame(HexHardMode.create(12,5)):
+      level===2?new HexHexagonest.HexagonestGame(HexHexagonest.create(12,5)):
+      new HexEngine.Game(6,HexRandomWaves.create(12,5));
+    game.setControlMode(1);game.sampleWalls();buildControls();
+   },level);
+   const before=await page.evaluate(()=>({angle:game.angle,teleport:game.teleport}));
+   for(const key of ['KeyW','KeyS','ArrowUp','ArrowDown'])await page.keyboard.press(key);
+   const after=await page.evaluate(()=>({angle:game.angle,teleport:game.teleport}));
+   assert(angularError(before.angle,after.angle)<1e-6,
+    'mode 1 must ignore up/down and W/S at level '+level);
+   assert.equal(after.teleport,null,'mode 1 cannot trigger warp at level '+level);
+  }
   await page.reload();
   await page.waitForFunction(()=>window.HexEngine?.Game&&typeof setControlMode==='function');
   assert.deepEqual(await page.evaluate(()=>({mode:settings.controlMode,old:records[0],second:recordsMode2[0]})),
