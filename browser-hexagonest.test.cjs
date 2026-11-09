@@ -38,6 +38,23 @@ const {chromium}=require('playwright');
    familyVersion:'video-family-v4',partVersion:'seamless-dodge-v9',
    observedParts:31,longestPart:37,coverage:360},
    'new unbroken-video-dodge-part script must be deployed');
+  // Source MP4 at 125s: core ring crosses x339..427 (89px in 768x480).
+  // Audit real raster pixels, not only the configured scene zoom.
+  const referenceCore=await page.evaluate(()=>{
+   settings.sound=false;settings.motion=false;selected=2;
+   const data=HexHexagonest.create(31,130);
+   game=new HexHexagonest.HexagonestGame({...data,waves:[]});
+   game.time=125;game.rotation=0;game.tilt=0;game.zoom=1;
+   screen='play';launch=null;uiAge=2;updatePalette(.016);draw();
+   const pixels=ctx.getImageData(0,300,960,1).data,bright=[];
+   for(let x=410;x<550;x++){
+    const k=x*4;
+    if(pixels[k]>200&&pixels[k+1]>200&&pixels[k+2]>200)bright.push(x);
+   }
+   return {width:bright.at(-1)-bright[0]+1,scale:HexHexagonest.sceneScale()};
+  });
+  assert(referenceCore.width*768/960>=82&&referenceCore.width*768/960<=97,
+   'central hexagon must match the original 89px diameter, not the old shrunken view');
   const init=await page.evaluate(async()=>{
    settings.sound=false;settings.motion=true;selected=2;screen='select';launch=null;
    await start();
