@@ -153,6 +153,19 @@ function wallPoly(r,sector,thickness=30,sides=6){
 }
 function playerPoly(angle,lean=0){const a=angle+lean,c=Math.cos(a),s=Math.sin(a),x=Math.cos(angle)*66,y=Math.sin(angle)*66;return [[7,0],[-3.5,-6.0621778265],[-3.5,6.0621778265]].map(([u,v])=>[x+u*c-v*s,y+u*s+v*c])}
 
+// Physics uses a single center point, distinct from the visible triangle.
+function playerHitPoint(angle){return [Math.cos(angle)*66,Math.sin(angle)*66];}
+function pointInPolygon(point,poly){
+ if(!poly||poly.length<3)return false;
+ const [x,y]=point;let inside=false;
+ for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+  const a=poly[j],b=poly[i],dx=b[0]-a[0],dy=b[1]-a[1];
+  const cross=(x-a[0])*dy-(y-a[1])*dx,along=(x-a[0])*dx+(y-a[1])*dy;
+  if(Math.abs(cross)<1e-9&&along>=0&&along<=dx*dx+dy*dy)return true;
+  if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+ }
+ return inside;
+}
 // Recorded connected walls may be concave. SAT is only valid for the old convex sectors.
 function polygonOverlap(a,b,holes=[]){
  const inside=(p,poly)=>{let hit=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
@@ -225,18 +238,21 @@ function rememberImpact(game,player,w,poly){
 }
 function observedPlayerHit(game,p,w){
  const batch=game.timeline?.mode==='batched-wall-waves',poly=w.points||wallVisualPoly(w,batch?game.fromSides:w.sides,batch?game.sides:w.sides,batch?game.morph:1);
- const hit=w.points?polygonOverlap(p,poly,w.holes):intersect(p,poly);
+ const point=playerHitPoint(game.angle);
+ const hit=pointInPolygon(point,poly)&&!(w.holes||[]).some(h=>pointInPolygon(point,h));
  if(hit)rememberImpact(game,p,w,poly);return hit;
 }
 function mixedPlayerHit(game,p){
- const minX=Math.min(p[0][0],p[1][0],p[2][0]),maxX=Math.max(p[0][0],p[1][0],p[2][0]);
- const minY=Math.min(p[0][1],p[1][1],p[2][1]),maxY=Math.max(p[0][1],p[1][1],p[2][1]);
+ const center=playerHitPoint(game.angle),[x,y]=center;
  for(const w of game.walls){
   if(w.renderPoly){
    if(w.collapsed)continue;
-   if(w.maxX<minX||w.minX>maxX||w.maxY<minY||w.minY>maxY)continue;
-   if(fastIntersect(p,w.renderPoly)){rememberImpact(game,p,w,w.renderPoly);return true;}
-  }else{const poly=wallVisualPoly(w,game.fromSides,game.sides,game.morph);if(intersect(p,poly)){rememberImpact(game,p,w,poly);return true;}}
+   if(w.maxX<x||w.minX>x||w.maxY<y||w.minY>y)continue;
+   if(pointInPolygon(center,w.renderPoly)){rememberImpact(game,p,w,w.renderPoly);return true;}
+  }else{
+   const poly=wallVisualPoly(w,game.fromSides,game.sides,game.morph);
+   if(pointInPolygon(center,poly)){rememberImpact(game,p,w,poly);return true;}
+  }
  }
  return false;
 }
@@ -480,6 +496,6 @@ const p=playerPoly(this.angle,this.playerLean);
 if(this.level===6&&this.timeline?.kind==='mixed-pattern'?mixedPlayerHit(this,p):this.walls.some(w=>observedPlayerHit(this,p,w))){this.dead=true;break}
 if(!this.timeline)this.walls=this.walls.filter(w=>w.r+(w.thickness||30)>50)}}
 }
-const API={fastIntersect,normalPatternTime,polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
+const API={fastIntersect,normalPatternTime,polygonOverlap,Game,PLAYER_SPEED,PLAYER_SPEED_BY_LEVEL,ORIGINAL_TICK_RATE,ORIGINAL_ARROW_DEGREES_PER_TICK,levels,wallPoly,playerPoly,playerHitPoint,pointInPolygon,intersect,wrap,observedWaveRadius,wallVisualPoly,shapeStateAt,stabilizeTimeline,hiddenWallEnd,HIDDEN_WALL_OUTER_RADIUS,wallTimelineTime,WALL_MORPH_HOLD_SECONDS,WALL_MORPH_RECOVERY_SECONDS,MORPH_SECONDS,FIRST_PENTAGON_POST_MORPH_HOLD_SECONDS,FIRST_PENTAGON_SAFE_SPEED_UNTIL_SECONDS,FIRST_PENTAGON_DELAYED_RECOVERY_SECONDS,FIRST_PENTAGON_RING_APPROACH_SPEED,FIRST_PENTAGON_RING_RESUME_TIME,firstPentagonRingWallTime};if(typeof module!=='undefined')module.exports=API;else root.HexEngine=API;
 })(typeof window!=='undefined'?window:globalThis);
 
