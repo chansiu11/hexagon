@@ -7,6 +7,16 @@ const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const HARD=typeof module!=='undefined'?require('./hard-mode'):root.HexHardMode;
 const VIDEO=typeof module!=='undefined'?require('./hexagonest-video'):root.HexagonestVideo;
 const TAU=Math.PI*2, CLOCK=25/24, SIXTH=TAU/6;
+// Measured from 9,479 decoded frames (768×480, 30fps) of the supplied
+// 316.0236-second recording. Color disappears near 59.2s; the arena
+// becomes still and black/white near 116.2s.
+const GRAYSCALE_AT=59.2, STILL_MONO_AT=116.2;
+const SPIN_REVERSALS=[0,5.4,10.5,15.5,21.8,27.1,32.9,38.9,43.8,48.9,
+ 53.8,63.6,69.1,73.7,76.6,81.9,87.3,91.5,97.1,100.1,104.5,111.3,
+ STILL_MONO_AT];
+function referenceSpinRate(t,dir){
+ return t>=STILL_MONO_AT?0:dir*(t<5.4?2.2:t<GRAYSCALE_AT?3.25:4.3);
+}
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
 function newSeed(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
 const mod6=n=>(n%6+6)%6;
@@ -33,8 +43,8 @@ const COLOR_EVENTS=[
  [58.25,106]
 ];
 function palette(time){
- if(time>=120)return [0,0,[0,0,100]];
- if(time>=60)return [0,0,[18,39,96]];
+ if(time>=STILL_MONO_AT)return [0,0,[0,0,100]];
+ if(time>=GRAYSCALE_AT)return [0,0,[18,39,96]];
  let index=0;
  for(let i=1;i<COLOR_EVENTS.length&&COLOR_EVENTS[i][0]<=time;i++)index=i;
  return [COLOR_EVENTS[index][1],92,[10,22,73]];
@@ -87,7 +97,9 @@ function create(seed=newSeed(),duration=3600){
    for(let sector=0;sector<6;sector++)if(!(mask&(1<<sector)))possible.push(sector);
    possible.sort((a,b)=>distance(a,previousSafe)-distance(b,previousSafe));
    const safe=possible[0];
-   const thickness=Math.max(22,Math.min(180,source.width*1.22));
+   // Preserve the visibly deep slabs in the gray section: the old 180-unit
+   // cap cut recorded 195–250px walls in half after viewport scaling.
+   const thickness=Math.max(22,source.width*1.22);
    if(last){
     if(safe===previousSafe)impact=Math.max(impact,last.impact+.36);
     else{
@@ -129,14 +141,10 @@ function create(seed=newSeed(),duration=3600){
   partOrder.at(-1).joinGap=joinGap;
   groupId++;impact=last.impact+joinGap;
  }
- // The reference stage reverses world rotation roughly every 5-6s.
- // Wall fragments are selected about every 1s; their boundaries are NOT
- // camera-reversal cues. Keep a separate, gently jittered spin timeline.
- const spinEvents=[{at:0,rate:-1}];let spinAt=5.5,direction=1;
- while(spinAt<duration){
-  spinEvents.push({at:spinAt,rate:direction});
-  direction=-direction;spinAt+=5.35+(random()-.5)*.65;
- }
+ // Frame-measured camera turns are independent of randomized wall chains.
+ // Reversal intervals are uneven, and the arena stops turning at 116.2s.
+ const spinEvents=SPIN_REVERSALS.filter(at=>at<duration)
+  .map((at,i)=>({at,rate:at>=STILL_MONO_AT?0:i%2?1:-1}));
  return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,duration,
    shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,partOrder,spinEvents,source:VIDEO.source};
 }
@@ -161,17 +169,22 @@ class HexagonestGame extends HARD.HardGame{
   while(this.spinIndex>0&&this.spinEvents[this.spinIndex].at>this.time)this.spinIndex--;
   while(this.spinIndex+1<this.spinEvents.length&&this.spinEvents[this.spinIndex+1].at<=this.time)this.spinIndex++;
   const direction=this.spinEvents[this.spinIndex].rate;
-  // Source core tracking: ~2.2 rad/s early, ~3.25 before 60s,
-  // ~4.3 from 60-120s. Post-120 observations are more uncertain.
-  const target=direction*(this.time<10?2.2:this.time<60?3.25:this.time<120?4.3:4.4);
-  const k=1-Math.exp(-elapsed*3);
-  this.rotationSpeed=rs0+(target-rs0)*k;
-  this.rotation=r0+(rs0+this.rotationSpeed)*.5*elapsed;
-  this.zoom=1.02+.04*Math.sin(this.time*.45);
-  this.tilt=.16*Math.sin(this.time*.81)+.07*Math.sin(this.time*.19);
+  if(this.time>=STILL_MONO_AT){
+   // The black/white recording has a fixed, level hexagon and walls.
+   // Reset the turn angle at the exact stage cut instead of continuing
+   // the earlier wobble and spin into the static monochrome segment.
+   this.rotation=0;this.rotationSpeed=0;this.zoom=1;this.tilt=0;
+  }else{
+   const target=referenceSpinRate(this.time,direction);
+   const k=1-Math.exp(-elapsed*3);
+   this.rotationSpeed=rs0+(target-rs0)*k;
+   this.rotation=r0+(rs0+this.rotationSpeed)*.5*elapsed;
+   this.zoom=1.02+.04*Math.sin(this.time*.45);
+   this.tilt=.16*Math.sin(this.time*.81)+.07*Math.sin(this.time*.19);
+  }
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'continuous-dodge-v7'};
+const API={create,HexagonestGame,palette,speedAt,sceneScale,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'continuous-dodge-v8',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);

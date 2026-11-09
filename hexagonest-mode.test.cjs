@@ -7,7 +7,7 @@ assert.equal(V.events.length,360);
 assert.equal(V.parts.length,33,'source should be split into full dodge sequences');
 assert.equal(V.clips.length,33,'no overlapping sliding source fragments');
 assert.equal(X.VIDEO_PART_COUNT,33);
-assert.equal(X.PART_REPLAY_VERSION,'continuous-dodge-v7');
+assert.equal(X.PART_REPLAY_VERSION,'continuous-dodge-v8');
 assert.equal(V.DODGE_BREAK_SECONDS,1.75);
 assert.deepEqual([0,1,2].map(e=>V.parts.filter(p=>p.era===e).length),[6,6,21]);
 assert.equal(V.parts.reduce((sum,p)=>sum+p.events.length,0),360,
@@ -33,7 +33,15 @@ for(const part of V.parts){
 assert.equal(X.PATTERN_TRANSITION_VERSION,'video-family-v4');
 assert(V.events.every(e=>e.mask>0&&e.mask<63&&e.width>=22&&e.videoSeconds<317));
 assert.equal(X.palette(30)[1],92,'bright early palette');
-assert.equal(X.palette(61)[1],0,'desaturation after 60 seconds');
+assert.equal(X.palette(61)[1],0,'desaturation after the first recorded stage transition');
+assert.equal(X.palette(59.19)[1],92);
+assert.equal(X.palette(59.2)[1],0,'grayscale starts at the decoded recording frame');
+assert.deepEqual(X.palette(116.2),[0,0,[0,0,100]],'monochrome starts at video 116.2s');
+assert.equal(X.palette(116.19)[2][0],18);
+assert.equal(X.referenceSpinRate(2,-1),-2.2);
+assert.equal(X.referenceSpinRate(7,1),3.25);
+assert.equal(X.referenceSpinRate(68,1),4.3);
+assert.equal(X.referenceSpinRate(117,1),0);
 assert.deepEqual(X.palette(125),[0,0,[0,0,100]],'monochrome later footage');
 // Independent source-video radial tracking: medians of roughly
 // 307 / 345 / 337 px/s. The sole Hexagonest canvas scale is .67;
@@ -83,7 +91,7 @@ for(let seed=1;seed<=100;seed++){
   assert.equal(w.sourceOffset,src.videoSeconds-part.sourceStart);
   assert.equal(w.pattern,X.rotateMask(src.mask,w.partRotation,false),
    'preserve ALL original source six-sector masks by a single part rotation');
-  assert(Math.abs(w.thickness-Math.max(22,Math.min(180,src.width*1.22)))<1e-7,
+  assert(Math.abs(w.thickness-Math.max(22,src.width*1.22))<1e-7,
    'preserve source wall thickness conversion');
   assert(w.sourceDelay>=0&&w.sourceDelay<3,
    'only delay a source crossing when needed for safe traversal');
@@ -115,14 +123,15 @@ for(let seed=1;seed<=100;seed++){
  if(late.length===21)assert.equal(new Set(late.map(p=>p.partId)).size,21,
    'shuffle bag plays all 21 late-era parts before repeating any one');
  assert(d.waves.at(-1).impact>315,'extend beyond the old 60s wall track');
- assert(d.spinEvents.length>50,'camera should keep rotating throughout the recording');
- assert.equal(d.spinEvents[0].rate,-1,'reference opening turns in the observed initial direction');
- for(let i=1;i<d.spinEvents.length;i++){
-  const dwell=d.spinEvents[i].at-d.spinEvents[i-1].at;
-  assert(dwell>=5.0&&dwell<=5.75,'spins reverse every ~5-6s, not on each short wall fragment');
-  assert.equal(d.spinEvents[i].rate,-d.spinEvents[i-1].rate);
- }
- assert(d.groups.length<d.spinEvents.length,'whole dodge parts and camera spin have independent timelines');
+ assert.deepEqual(d.spinEvents.map(e=>e.at),X.SPIN_REVERSALS,
+   'rotation cuts follow measured source frames, not randomized intervals');
+ assert.equal(d.spinEvents[0].rate,-1,'original opening rotates counterclockwise');
+ assert.equal(d.spinEvents.at(-1).rate,0,'post-116.2 arena must stop rotating');
+ for(let i=1;i<d.spinEvents.length-1;i++)
+  assert.equal(d.spinEvents[i].rate,-d.spinEvents[i-1].rate,
+   'the measured sequence preserves alternating turns');
+ assert(d.groups.length!==d.spinEvents.length,
+   'whole dodge parts and camera turns have independent event timelines');
  for(const w of d.waves){
   assert(w.sectors.length>0&&w.sectors.length<6);
   assert(!w.sectors.includes(w.safeSector),'every wave has a real passable lane');
@@ -150,6 +159,17 @@ assert(sourceWallChecks>32000,'verify every observed event identity across 100 s
 console.log('PASS 100 Hexagonest seeds: 33 whole source dodge parts, seeded shuffle bags, original mask/width/order/offset integrity');
 console.log('PASS source-derived wall rhythm, long continuous dodge chains, color/speed eras and playable masks');
 
+// The video is still from the black/white transition onwards.
+{
+ const d=X.create(7,180);
+ const g=new X.HexagonestGame({...d,waves:[]});
+ g.time=116.25;g.rotation=2.3;g.rotationSpeed=4.3;g.tilt=.3;g.zoom=1.2;
+ g.update(1/60,0);
+ assert.equal(g.rotation,0,'the mono arena must stop and align');
+ assert.equal(g.rotationSpeed,0,'the mono arena must not continue spinning');
+ assert.equal(g.tilt,0,'source video has no post-transition wobble');
+ assert.equal(g.zoom,1,'source video uses a level mono view');
+}
 const delta=(a,b)=>E.wrap(b-a+Math.PI)-Math.PI;
 let replays=0;
 for(let seed=1;seed<=8;seed++){
