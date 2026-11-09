@@ -161,7 +161,8 @@ function pointInPolygon(point,poly){
  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
   const a=poly[j],b=poly[i],dx=b[0]-a[0],dy=b[1]-a[1];
   const cross=(x-a[0])*dy-(y-a[1])*dx,along=(x-a[0])*dx+(y-a[1])*dy;
-  if(Math.abs(cross)<1e-9&&along>=0&&along<=dx*dx+dy*dy)return true;
+  // A collapsed edge has zero length and must not count as a hit.
+  if(dx*dx+dy*dy>1e-12&&Math.abs(cross)<1e-9&&along>=0&&along<=dx*dx+dy*dy)return true;
   if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])inside=!inside;
  }
  return inside;
