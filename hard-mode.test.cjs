@@ -24,6 +24,13 @@ for(let seed=1;seed<=100;seed++)for(const mode of [1,2,3]){
 assert.deepEqual(H.create(42),H.create(42));assert.notDeepEqual(H.create(1).waves,H.create(2).waves);
 console.log('PASS',runs,'HARD 120-second collision replays');
 const sideData={duration:10,shapeSchedule:[[0,6]],groups:[{at:0,rate:0,tilt:0}],waves:[{id:'side',sides:6,sectors:[0],safeSector:2,safeAngle:2.6,impact:1,r:65,speed:0,thickness:30,start:0,end:10}]};
+// An edge may touch the visible triangle tip without touching the hit point.
+const tipOnly=new H.HardGame({...sideData,waves:[{...sideData.waves[0],r:70,speed:0,thickness:6}]});
+tipOnly.angle=Math.PI/6;tipOnly.sampleWalls();
+assert.equal(tipOnly.hit(),undefined,'HARD center dot must ignore the visual tip');
+const centerHit=new H.HardGame({...sideData,waves:[{...sideData.waves[0],r:62,speed:0,thickness:10}]});
+centerHit.angle=Math.PI/6;centerHit.sampleWalls();
+assert(centerHit.hit(),'HARD center dot must collide when covered');
 const side=new H.HardGame(sideData);side.angle=1.4;side.update(.4,-1);assert(!side.dead,'a static lateral face must block rather than kill');assert(side.angle>Math.PI/3,'player must not pass through the lateral wall');
 const front=new H.HardGame({...sideData,waves:[{...sideData.waves[0],id:'front',r:100,speed:60}]});front.angle=Math.PI/6;front.update(1,0);assert(front.dead&&front.death.wallId.startsWith('front'),'an inward-moving front must kill on real triangle contact');
 const death=JSON.stringify(front.death);front.update(1,1);assert.equal(JSON.stringify(front.death),death);
