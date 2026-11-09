@@ -43,7 +43,7 @@ const COLOR_EVENTS=[
  [58.25,106]
 ];
 function palette(time){
- if(time>=STILL_MONO_AT)return [0,0,[0,0,100]];
+ if(time>=STILL_MONO_AT)return [0,0,[0,24,100]]; // visibly alternating black and gray floor
  if(time>=GRAYSCALE_AT)return [0,0,[18,39,96]];
  let index=0;
  for(let i=1;i<COLOR_EVENTS.length&&COLOR_EVENTS[i][0]<=time;i++)index=i;
