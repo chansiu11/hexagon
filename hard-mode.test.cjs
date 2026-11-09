@@ -28,7 +28,7 @@ const sideData={duration:10,shapeSchedule:[[0,6]],groups:[{at:0,rate:0,tilt:0}],
 const tipOnly=new H.HardGame({...sideData,waves:[{...sideData.waves[0],r:70,speed:0,thickness:6}]});
 tipOnly.angle=Math.PI/6;tipOnly.sampleWalls();
 assert.equal(tipOnly.hit(),undefined,'HARD center dot must ignore the visual tip');
-const centerHit=new H.HardGame({...sideData,waves:[{...sideData.waves[0],r:62,speed:0,thickness:10}]});
+const centerHit=new H.HardGame({...sideData,waves:[{...sideData.waves[0],r:70,speed:0,thickness:15}]});
 centerHit.angle=Math.PI/6;centerHit.sampleWalls();
 assert(centerHit.hit(),'HARD center dot must collide when covered');
 const side=new H.HardGame(sideData);side.angle=1.4;side.update(.4,-1);assert(!side.dead,'a static lateral face must block rather than kill');assert(side.angle>Math.PI/3,'player must not pass through the lateral wall');
