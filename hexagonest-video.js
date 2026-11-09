@@ -1,8 +1,8 @@
 /* Observed wall-crossing traces from the user-provided 317s Hexagonest MP4.
  * 360 video-derived events, ~0.1s time quantization, approximate six-sector
  * masks and wall thickness. Not the original game's wall RNG or source code.
- * Continuous player-dodge stretches are WHOLE replay parts: never arbitrarily
- * cut a live chain into overlapping 1-3-wall fragments.
+ * Whole dodge parts stop only at recovery pauses. Extra-thick slabs stay
+ * visible longer, so their source chains require longer recovery windows.
  * No video, music, gameplay images or sound are embedded or redistributed.
  */
 (function(root){'use strict';
@@ -22,13 +22,18 @@ for(let i=0;i<packed.length;i+=4){
 // change at 60 and 120 seconds. There is NO arbitrary fixed-length cap:
 // long sequences of 20-37 crossings are retained as a single source part.
 const DODGE_BREAK_SECONDS=1.75;
+const THICK_DODGE_BREAK_SECONDS=2.3;
+const THICK_WALL_WIDTH=100;
 const eraOf=t=>t<60?0:t<120?1:2;
+const openSectors=mask=>Array.from({length:6},(_,i)=>i).filter(i=>!(mask&(1<<i)));
+const breakAfter=(prior,next)=>prior.width>THICK_WALL_WIDTH||
+ next.width>THICK_WALL_WIDTH?THICK_DODGE_BREAK_SECONDS:DODGE_BREAK_SECONDS;
 const parts=[];
 let first=0;
 for(let i=1;i<=events.length;i++){
  const prior=events[i-1],next=events[i];
  const eraChange=i<events.length&&eraOf(prior.videoSeconds)!==eraOf(next.videoSeconds);
- const recovery=i<events.length&&(next.videoSeconds-prior.videoSeconds)>=DODGE_BREAK_SECONDS;
+ const recovery=i<events.length&&(next.videoSeconds-prior.videoSeconds)>=breakAfter(prior,next);
  if(i<events.length&&!eraChange&&!recovery)continue;
  const trace=events.slice(first,i),sourceStart=trace[0].videoSeconds,
    sourceEnd=trace[trace.length-1].videoSeconds;
@@ -40,6 +45,11 @@ for(let i=1;i<=events.length;i++){
   firstEventIndex:first,lastEventIndex:i-1,
   sourceStart,sourceEnd,duration:sourceEnd-sourceStart,
   gapAfter,boundary:eraChange?'era':recovery?'recovery':'end',
+  // Fixed signatures for matching a complete incoming dodge chain to the
+  // previous exit. No individual walls are rotated or reordered.
+  entryOpenings:openSectors(trace[0].mask),
+  exitOpenings:openSectors(trace[trace.length-1].mask),
+  entryWidth:trace[0].width,exitWidth:trace[trace.length-1].width,
   events:trace
  });
  first=i;
@@ -47,7 +57,7 @@ for(let i=1;i<=events.length;i++){
 // Compatibility identifier for existing diagnostics; this is now precisely
 // the same NON-OVERLAPPING set of full dodge runs, never 984 sliding snippets.
 const clips=parts;
-const API={events,parts,clips,DODGE_BREAK_SECONDS,
+const API={events,parts,clips,DODGE_BREAK_SECONDS,THICK_DODGE_BREAK_SECONDS,THICK_WALL_WIDTH,breakAfter,
  source:'UrPXBSh4mqU',videoLength:316.023583};
 if(typeof module!=='undefined')module.exports=API;else root.HexagonestVideo=API;
 })(typeof window!=='undefined'?window:globalThis);
