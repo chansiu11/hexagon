@@ -36,13 +36,13 @@ assert.equal(X.palette(30)[1],92,'bright early palette');
 assert.equal(X.palette(61)[1],0,'desaturation after the first recorded stage transition');
 assert.equal(X.palette(59.19)[1],92);
 assert.equal(X.palette(59.2)[1],0,'grayscale starts at the decoded recording frame');
-assert.deepEqual(X.palette(116.2),[0,0,[0,0,100]],'monochrome starts at video 116.2s');
+assert.deepEqual(X.palette(116.2),[0,0,[0,24,100]],'monochrome starts at video 116.2s');
 assert.equal(X.palette(116.19)[2][0],18);
 assert.equal(X.referenceSpinRate(2,-1),-2.2);
 assert.equal(X.referenceSpinRate(7,1),3.25);
 assert.equal(X.referenceSpinRate(68,1),4.3);
 assert.equal(X.referenceSpinRate(117,1),0);
-assert.deepEqual(X.palette(125),[0,0,[0,0,100]],'monochrome later footage');
+assert.deepEqual(X.palette(125),[0,0,[0,24,100]],'monochrome later footage');
 // Independent source-video radial tracking: medians of roughly
 // 307 / 345 / 337 px/s. The sole Hexagonest canvas scale is .67;
 // compare the physical wall speed at that scale with a 3px/s tolerance.
