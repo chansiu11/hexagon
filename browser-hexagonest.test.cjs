@@ -12,18 +12,19 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
   const rendererUrl=await page.evaluate(()=>
    Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src||'');
-  assert(rendererUrl.includes('mode1-no-halfturn-v8'),
+  assert(rendererUrl.includes('hexest-video-ratios-v9'),
     'public Pages must load the updated Hexagonest continuous-contour renderer');
   const sourceVersions=await page.evaluate(()=>
    Array.from(document.scripts).filter(s=>s.src.includes('hexagonest-')).map(s=>s.src));
-  assert(sourceVersions.some(u=>u.includes('hexagonest-video.js?v=hexest-parts-v6')),
+  assert(sourceVersions.some(u=>u.includes('hexagonest-video.js?v=hexest-connected-31-v9')),
     'the source-video part inventory must bypass the old cache');
-  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=hexest-frame-calibration-v8')),
+  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=hexest-video-ratios-v9')),
     'the whole-part replay engine must bypass the old cache');
   // The deployed site must load the complete-video dodge-part generator.
   const calibrated=await page.evaluate(()=>({
    velocities:[HexHexagonest.speedAt(20),HexHexagonest.speedAt(80),HexHexagonest.speedAt(180)],
-   colors:HexHexagonest.COLOR_EVENTS?.length,
+   scale:HexHexagonest.sceneScale(),widthScale:HexHexagonest.WALL_WIDTH_SCALE,
+    colors:HexHexagonest.COLOR_EVENTS?.length,
    openingHues:[3,5,7,11].map(t=>HexHexagonest.palette(t)[0]),
    spinEvents:HexHexagonest.create(19,30).spinEvents?.length,
    familyVersion:HexHexagonest.PATTERN_TRANSITION_VERSION,
@@ -32,10 +33,10 @@ const {chromium}=require('playwright');
    longestPart:Math.max(...HexagonestVideo.parts.map(p=>p.events.length)),
    coverage:HexagonestVideo.parts.reduce((sum,p)=>sum+p.events.length,0)
   }));
-  assert.deepEqual(calibrated,{velocities:[460,515,505],colors:31,
+  assert.deepEqual(calibrated,{velocities:[355,400,390],scale:1.08,widthScale:.92,colors:31,
    openingHues:[260,18,194,58],spinEvents:6,
-   familyVersion:'video-family-v4',partVersion:'continuous-dodge-v8',
-   observedParts:33,longestPart:37,coverage:360},
+   familyVersion:'video-family-v4',partVersion:'seamless-dodge-v9',
+   observedParts:31,longestPart:37,coverage:360},
    'new unbroken-video-dodge-part script must be deployed');
   const init=await page.evaluate(async()=>{
    settings.sound=false;settings.motion=true;selected=2;screen='select';launch=null;
@@ -84,7 +85,7 @@ const {chromium}=require('playwright');
     firstLateUnique:new Set(later.map(p=>p.partId)).size,
     latePartsInCycle:later.length};
   });
-  assert.deepEqual(partIntegrity.eras,[6,6,21]);
+  assert.deepEqual(partIntegrity.eras,[6,4,21]);
   assert(partIntegrity.longParts>=1&&partIntegrity.sourceWallsVerified>320,
    'full uninterrupted dodge chains should render the actual recorded sequences');
   if(partIntegrity.latePartsInCycle===21)
@@ -166,6 +167,6 @@ const {chromium}=require('playwright');
   });
   assert(sources.different&&sources.hard==='hard-rules');
   assert.deepEqual(errors,[],'browser console JavaScript errors');
-  console.log('PASS 317s Hexagonest, 33 non-overlapping long video dodge parts, exact source-mask and ordering integrity, shuffled unique-part bag, connected wall contours and 3 modes');
+  console.log('PASS 317s Hexagonest, 31 non-overlapping continuous video dodge parts, exact source-mask and ordering integrity, shuffled unique-part bag, connected wall contours and 3 modes');
  }finally{await b.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
