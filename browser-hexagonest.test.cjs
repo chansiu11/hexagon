@@ -18,7 +18,7 @@ const {chromium}=require('playwright');
    Array.from(document.scripts).filter(s=>s.src.includes('hexagonest-')).map(s=>s.src));
   assert(sourceVersions.some(u=>u.includes('hexagonest-video.js?v=hexest-connected-31-v9')),
     'the source-video part inventory must bypass the old cache');
-  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=part-shuffle-v12')),
+  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=gap-bridges-v14')),
     'the whole-part replay engine must bypass the old cache');
   // The deployed site must load the complete-video dodge-part generator.
   const calibrated=await page.evaluate(()=>({
