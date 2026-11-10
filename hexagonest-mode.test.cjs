@@ -3,6 +3,39 @@ const assert=require('node:assert/strict');
 const E=require('./engine');
 const V=require('./hexagonest-video');
 const X=require('./hexagonest-mode');
+const CAMERA=require('./hexagonest-camera');
+// The default actual gameplay now replays the 316-second recording in
+// original chronological order, instead of shuffling its opening at random.
+assert.equal(CAMERA.ZOOM_SAMPLES,790);
+assert.equal(CAMERA.ROTATION_SAMPLES,291);
+assert.equal(CAMERA.VIDEO_WIDTH/CAMERA.VIDEO_HEIGHT,16/10);
+assert(CAMERA.at(3).zoom>1.03&&CAMERA.at(3).zoom<1.14);
+assert(CAMERA.at(125).zoom>.91&&CAMERA.at(125).zoom<.99);
+assert.equal(CAMERA.at(125).rotation,0,'the monochrome part has a fixed source orientation');
+for(const seed of [1,2,19,42]){
+ const d=X.createVideoTimeline(seed,320);
+ assert.equal(d.sourceAligned,true);
+ assert.equal(d.sourceWaveCount,360);
+ assert.equal(d.sourceVideoOffset,.6);
+ assert(d.videoEnd>315&&d.videoEnd<316);
+ assert.equal(d.waves.length>360,true);
+ assert.equal(d.partOrder[0].partId,0);
+ assert.equal(d.partOrder[30].partId,30);
+ for(let i=0;i<360;i++){
+  const w=d.waves[i],e=V.events[i];
+  assert.equal(w.sourceVideoSeconds,e.videoSeconds);
+  assert.equal(w.sourceEventIndex,i);
+  assert.equal(w.pattern,e.mask,'original source masks must not be rotated');
+  assert.equal(w.partRotation,0);
+  assert.equal(w.sourceDelay,0,'source footage must not be retimed');
+  assert(Math.abs(w.impact-(e.videoSeconds-CAMERA.OFFSET))<1e-8);
+  assert(Math.abs(w.thickness-Math.max(22,e.width*X.WALL_WIDTH_SCALE))<1e-8);
+ }
+ assert(d.waves.slice(360).every(w=>w.impact>d.videoEnd),
+  'randomized whole parts begin only after the recorded movie');
+}
+assert.notDeepEqual(X.create(1,125).waves,X.create(2,125).waves,
+ 'the optional random parts workflow remains available');
 assert.equal(V.events.length,360);
 assert.equal(V.parts.length,31,'thick slabs extend continuous dodge chains across brief pauses');
 assert.equal(V.clips.length,31,'no overlapping sliding source fragments');
