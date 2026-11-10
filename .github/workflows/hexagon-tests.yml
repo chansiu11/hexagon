@@ -20,6 +20,7 @@ jobs:
           node hard-variation.test.cjs
           node hard-video-parts.test.cjs
           node --check hexagonest-video.js
+          node --check hexagonest-camera.js
           node --check hexagonest-mode.js
           node hexagonest-mode.test.cjs
           node hard-motion.test.cjs
