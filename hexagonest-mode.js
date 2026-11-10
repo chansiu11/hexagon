@@ -6,6 +6,7 @@
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const HARD=typeof module!=='undefined'?require('./hard-mode'):root.HexHardMode;
 const VIDEO=typeof module!=='undefined'?require('./hexagonest-video'):root.HexagonestVideo;
+const CAMERA=typeof module!=='undefined'?require('./hexagonest-camera'):root.HexHexagonestCamera;
 const TAU=Math.PI*2, CLOCK=25/24, SIXTH=TAU/6;
 // Measured from 9,479 decoded frames (768×480, 30fps) of the supplied
 // 316.0236-second recording. Color disappears near 59.2s; the arena
@@ -177,14 +178,82 @@ function create(seed=newSeed(),duration=3600){
  return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,duration,
    shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,partOrder,spinEvents,source:VIDEO.source};
 }
+// Video-faithful chronological replay for the first complete recorded run.
+// Source video timestamps are measured from the MP4; the 0.60-second menu
+// is excluded from gameplay time. Preserve every observed mask, thickness,
+// source event and pause. Only AFTER the recording ends may the existing
+// 31-part randomized replay continue.
+function createVideoTimeline(seed=newSeed(),duration=3600){
+ const offset=CAMERA.OFFSET,endOfVideo=VIDEO.videoLength-offset;
+ const waves=[],groups=[{at:0,rate:0,tilt:0}],partOrder=[];
+ let id=0,previousSafe=4;
+ for(const part of VIDEO.parts){
+  const at=Math.max(0,part.sourceStart-offset);
+  if(at>=duration)break;
+  const groupId=partOrder.length;
+  let played=0,lastWave=null;
+  for(let j=0;j<part.events.length;j++){
+   const event=part.events[j],impact=event.videoSeconds-offset;
+   if(impact>=duration)break;
+   const sectors=Array.from({length:6},(_,k)=>k).filter(k=>event.mask&(1<<k));
+   const possible=Array.from({length:6},(_,k)=>k).filter(k=>!(event.mask&(1<<k)));
+   if(!sectors.length||!possible.length)continue;
+   const safe=possible.reduce((best,next)=>
+    distance(next,previousSafe)<distance(best,previousSafe)?next:best,possible[0]);
+   const speed=speedAt(event.videoSeconds),thickness=Math.max(22,event.width*WALL_WIDTH_SCALE);
+   const r=1180,start=impact-(r-66)/speed,profiles={};
+   for(const sector of sectors)profiles[sector]={thickness,offset:0};
+   const wave={id:id++,group:groupId,partId:part.id,
+    sourceEventIndex:part.firstEventIndex+j,
+    sourceVideoSeconds:event.videoSeconds,
+    sourceOffset:event.videoSeconds-part.sourceStart,
+    sourceMask:event.mask,sourceWidth:event.width,
+    partRotation:0,sourceDelay:0,
+    pattern:event.mask,sides:6,sectors,profiles,innerExtra:0,outerExtra:0,
+    safeSector:safe,safeAngle:(safe+.5)*SIXTH,impact,r,speed,thickness,
+    start,end:start+(r+thickness-26)/speed};
+   waves.push(wave);lastWave=wave;previousSafe=safe;played++;
+  }
+  if(!played)break;
+  groups.push({at,rate:0,tilt:0,partId:part.id,group:groupId});
+  partOrder.push({partId:part.id,era:part.era,at,end:lastWave.impact,
+   sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,rotation:0,
+   observedEvents:part.events.length,played,maxDelay:0,sourceAligned:true,
+   joinGap:part.gapAfter,entryOpenings:part.entryOpenings,
+   exitOpenings:part.exitOpenings,exitSector:previousSafe});
+ }
+ // The recorded run ends naturally. The original randomized, whole-part
+ // generator remains available for indefinite play beyond the source movie.
+ if(duration>endOfVideo+2.1){
+  const extra=create(seed,Math.max(8,duration-endOfVideo));
+  const groupOffset=partOrder.length,shift=endOfVideo;
+  for(const wave of extra.waves){
+   const moved={...wave,id:id++,group:wave.group+groupOffset,
+    start:wave.start+shift,end:wave.end+shift,impact:wave.impact+shift};
+   if(moved.impact<duration)waves.push(moved);
+  }
+  for(const group of extra.groups.slice(1))
+   groups.push({...group,at:group.at+shift,group:group.group+groupOffset});
+  for(const part of extra.partOrder)
+   partOrder.push({...part,at:part.at+shift,end:part.end+shift});
+ }
+ const spinEvents=SPIN_REVERSALS.map((at,i)=>
+  ({at:Math.max(0,at-offset),rate:at>=STILL_MONO_AT?0:i%2?1:-1}));
+ return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,
+  duration,shapeSchedule:[[0,6]],morphSeconds:0,
+  waves,groups,partOrder,spinEvents,source:VIDEO.source,
+  sourceAligned:true,sourceVideoOffset:offset,videoEnd:endOfVideo,
+  sourceWaveCount:VIDEO.events.length};
+}
 class HexagonestGame extends HARD.HardGame{
- constructor(data=create()){
+ constructor(data=createVideoTimeline()){
   super(data);this.level=2;this.hexagonestMode=true;this.hardMode=false;
   // HARD's internal physics scans all spin groups at each 240Hz step.
   // Hexagonest has hundreds of groups over the longer recording, so keep a
   // single neutral event for the inherited collision/mesh loop and advance
   // video-inspired spin events once per rendered update.
   this.spinEvents=data.spinEvents||data.groups;
+  this.sourceAligned=!!data.sourceAligned;
   this.timeline={...data,groups:[{at:0,rate:0,tilt:0}]};
   this.spinIndex=0;
   this.recordedCamera=null;this.profile=null;this.rotation=0;this.rotationSpeed=-2.2;
@@ -198,6 +267,13 @@ class HexagonestGame extends HARD.HardGame{
   while(this.spinIndex>0&&this.spinEvents[this.spinIndex].at>this.time)this.spinIndex--;
   while(this.spinIndex+1<this.spinEvents.length&&this.spinEvents[this.spinIndex+1].at<=this.time)this.spinIndex++;
   const direction=this.spinEvents[this.spinIndex].rate;
+  if(this.sourceAligned){
+   const reference=CAMERA.at(this.time+CAMERA.OFFSET);
+   this.rotation=reference.rotation;
+   this.rotationSpeed=(this.rotation-r0)/elapsed;
+   this.zoom=reference.zoom;this.tilt=reference.tilt;
+   this.recordedCamera=null;return;
+  }
   if(this.time>=STILL_MONO_AT){
    // The black/white recording has a fixed, level hexagon and walls.
    // Reset the turn angle at the exact stage cut instead of continuing
@@ -214,6 +290,7 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,HexagonestGame,palette,speedAt,sceneScale,SOURCE_VIEW,WALL_WIDTH_SCALE,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'seamless-dodge-v9',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
+const API={create,createVideoTimeline,HexagonestGame,palette,speedAt,sceneScale,
+ SOURCE_OFFSET:CAMERA.OFFSET,VIDEO_CLOCK_RATE:CLOCK,SOURCE_VIEW,WALL_WIDTH_SCALE,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'seamless-dodge-v9',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);
