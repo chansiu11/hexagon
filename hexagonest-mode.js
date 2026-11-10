@@ -165,9 +165,9 @@ function create(seed=newSeed(),duration=3600){
    exitOpenings:Array.from({length:6},(_,s)=>s).filter(s=>!(last.pattern&(1<<s))),
    exitSector:previousSafe});
   groups.push({at:anchor,rate:0,tilt:0,partId:part.id,group:groupId});
-  // Shorten ONLY randomized whole-part transitions by at most 0.14 s.
-  // Source wall timing inside each original dodge part is unchanged.
-  const joinGap=Math.max(.2,Math.min(part.gapAfter,2.6)-.14);
+  // Shuffle changes the next source part: very long pauses recorded before
+  // a different source chain do not need to create several seconds of dead air.
+  const joinGap=Math.min(part.gapAfter,2.6);
   partOrder.at(-1).joinGap=joinGap;
   groupId++;impact=last.impact+joinGap;
  }

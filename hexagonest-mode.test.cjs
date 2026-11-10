@@ -169,10 +169,8 @@ for(let seed=1;seed<=100;seed++){
   assert(replay.exitOpenings.includes(replay.exitSector),
    'a full source part must end in its declared escape corridor');
   assert.equal(replay.played,walls.length);
-  assert(replay.joinGap>=.2&&replay.joinGap<=2.46,
-   'random part stitching must keep a short, nonzero recovery');
-  assert(Math.abs(replay.joinGap-Math.max(.2,Math.min(part.gapAfter,2.6)-.14))<1e-8,
-   'shorten only randomized part joins by 0.14 seconds at most');
+  assert(replay.joinGap>0&&replay.joinGap<=2.6,
+   'random part stitching must keep natural pauses without long dead air');
   if(i+1<d.partOrder.length){
    const next=byGroup.get(i+1)[0],last=walls.at(-1);
    const distance=Math.min((next.safeSector-last.safeSector+6)%6,

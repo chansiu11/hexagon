@@ -12,13 +12,13 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
   const rendererUrl=await page.evaluate(()=>
    Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src||'');
-  assert(rendererUrl.includes('part-shuffle-v13'),
+  assert(rendererUrl.includes('part-shuffle-v12'),
     'public Pages must load the updated Hexagonest continuous-contour renderer');
   const sourceVersions=await page.evaluate(()=>
    Array.from(document.scripts).filter(s=>s.src.includes('hexagonest-')).map(s=>s.src));
   assert(sourceVersions.some(u=>u.includes('hexagonest-video.js?v=hexest-connected-31-v9')),
     'the source-video part inventory must bypass the old cache');
-  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=part-shuffle-v13')),
+  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=part-shuffle-v12')),
     'the whole-part replay engine must bypass the old cache');
   // The deployed site must load the complete-video dodge-part generator.
   const calibrated=await page.evaluate(()=>({
