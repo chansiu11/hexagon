@@ -43,7 +43,7 @@ let musicLoading=false;let starting=false;const timelineCache=new Map();
 async function loadTimeline(level){
  // Every new random-stage attempt gets a new seed and wave arrangement.
  if(level===0)return HexHardMode.create();
- if(level===2)return HexHexagonest.createVideoTimeline();
+ if(level===2)return HexHexagonest.createRandomTimeline();
  if(level===6)return HexRandomWaves.create();
  if(!timelineCache.has(level))timelineCache.set(level,fetch('assets/timelines/'+'waves-stage-'+level+'.json?v=8',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('wall timeline '+r.status);return r.json();}).catch(e=>{timelineCache.delete(level);throw e;}));
  return timelineCache.get(level);

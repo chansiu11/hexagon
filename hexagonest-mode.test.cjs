@@ -36,11 +36,32 @@ for(const seed of [1,2,19,42]){
 }
 assert.notDeepEqual(X.create(1,125).waves,X.create(2,125).waves,
  'the optional random parts workflow remains available');
+// Normal gameplay now shuffles the original VIDEO.parts from the start.
+// The chronological 316-second replay remains a separate diagnostic mode.
+for(const seed of [1,2,3,17,42]){
+ const d=X.createRandomTimeline(seed,320),raw=X.create(seed,320);
+ assert(d.partShuffle&&d.sourceAligned,'shuffle and calibrated camera enabled');
+ assert.equal(d.sourceVideoOffset,CAMERA.OFFSET);
+ assert.deepEqual(d.waves,raw.waves,'original source wall geometry unchanged');
+ assert.deepEqual(d.partOrder,raw.partOrder,'only whole parts can be shuffled');
+ assert(d.partOrder.length>=31);
+ for(const partInfo of d.partOrder){
+  const src=V.parts[partInfo.partId];
+  assert.equal(partInfo.observedEvents,src.events.length);
+  assert(partInfo.rotation>=0&&partInfo.rotation<6);
+ }
+}
+const shuffledA=X.createRandomTimeline(100,320),shuffledB=X.createRandomTimeline(101,320);
+assert.notDeepEqual(shuffledA.partOrder.map(p=>p.partId),shuffledB.partOrder.map(p=>p.partId));
+assert.deepEqual(X.createRandomTimeline(100,320),shuffledA,'same seed same parts');
+const newAttempt=new X.HexagonestGame();
+assert(newAttempt.timeline.partShuffle&&newAttempt.sourceAligned,
+ 'default Hexagonest constructor must use shuffled full parts');
 assert.equal(V.events.length,360);
 assert.equal(V.parts.length,31,'thick slabs extend continuous dodge chains across brief pauses');
 assert.equal(V.clips.length,31,'no overlapping sliding source fragments');
 assert.equal(X.VIDEO_PART_COUNT,31);
-assert.equal(X.PART_REPLAY_VERSION,'seamless-dodge-v9');
+assert.equal(X.PART_REPLAY_VERSION,'seamless-dodge-v10-random-default');
 assert.equal(V.DODGE_BREAK_SECONDS,1.75);
 assert.deepEqual([0,1,2].map(e=>V.parts.filter(p=>p.era===e).length),[6,4,21]);
 assert.equal(X.SOURCE_VIEW.width/X.SOURCE_VIEW.height,960/600,

@@ -178,6 +178,15 @@ function create(seed=newSeed(),duration=3600){
  return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,duration,
    shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,partOrder,spinEvents,source:VIDEO.source};
 }
+// Play the existing 31 whole, video-observed dodge chains in shuffled order.
+// Shuffle bags select among compatible part boundaries, and NEVER reorder
+// or regenerate individual walls inside a part. Reuse measured source
+// camera/zoom/palette data, independently of wall order.
+function createRandomTimeline(seed=newSeed(),duration=3600){
+ const data=create(seed,duration);
+ return {...data,sourceAligned:true,sourceVideoOffset:CAMERA.OFFSET,
+  partShuffle:true,sourceWaveCount:VIDEO.events.length};
+}
 // Video-faithful chronological replay for the first complete recorded run.
 // Source video timestamps are measured from the MP4; the 0.60-second menu
 // is excluded from gameplay time. Preserve every observed mask, thickness,
@@ -246,7 +255,7 @@ function createVideoTimeline(seed=newSeed(),duration=3600){
   sourceWaveCount:VIDEO.events.length};
 }
 class HexagonestGame extends HARD.HardGame{
- constructor(data=createVideoTimeline()){
+ constructor(data=createRandomTimeline()){
   super(data);this.level=2;this.hexagonestMode=true;this.hardMode=false;
   // HARD's internal physics scans all spin groups at each 240Hz step.
   // Hexagonest has hundreds of groups over the longer recording, so keep a
@@ -306,7 +315,7 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,createVideoTimeline,HexagonestGame,palette,speedAt,sceneScale,
- SOURCE_OFFSET:CAMERA.OFFSET,VIDEO_CLOCK_RATE:CLOCK,SOURCE_VIEW,WALL_WIDTH_SCALE,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'seamless-dodge-v9',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
+const API={create,createRandomTimeline,createVideoTimeline,HexagonestGame,palette,speedAt,sceneScale,
+ SOURCE_OFFSET:CAMERA.OFFSET,VIDEO_CLOCK_RATE:CLOCK,SOURCE_VIEW,WALL_WIDTH_SCALE,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'seamless-dodge-v10-random-default',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);

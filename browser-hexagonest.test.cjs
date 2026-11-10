@@ -12,13 +12,13 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
   const rendererUrl=await page.evaluate(()=>
    Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src||'');
-  assert(rendererUrl.includes('source-timeline-v11'),
+  assert(rendererUrl.includes('part-shuffle-v12'),
     'public Pages must load the updated Hexagonest continuous-contour renderer');
   const sourceVersions=await page.evaluate(()=>
    Array.from(document.scripts).filter(s=>s.src.includes('hexagonest-')).map(s=>s.src));
   assert(sourceVersions.some(u=>u.includes('hexagonest-video.js?v=hexest-connected-31-v9')),
     'the source-video part inventory must bypass the old cache');
-  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=source-timeline-v11')),
+  assert(sourceVersions.some(u=>u.includes('hexagonest-mode.js?v=part-shuffle-v12')),
     'the whole-part replay engine must bypass the old cache');
   // The deployed site must load the complete-video dodge-part generator.
   const calibrated=await page.evaluate(()=>({
@@ -35,7 +35,7 @@ const {chromium}=require('playwright');
   }));
   assert.deepEqual(calibrated,{velocities:[355,400,390],scale:1.08,widthScale:.92,colors:31,
    openingHues:[260,18,194,58],spinEvents:6,
-   familyVersion:'video-family-v4',partVersion:'seamless-dodge-v9',
+   familyVersion:'video-family-v4',partVersion:'seamless-dodge-v10-random-default',
    observedParts:31,longestPart:37,coverage:360},
    'new unbroken-video-dodge-part script must be deployed');
   // Source MP4 at 125s: core ring crosses x339..427 (89px in 768x480).
@@ -59,11 +59,15 @@ const {chromium}=require('playwright');
    settings.sound=false;settings.motion=true;selected=2;screen='select';launch=null;
    await start();
    return {screen,level:game.level,flag:game.hexagonestMode,kind:game.timeline.kind,
-    duration:game.timeline.duration,waves:game.timeline.waves.length,controls:game.controlMode};
+    duration:game.timeline.duration,waves:game.timeline.waves.length,controls:game.controlMode,
+    partShuffle:game.timeline.partShuffle,sourceAligned:game.sourceAligned,
+    firstPartIds:game.timeline.partOrder.slice(0,6).map(p=>p.partId)};
   });
   assert.equal(init.screen,'play');assert.equal(init.level,2);
   assert(init.flag&&init.kind==='hexagonest-video');
   assert(init.duration>=317&&init.waves>300,'317s source should extend the stage past 60s');
+  assert(init.partShuffle&&init.sourceAligned,'real gameplay must shuffle whole parts with original camera');
+  assert.equal(init.firstPartIds.length,6);
   // Source-informed pauses are real: a particular screenshot can be empty.
   // Verify rhythm on a deterministic 320s excerpt; the user session remains
   // randomly seeded as normal.
@@ -86,6 +90,13 @@ const {chromium}=require('playwright');
     late:d.waves.filter(w=>w.impact>=120).length};
   });
   assert(sourceRhythm.count>320&&sourceRhythm.count<470,'video-informed density');
+  const attempts=await page.evaluate(async()=>{
+   const a=await loadTimeline(2),b=await loadTimeline(2);
+   return {different:a.partOrder.map(p=>p.partId).join(',')!==b.partOrder.map(p=>p.partId).join(','),
+    intact:a.partShuffle&&b.partShuffle,camera:a.sourceAligned&&b.sourceAligned};
+  });
+  assert(attempts.different&&attempts.intact&&attempts.camera,
+   'each real-game attempt should reshuffle original complete dodge chains');
   const partIntegrity=await page.evaluate(()=>{
    const V=HexagonestVideo,d=HexHexagonest.create(137,320);
    const groups=new Map();
