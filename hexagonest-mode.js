@@ -270,7 +270,10 @@ class HexagonestGame extends HARD.HardGame{
   if(this.sourceAligned){
    const reference=CAMERA.at(this.time+CAMERA.OFFSET);
    this.rotation=reference.rotation;
-   this.rotationSpeed=(this.rotation-r0)/elapsed;
+   // The original recording snaps to a stationary, level arena in mono.
+   // Never interpret that camera cut as an enormous physical spin velocity.
+   const monoCut=this.time+CAMERA.OFFSET>=CAMERA.STILL_AT;
+   this.rotationSpeed=monoCut?0:Math.max(-5,Math.min(5,(this.rotation-r0)/elapsed));
    this.zoom=reference.zoom;this.tilt=reference.tilt;
    this.recordedCamera=null;return;
   }
