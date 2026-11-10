@@ -2,11 +2,19 @@
    recorded in hard-motion-reference.json / HARD-REFERENCE-ANALYSIS.md. */
 (function(root){'use strict';
 const CLOCK_RATE=25/24,BASE_COMPRESSION=.92;
+const BEAT=typeof module!=='undefined'?require('./hexagon-beat'):root.HexHexagonBeat;
 function audioTime(gameTime){return gameTime/CLOCK_RATE}
 function frameDelta(seconds,hard){return Math.max(0,Math.min(seconds,hard ? .25 : .05))}
 function wallSpeed(time){return time<60?300:360}
 function spinRate(time){return (time<10?60:time<60?120:180)*Math.PI/180}
-function zoomAt(gameTime){const t=audioTime(gameTime),beat=t*130/60;return 1.03+.085*Math.exp(-(beat%1)*9)+.09*(1+Math.sin(t*.48))/2}
+function zoomAt(gameTime){
+ // The real source clip contains the entire 130 BPM pulse shape, not just
+ // a theoretical exponential on each beat. The game clock runs at 25/24.
+ const videoMeasured=BEAT.zoom(gameTime);
+ if(videoMeasured!==null)return videoMeasured;
+ const t=audioTime(gameTime),beat=t*130/60;
+ return 1.03+.085*Math.exp(-(beat%1)*9)+.09*(1+Math.sin(t*.48))/2;
+}
 function viewState(time,events=[]){
  let kick=0;
  for(const e of events){
