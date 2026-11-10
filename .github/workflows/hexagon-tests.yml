@@ -23,6 +23,8 @@ jobs:
           node --check hexagonest-camera.js
           node --check hexagonest-mode.js
           node hexagonest-mode.test.cjs
+          node --check hexagon-beat.js
+          node --check hexagonest-beat-early.js
           node hard-motion.test.cjs
           node audio-feedback.test.cjs
           node --check play.js
