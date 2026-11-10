@@ -41,8 +41,10 @@ const SAMPLES=2761,VIDEO_BEGIN=3,VIDEO_END=95,PLAY_START=3.5,CLOCK_RATE=25/24;
 const q=unpack(TRACK,SAMPLES);
 function sourceRadius(t){
  const frame=Math.max(0,Math.min(SAMPLES-1,(t-VIDEO_BEGIN)*30));
- const i=Math.floor(frame),u=frame-i;
- return 20+(q[i]*(1-u)+q[Math.min(i+1,SAMPLES-1)]*u)/4;
+ // Display the measured source frame at its actual 30 Hz timestamp.
+ // Do not invent in-between easing that softens the recorded beat attack.
+ const i=Math.floor(frame+1e-7);
+ return 20+q[i]/4;
 }
 function zoom(gameTime){
  const videoTime=PLAY_START+gameTime/CLOCK_RATE;

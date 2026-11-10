@@ -21,21 +21,45 @@ function interpolation(t,count,fn){
  const i=Math.floor(position),next=Math.min(i+1,count-1),p=position-i;
  return fn(i)*(1-p)+fn(next)*p;
 }
+// The 2.5 Hz angular samples resolve position but a linear cross-fade
+// over each .4s interval spreads abrupt direction changes over many frames.
+// Locate true reversal boundaries from the surrounding measured velocities:
+// before / after velocities are held constant and switch on one instant.
+// Endpoints remain EXACTLY the original extracted positions.
+function rotationSample(i){
+ const index=Math.max(0,Math.min(r.length/2-1,i));
+ let signed=r[index*2]|r[index*2+1]<<8;
+ if(signed>=32768)signed-=65536;
+ return signed/128;
+}
+function rotationAt(videoTime){
+ const position=Math.max(0,Math.min(r.length/2-1,videoTime*HZ));
+ const i=Math.floor(position),f=position-i;
+ if(i>=r.length/2-1)return rotationSample(i);
+ const a=rotationSample(i),b=rotationSample(i+1);
+ const middle=(b-a)*HZ;
+ const before=i>0?(a-rotationSample(i-1))*HZ:middle;
+ const after=i+2<r.length/2?(rotationSample(i+2)-b)*HZ:middle;
+ if(before*after<0&&Math.abs(before)>.8&&Math.abs(after)>.8&&
+    Math.abs(middle)<.92*Math.max(Math.abs(before),Math.abs(after))){
+  const cut=(middle-after)/(before-after);
+  if(cut>.05&&cut<.95){
+   // Constant angular speed on both sides, no eased braking or acceleration.
+   return f<cut?a+before*f/HZ:a+(before*cut+after*(f-cut))/HZ;
+  }
+ }
+ return a+(b-a)*f;
+}
 function at(videoTime){
  const t=Math.max(0,videoTime);
  // Exact phase and amplitude from video-frame center-ring measurements.
  // Keep source launch frames and the later mono source behavior separate.
  const zoom=t>=STILL_AT?MONO.zoom(t):
   t>=.6?BEAT.zoom(t):interpolation(t,z.length,i=>.7+z[i]*.003);
- let rotation=0;
- if(t<STILL_AT){
-  const value=i=>{let signed=r[i*2]|r[i*2+1]<<8;
-   if(signed>=32768)signed-=65536;return signed/128;};
-  rotation=interpolation(t,r.length/2,value);
- }
+ const rotation=t<STILL_AT?rotationAt(t):0;
  return {rotation,zoom,tilt:0};
 }
 const API={at,HZ,OFFSET,STILL_AT,VIDEO_WIDTH:768,VIDEO_HEIGHT:480,
- CAMERA_VERSION:'measured-camera-and-beats-v2',ZOOM_SAMPLES:z.length,ROTATION_SAMPLES:r.length/2};
+ CAMERA_VERSION:'source-reversal-snap-v3',ZOOM_SAMPLES:z.length,ROTATION_SAMPLES:r.length/2,rotationAt};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonestCamera=API;
 })(typeof window!=='undefined'?window:globalThis);

@@ -259,10 +259,23 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;this.profile=null;this.rotation=0;this.rotationSpeed=-2.2;
  }
  get playerSpeed(){return 9*Math.PI/180*60*CLOCK}
+ die(w){
+  if(!w||this.dead)return;
+  // HARD physics uses its own internal spin. Restore the VIDEO camera on the
+  // very same collision substep, not one render frame after it.
+  if(this.sourceAligned){
+   const reference=CAMERA.at(this.time+CAMERA.OFFSET);
+   this.rotation=reference.rotation;this.zoom=reference.zoom;this.tilt=reference.tilt;
+  }
+  super.die(w);
+  this.deathCamera={rotation:this.rotation,zoom:this.zoom,tilt:this.tilt,time:this.time};
+ }
  update(dt,input=0){
   const t0=this.time,r0=this.rotation,rs0=this.rotationSpeed;
   // HARD physics uses a 25/24 game clock. Hexagonest is video-time 1:1.
   super.update(dt/CLOCK,input);
+  // die() already captured the source camera in the exact collision step.
+  if(this.dead)return;
   const elapsed=this.time-t0;if(elapsed<=0)return;
   while(this.spinIndex>0&&this.spinEvents[this.spinIndex].at>this.time)this.spinIndex--;
   while(this.spinIndex+1<this.spinEvents.length&&this.spinEvents[this.spinIndex+1].at<=this.time)this.spinIndex++;

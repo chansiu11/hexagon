@@ -170,7 +170,13 @@ class HardGame extends E.Game{
   const center=E.playerHitPoint(angle);
   return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(center,w.renderPoly));
  }
- die(w){if(!w||this.dead)return;this.dead=true;this.death={time:this.time,angle:this.angle,wallId:w.id,player:E.playerPoly(this.angle),wall:w.renderPoly.map(p=>p.slice()),holes:[],contact:[Math.cos(this.angle)*66,Math.sin(this.angle)*66]}}
+ die(w){
+  if(!w||this.dead)return;
+  this.dead=true;
+  this.death={time:this.time,angle:this.angle,wallId:w.id,player:E.playerPoly(this.angle),wall:w.renderPoly.map(p=>p.slice()),holes:[],contact:[Math.cos(this.angle)*66,Math.sin(this.angle)*66]};
+  // Frame-exact physical impact snapshot, independent of the later death zoom.
+  if(this.level===0)this.deathCamera={rotation:this.rotation,zoom:this.zoom,tilt:this.tilt,time:this.time};
+ }
  stepSector(d){if(this.controlMode!==2||this.dead||!d)return false;const current=this.currentSector(),count=this.doubleStepReady?2:1,from=this.angle;this.doubleStepReady=false;this.angle=this.sectorAngle((current+Math.sign(d)*count+this.sides)%this.sides);this._ride=null;this.stepEffect={from,to:this.angle,direction:Math.sign(d),count,age:0,duration:.23};this.die(this.hit());return true}
  selectSector(s){if(this.controlMode!==3||this.dead||s<0||s>=this.sides||!Number.isInteger(s))return false;const from=this.angle;this._ride=null;this.angle=this.sectorAngle(s);this.stepEffect={from,to:this.angle,direction:Math.sign(delta(from,this.angle)),count:1,age:0,duration:.23};this.die(this.hit());return true}
  teleportHalfTurn(){return false}

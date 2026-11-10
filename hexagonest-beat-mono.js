@@ -12,7 +12,7 @@ function unpack(s,n){
  return out;
 }
 const SAMPLES=1998,START=116.2,HZ=10,trace=unpack(B64,SAMPLES);
-function radiusAt(t){const p=Math.max(0,Math.min(SAMPLES-1,(t-START)*HZ));const i=Math.floor(p),u=p-i;return 20+(trace[i]*(1-u)+trace[Math.min(SAMPLES-1,i+1)]*u)/4}
+function radiusAt(t){const p=Math.max(0,Math.min(SAMPLES-1,(t-START)*HZ));return 20+trace[Math.floor(p+1e-7)]/4}
 const API={radiusAt,zoom:t=>radiusAt(t)/(50*1.08*.8*Math.cos(Math.PI/6)),SAMPLES,START,HZ,VERSION:'source-mono-1hz-v2'};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonestBeatMono=API;
 })(typeof window!=='undefined'?window:globalThis);

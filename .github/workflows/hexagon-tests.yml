@@ -28,6 +28,7 @@ jobs:
           node --check hexagonest-beat-mono.js
           node hard-motion.test.cjs
           node beat-video.test.cjs
+          node camera-source-freeze.test.cjs
           node audio-feedback.test.cjs
           node --check play.js
           node --check engine.js

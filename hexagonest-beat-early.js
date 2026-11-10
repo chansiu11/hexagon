@@ -36,7 +36,7 @@ function unpack(s,n){
  const a=new Uint8Array(n);a[0]=bytes[0];for(let i=1;i<n;i++){const p=nib();a[i]=p===15?(nib()<<4)|nib():a[i-1]+p-7}return a;
 }
 const SAMPLES=3487,HZ=30,trace=unpack(B64,SAMPLES);
-function radiusAt(t){const x=Math.max(0,Math.min(SAMPLES-1,t*HZ)),i=Math.floor(x),u=x-i;return 20+(trace[i]*(1-u)+trace[Math.min(SAMPLES-1,i+1)]*u)/4}
+function radiusAt(t){const x=Math.max(0,Math.min(SAMPLES-1,t*HZ));return 20+trace[Math.floor(x+1e-7)]/4}
 const API={radiusAt,zoom:t=>radiusAt(t)/(50*1.08*.8*Math.cos(Math.PI/6)),SAMPLES,HZ,VERSION:'video-early-pulse-v2'};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonestBeatEarly=API;
 })(typeof window!=='undefined'?window:globalThis);
