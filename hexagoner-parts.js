@@ -4,6 +4,7 @@
  */
 (function(root){'use strict';
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
+const REF=typeof module!=='undefined'?require('./hexagoner-reference-60'):root.HexHexagonerReference;
 const TAU=Math.PI*2,RECOVERY_BREAK=.45,mod6=n=>(n%6+6)%6;
 const distance=(a,b)=>Math.min(mod6(a-b),mod6(b-a));
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
@@ -95,7 +96,7 @@ class HexagonerGame extends E.Game{
   const t=this.time,data=this.timeline;
   if(t<this._sampleTime){this._cursor=0;this._active.length=0}
   this._sampleTime=t;this.wallFrame=Math.floor(t*60);
-  if(t<60&&data.camera?.length){
+  if(t<60&&REF){this.recordedCamera=REF.cameraAt(t)}else if(t<60&&data.camera?.length){
    const position=Math.max(0,Math.min(data.camera.length-1,t*data.sampleRate));
    const i=Math.floor(position),u=position-i,a=data.camera[i],b=data.camera[Math.min(i+1,data.camera.length-1)];
    this.recordedCamera=a.map((v,k)=>v+(b[k]-v)*u);
