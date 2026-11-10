@@ -82,6 +82,8 @@ jobs:
         run: node browser-death.test.cjs
       - name: Freeze source camera on the exact impact frame in Chromium
         run: node browser-source-camera.test.cjs
+      - name: Verify source-video Hexagoner part shuffle and death frame in Chromium
+        run: node browser-hexagoner.test.cjs
       - name: Verify 317-second Hexagonest canvas and three controls
         run: node browser-hexagonest.test.cjs
       - name: Verify Hexagonest collision death camera, result and decoded voice cues
@@ -91,7 +93,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'play.js?v=gap-bridges-v14'; then exit 0; fi
+              grep -q 'play.js?v=hexagoner-video-v15'; then exit 0; fi
             sleep 10
           done
           exit 1
@@ -100,6 +102,7 @@ jobs:
         run: |
           node browser-wall-visual.test.cjs
           node browser-source-camera.test.cjs
+          node browser-hexagoner.test.cjs
           node browser-hexagonest.test.cjs
           node browser-hexagonest-feedback.test.cjs
         env:

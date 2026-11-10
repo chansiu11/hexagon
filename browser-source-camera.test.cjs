@@ -9,7 +9,7 @@ const fs=require('node:fs'),{chromium}=require('playwright');
   await p.goto(process.env.HEXAGON_URL||'http://127.0.0.1:4173/',{waitUntil:'load'});
   await p.evaluate(()=>{window.requestAnimationFrame=()=>0});
   const version=await p.evaluate(()=>Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src);
-  assert(version.includes('part-shuffle-v12'),'new camera must be on the deployed site');
+  assert(version.includes('hexagoner-video-v15'),'new camera must be on the deployed site');
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
   for(const stage of [0,2]){
    const result=await p.evaluate(stage=>{

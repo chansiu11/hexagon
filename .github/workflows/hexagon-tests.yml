@@ -23,6 +23,9 @@ jobs:
           node --check hexagonest-camera.js
           node --check hexagonest-mode.js
           node hexagonest-mode.test.cjs
+          node hexagonest-gap-bridges.test.cjs
+          node --check hexagoner-parts.js
+          node hexagoner-parts.test.cjs
           node --check hexagon-beat.js
           node --check hexagonest-beat-early.js
           node --check hexagonest-beat-mono.js
