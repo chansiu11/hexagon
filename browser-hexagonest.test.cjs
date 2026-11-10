@@ -120,8 +120,8 @@ const {chromium}=require('playwright');
    assert(state.finite&&state.sides===6,'valid six-sided wall mesh at '+t+'s');
    if(state.walls>=1)nonempty++;
    // Sparse source-video intervals can legitimately show an empty arena.
-   const videoTime=t+(game.sourceAligned?HexHexagonest.SOURCE_OFFSET:0);
-   if(videoTime>=HexHexagonest.GRAYSCALE_AT)
+   const videoTime=t+.6;
+   if(videoTime>=59.2)
     assert.equal(state.saturation,0,'source grayscale begins at exact MP4 timestamp');
    else assert(state.saturation>0,'source video colorful opening');
    await page.screenshot({path:'wall-browser-screenshots/hexagonest-'+t+'s.png'});
