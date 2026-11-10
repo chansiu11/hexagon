@@ -67,6 +67,18 @@ const {chromium}=require('playwright');
   // Source-informed pauses are real: a particular screenshot can be empty.
   // Verify rhythm on a deterministic 320s excerpt; the user session remains
   // randomly seeded as normal.
+  // Video frame-rate pulses must be present in both source tracks.
+  const beats=await page.evaluate(()=>{
+   const h=HexHexagonBeat,e=HexHexagonestBeatEarly,m=HexHexagonestBeatMono;
+   return {samples:[h.SAMPLES,e.SAMPLES,m.SAMPLES],hz:[e.HZ,m.HZ],
+    hZoom:h.zoom(2),eZoom:e.zoom(5),
+    grayscaleZoom:HexHexagonestCamera.at(90).zoom,
+    monoZoom:HexHexagonestCamera.at(125).zoom};
+  });
+  assert.deepEqual(beats.samples,[2761,3487,1998]);
+  assert.deepEqual(beats.hz,[30,10]);
+  for(const z of [beats.hZoom,beats.eZoom,beats.grayscaleZoom,beats.monoZoom])
+   assert(Number.isFinite(z)&&z>.65&&z<1.65,'recorded stage zoom is finite and source-sized');
   const sourceRhythm=await page.evaluate(()=>{
    const d=HexHexagonest.create(137,320);
    return {count:d.waves.length,opening:d.waves.filter(w=>w.impact<60).length,
@@ -111,7 +123,7 @@ const {chromium}=require('playwright');
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
   for(const t of [4,10,25,59,61,110,121,180,240,305]){
    const state=await page.evaluate(t=>{
-    game.time=t;game.sampleWalls();game.rotation=t*2.0;game.referenceCamera=null;
+    game.time=t;game.sampleWalls();const ref=HexHexagonestCamera.at(t+HexHexagonest.SOURCE_OFFSET);game.rotation=ref.rotation;game.zoom=ref.zoom;game.tilt=ref.tilt;game.referenceCamera=null;
     screen='play';launch=null;transition=null;flash=0;updatePalette(.05);draw();
     return {time:game.time,walls:game.walls.length,sides:game.sides,
       hue:displayedHue,saturation:displayedSat,lightness:displayedLight.slice(),
