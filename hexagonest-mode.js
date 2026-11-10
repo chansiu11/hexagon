@@ -178,6 +178,37 @@ function create(seed=newSeed(),duration=3600){
  return {mode:'hexagonest-video',kind:'hexagonest-video',seed:seed>>>0,duration,
    shapeSchedule:[[0,6]],morphSeconds:0,waves,groups,partOrder,spinEvents,source:VIDEO.source};
 }
+
+const MAX_VISIBLE_GAP=1.65;
+function fillVideoGaps(data){
+ // Use an actual single-sector wall measured from the supplied video.
+ const sourceIndex=VIDEO.events.findIndex(e=>e.mask>0&&(e.mask&(e.mask-1))===0);
+ if(sourceIndex<0)return [];
+ const source=VIDEO.events[sourceIndex],sourceSector=Math.log2(source.mask);
+ const waves=data.waves,bridges=[];
+ for(let i=1;i<waves.length;i++){
+  const previous=waves[i-1],next=waves[i],gap=next.impact-previous.impact;
+  if(gap<=MAX_VISIBLE_GAP+1e-8)continue;
+  const pieces=Math.ceil(gap/MAX_VISIBLE_GAP);
+  for(let j=1;j<pieces;j++){
+   const impact=previous.impact+gap*j/pieces;
+   // Neither adjacent source passage may be obstructed by the filler.
+   const openings=new Set([previous.safeSector,next.safeSector]);
+   let blocked=mod6(previous.safeSector+3);
+   if(openings.has(blocked))blocked=[0,1,2,3,4,5].find(k=>!openings.has(k));
+   const rotation=mod6(blocked-sourceSector),pattern=1<<blocked;
+   const speed=speedAt(impact),thickness=Math.max(22,source.width*WALL_WIDTH_SCALE);
+   const r=1180,start=impact-(r-66)/speed;
+   bridges.push({id:'empty-gap-'+i+'-'+j,bridge:true,
+    sourceEventIndex:sourceIndex,sourceVideoSeconds:source.videoSeconds,
+    sourceMask:source.mask,sourceWidth:source.width,partRotation:rotation,
+    pattern,sides:6,sectors:[blocked],profiles:{[blocked]:{thickness,offset:0}},
+    safeSector:previous.safeSector,safeAngle:(previous.safeSector+.5)*SIXTH,
+    impact,r,speed,thickness,start,end:start+(r+thickness-26)/speed});
+  }
+ }
+ return bridges;
+}
 // Play the existing 31 whole, video-observed dodge chains in shuffled order.
 // Shuffle bags select among compatible part boundaries, and NEVER reorder
 // or regenerate individual walls inside a part. Reuse measured source
@@ -185,7 +216,8 @@ function create(seed=newSeed(),duration=3600){
 function createRandomTimeline(seed=newSeed(),duration=3600){
  const data=create(seed,duration);
  return {...data,sourceAligned:true,sourceVideoOffset:CAMERA.OFFSET,
-  partShuffle:true,sourceWaveCount:VIDEO.events.length};
+  partShuffle:true,sourceWaveCount:VIDEO.events.length,
+  bridgeWaves:fillVideoGaps(data)};
 }
 // Video-faithful chronological replay for the first complete recorded run.
 // Source video timestamps are measured from the MP4; the 0.60-second menu
@@ -256,7 +288,9 @@ function createVideoTimeline(seed=newSeed(),duration=3600){
 }
 class HexagonestGame extends HARD.HardGame{
  constructor(data=createRandomTimeline()){
-  super(data);this.level=2;this.hexagonestMode=true;this.hardMode=false;
+  super(data.bridgeWaves?.length?
+   {...data,waves:data.waves.concat(data.bridgeWaves)}:data);
+  this.level=2;this.hexagonestMode=true;this.hardMode=false;
   // HARD's internal physics scans all spin groups at each 240Hz step.
   // Hexagonest has hundreds of groups over the longer recording, so keep a
   // single neutral event for the inherited collision/mesh loop and advance
@@ -315,7 +349,7 @@ class HexagonestGame extends HARD.HardGame{
   this.recordedCamera=null;
  }
 }
-const API={create,createRandomTimeline,createVideoTimeline,HexagonestGame,palette,speedAt,sceneScale,
+const API={create,createRandomTimeline,createVideoTimeline,fillVideoGaps,MAX_VISIBLE_GAP,HexagonestGame,palette,speedAt,sceneScale,
  SOURCE_OFFSET:CAMERA.OFFSET,VIDEO_CLOCK_RATE:CLOCK,SOURCE_VIEW,WALL_WIDTH_SCALE,rotateMask,VIDEO_PART_COUNT:VIDEO.parts.length,COLOR_EVENTS,PATTERN_TRANSITION_VERSION:'video-family-v4',PART_REPLAY_VERSION:'seamless-dodge-v10-random-default',SPIN_REVERSALS,GRAYSCALE_AT,STILL_MONO_AT,referenceSpinRate};
 if(typeof module!=='undefined')module.exports=API;else root.HexHexagonest=API;
 })(typeof window!=='undefined'?window:globalThis);
