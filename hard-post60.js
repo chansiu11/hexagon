@@ -4,7 +4,10 @@
  * 12 contiguous dodge clips; ONLY clip order/whole-clip angle is shuffled.
  */
 (function(root){'use strict';
-const H=root.HexHardMode,M=root.HexMixedTransition,V=root.HexHardMotion,TAU=Math.PI*2;
+const H=typeof module!=='undefined'?require('./hard-mode'):root.HexHardMode;
+const M=typeof module!=='undefined'?require('./mixed-transition'):root.HexMixedTransition;
+const V=typeof module!=='undefined'?require('./hard-motion'):root.HexHardMotion;
+const TAU=Math.PI*2;
 const START=60,TRAVEL=(1250-66)/360;
 const wrap=x=>(x%TAU+TAU)%TAU;
 function rng(seed){let s=(seed^0x6a5d4e31)>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let v=Math.imul(s^s>>>15,1|s);v^=v+Math.imul(v^v>>>7,61|v);return ((v^v>>>14)>>>0)/4294967296}}
