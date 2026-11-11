@@ -84,9 +84,11 @@ const SOURCE_EVENTS=D.EVENTS.map((e,i)=>{
  // If two neighboring masks jointly close all six cells, trim the pulse's
  // inferred radial thickness before the next ring's impact. This repairs
  // occlusion-overestimated widths without rotating or deleting any walls.
- const sealedNext=next&&((e.worldMask|next.worldMask)===63);
- const maxGapWidth=sealedNext&&gap>0?
-  Math.max(20,Math.floor((gap-.12)*SPEED)):Infinity;
+ // Near-orbit colored occupancy tends to overestimate broad bands when
+ // consecutive rings pass the same region. Reserve player steering time
+ // even when the next two masks happen to share one narrow opening.
+ const maxGapWidth=next&&gap>0?
+  Math.max(20,Math.floor((gap-.22)*SPEED)):Infinity;
  const width=Math.min(e.width,maxGapWidth);
  return Object.freeze({id:e.id,time:e.time,videoSecond:e.videoSecond,
   width,measuredWidth:e.width,sectors:Object.freeze(sectors),
