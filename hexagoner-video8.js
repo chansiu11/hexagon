@@ -11,6 +11,7 @@ const REF=typeof module!=='undefined'?require('./stage-profiles'):root.StageProf
 const P=typeof module!=='undefined'?require('./hexagoner-post60'):root.HexHexagonerPost60;
 const D=typeof module!=='undefined'?require('./hexagoner-video8-data'):root.HexHexagonerVideo8Data;
 const TAU=Math.PI*2,SECTOR=TAU/6,SPEED=355,SPAWN=1100,RECOVERY=1.0;
+const SECTOR_UNITS=Array.from({length:7},(_,i)=>[Math.cos(i*SECTOR),Math.sin(i*SECTOR)]);
 const modulo=(n,m)=>(n%m+m)%m;
 const circularDistance=(a,b)=>Math.min(modulo(a-b,6),modulo(b-a,6));
 const ANGULAR_SPEED=7*TAU/360*60; // documented 7° per 60Hz tick for this mode.
@@ -38,6 +39,8 @@ function cameraAt(t){
   const matrix=c.frames[index].slice(),sourceScale=Math.hypot(matrix[0],matrix[1])||1;
   const factor=measuredZoom(D.PRE_ZOOM_100,t)/sourceScale;
   for(let k=0;k<4;k++)matrix[k]*=factor;
+  // Remove video-estimated idle jitter: actual music drives only camera shake.
+  matrix[4]=0;matrix[5]=0;
   return matrix;
  }
  const prior=P.cameraAt(t),base=P.cameraAt(60),before=cameraAt(59.9333);
@@ -53,7 +56,7 @@ function cameraAt(t){
  const compression=.96+.019*Math.sin(t*.52),shear=.02*Math.sin(t*.71);
  const c=Math.cos(angle),s=Math.sin(angle);
  return [(c+shear*s)*zoom,(s*compression)*zoom,
-  (-s+shear*c)*zoom,(c*compression)*zoom,prior[4],prior[5]];
+  (-s+shear*c)*zoom,(c*compression)*zoom,0,0];
 }
 function interpolateSpin(keys,t){
  if(t<=keys[0][0])return keys[0][1];
@@ -229,8 +232,14 @@ class HexagonerGame extends E.Game{
  constructor(data=create()){
   super(1,data);this.hexagonerMode=true;this.hexagonerSource8=true;
   this.profile=null;this.fromSides=6;this.sides=6;this.morph=1;
-  this._spawns=data.waves.slice().sort((a,b)=>a.start-b.start);
+  // Allocate every wall panel and its four collision vertices only once.
+  // During physics ticks mutate positions in place, with zero new polygons.
+  this._spawns=data.waves.map(w=>({...w,actors:w.sectors.map(sector=>({
+   id:w.id+':'+sector,waveId:w.id,sector,sides:6,r:w.r,
+   thickness:w.thickness,points:[[0,0],[0,0],[0,0],[0,0]]
+  }))})).sort((a,b)=>a.start-b.start);
   this._active=[];this._cursor=0;this._sampleTime=-Infinity;
+  this._lastCameraFrame=-1;
   this.recordedCamera=null;this.referenceCamera=null;this.sampleWalls();
  }
  get playerSpeed(){return ANGULAR_SPEED}
@@ -238,22 +247,31 @@ class HexagonerGame extends E.Game{
  sampleWalls(){
   if(!this._spawns)return;
   const t=this.time;
-  if(t<this._sampleTime){this._cursor=0;this._active=[]}
+  if(t<this._sampleTime){this._cursor=0;this._active.length=0;this._lastCameraFrame=-1}
   this._sampleTime=t;
-  this.recordedCamera=cameraAt(t);
-  this.referenceCamera=this.recordedCamera;
-  this.wallFrame=Math.floor(t*60);
+  const videoFrame=Math.floor(t*60+1e-8);
+  this.wallFrame=videoFrame;
+  // Camera is visual-only; physics collision continues at its 240Hz rate.
+  if(videoFrame!==this._lastCameraFrame){
+   this.recordedCamera=cameraAt(t);
+   this.referenceCamera=this.recordedCamera;
+   this._lastCameraFrame=videoFrame;
+  }
   while(this._cursor<this._spawns.length&&this._spawns[this._cursor].start<=t)
    this._active.push(this._spawns[this._cursor++]);
   for(let i=this._active.length-1;i>=0;i--)
    if(this._active[i].end<=t)this._active.splice(i,1);
   this.walls.length=0;
   for(const wave of this._active){
-   const r=wave.r-wave.speed*(t-wave.start);
-   for(const sector of wave.sectors){
-    const w={id:wave.id+':'+sector,waveId:wave.id,sector,
-     sides:6,r,thickness:wave.thickness};
-    w.points=E.wallVisualPoly(w);
+   const radius=wave.r-wave.speed*(t-wave.start);
+   const inner=Math.max(0,radius),outer=Math.max(inner,radius+wave.thickness);
+   for(const w of wave.actors){
+    w.r=radius;
+    const a=SECTOR_UNITS[w.sector],b=SECTOR_UNITS[w.sector+1],pts=w.points;
+    pts[0][0]=a[0]*inner;pts[0][1]=a[1]*inner;
+    pts[1][0]=b[0]*inner;pts[1][1]=b[1]*inner;
+    pts[2][0]=b[0]*outer;pts[2][1]=b[1]*outer;
+    pts[3][0]=a[0]*outer;pts[3][1]=a[1]*outer;
     this.walls.push(w);
    }
   }
@@ -267,7 +285,15 @@ class HexagonerGame extends E.Game{
   }
  }
 }
-const API={HexagonerGame,create,palette,cameraAt,SPEED,ANGULAR_SPEED,
+function audioShakeAt(audioSeconds,pulse,enabled=true){
+ // Actual music-only bass onsets, not periodic wall timers or random jitter.
+ if(!enabled||!Number.isFinite(pulse)||pulse<=.005)return [0,0];
+ const kick=Math.min(1,Math.max(0,pulse));
+ const beat=Math.floor(Math.max(0,audioSeconds)*140/60);
+ const dir=beat%2?1:-1;
+ return [dir*3.8*kick,(beat%3===0?1:-1)*2.6*kick];
+}
+const API={HexagonerGame,create,palette,cameraAt,audioShakeAt,SPEED,ANGULAR_SPEED,
  PARTS_PRE,PARTS_POST,SOURCE_EVENTS,RECOVERY,VIDEO_START:D.VIDEO_START};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHexagonerVideo8=API;
