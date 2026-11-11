@@ -11,7 +11,7 @@ const MORPH_RECHECK=.085;
 // The wall clock freezes during morph; after it resumes, old wall rings
 // should still have time to clear the player's changing polygonal lane.
 const MORPH_SAFETY_SAMPLES=Object.freeze([
- [0,0],[.25,0],[.5,0],[.75,0],[1,0],
+ ...Array.from({length:13},(_,i)=>[i/12,0]),
  [1,.12],[1,.26],[1,.38],[1,.5],[1,.63]
 ]);
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
