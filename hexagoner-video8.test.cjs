@@ -38,7 +38,7 @@ for(const t of [0,5,25,38,57,60,64,72,85,100,109]){
 const script=fs.readFileSync('play.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 assert(script.includes('new HexHexagonerVideo8.HexagonerGame(timeline)'));
-assert(script.includes('return level===1?HexHexagonerVideo8.create(video):video'));
+assert(script.includes('if(level===1)return HexHexagonerVideo8.create();'));
 assert(script.includes('game.controlMode===1?(game.visualTurn||0):game.playerLean'));
 assert(index.indexOf('hexagoner-video8-data.js')<index.indexOf('hexagoner-video8.js'));
 const n=144,dt=.05,step=Math.floor(H.ANGULAR_SPEED*dt/(2*Math.PI/n));
