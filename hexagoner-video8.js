@@ -166,8 +166,9 @@ const BOUNDARY_PART=Object.freeze({
 // bands rather than inventing extra impassable sectors or collision paths.
 const SPECIAL_PARTS=Object.freeze({
  'HX3-06':'double-rail','HX3-10':'comb','HX3-11':'comb',
- 'HX-60-BRIDGE':'staircase','HX4-02':'staircase','HX4-07':'comb',
- 'HX4-08':'double-rail','HX4-09':'comb'
+ 'HX-60-BRIDGE':'staircase','HX4-03':'staircase','HX4-04':'comb',
+ 'HX4-08':'double-rail','HX4-09':'comb','HX4-10':'comb',
+ 'HX4-11':'staircase'
 });
 function shapeBands(w){
  if(w.special==='double-rail'&&w.thickness>=35)return [[0,.40],[.52,1]];
