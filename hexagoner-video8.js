@@ -76,11 +76,20 @@ function videoMaskToWorld(event){
  if(lanes.length>=6)lanes.pop();
  return lanes.sort((a,b)=>a-b);
 }
-const SOURCE_EVENTS=D.EVENTS.map(e=>{
- const sectors=Array.from({length:6},(_,i)=>i).filter(i=>e.worldMask&(1<<i));
+const SOURCE_EVENTS=D.EVENTS.map((e,i)=>{
+ const sectors=Array.from({length:6},(_,k)=>k).filter(k=>e.worldMask&(1<<k));
  if(!sectors.length||sectors.length>=6)throw Error('Invalid video10 sector mask '+e.id);
+ const next=D.EVENTS[i+1],gap=next?.time-e.time;
+ // A broad near-orbit color pulse can include several layered frames.
+ // If two neighboring masks jointly close all six cells, trim the pulse's
+ // inferred radial thickness before the next ring's impact. This repairs
+ // occlusion-overestimated widths without rotating or deleting any walls.
+ const sealedNext=next&&((e.worldMask|next.worldMask)===63);
+ const maxGapWidth=sealedNext&&gap>0?
+  Math.max(20,Math.floor((gap-.12)*SPEED)):Infinity;
+ const width=Math.min(e.width,maxGapWidth);
  return Object.freeze({id:e.id,time:e.time,videoSecond:e.videoSecond,
-  width:e.width,sectors:Object.freeze(sectors),
+  width,measuredWidth:e.width,sectors:Object.freeze(sectors),
   sourceMask:e.worldMask,widthPixels:Math.round(e.width/2)});
 });
 function stabilizePostVideoMasks(raw){
