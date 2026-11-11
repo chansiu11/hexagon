@@ -1,6 +1,6 @@
 'use strict';
 /* Task 3/4 only. Run: node hexagoner-camera-smooth.test.cjs
- * Reference video 1557(8).mp4, 119–224s:
+ * Reference video 1557(10).mp4, 119–224s:
  * bass onsets ~0.445s apart; ring radius +10% on kick and -9% at +0.2s.
  * New camera must be a uniform rotation + music-onset zoom, not a shear.
  */
@@ -41,8 +41,8 @@ assert(play.includes('audioShakeAt(music.position,music.pulse,musicReady)'),
 assert(play.includes('game.dead?(game.deathCamera?.affine||game.recordedCamera)'),
  'death camera frozen');
 const special=H.SPECIAL_PARTS;
-assert(special['HX3-08']==='staircase'&&special['HX3-14']==='double-rail');
-assert(special['HX4-02']==='double-rail'&&special['HX4-04']==='comb');
+assert(special['HX3-06']==='double-rail'&&special['HX3-10']==='comb');
+assert(special['HX-60-BRIDGE']==='staircase'&&special['HX4-09']==='comb');
 const delta=2*Math.PI/6;
 function fixture(){
  const game=new H.HexagonerGame(H.create(null,318,112));
