@@ -11,12 +11,22 @@ const E=require('./engine');
 assert.equal(D.EVENTS.length,134);
 assert.equal(D.EVENTS.filter(e=>e.time<60).length,70);
 assert.equal(D.EVENTS.filter(e=>e.time>=60).length,64);
-assert.equal(H.PARTS_PRE.length,15);
-assert.equal(H.PARTS_POST.length,10);
-assert.equal(H.PARTS_PRE.flatMap(p=>p.events).length,70);
-assert.equal(H.PARTS_POST.flatMap(p=>p.events).length,64);
+assert.equal(H.PARTS_PRE.length,14);
+assert.equal(H.PARTS_POST.length,9);
+assert.equal(H.PARTS_PRE.flatMap(p=>p.events).length,67);
+assert.equal(H.PARTS_POST.flatMap(p=>p.events).length,56);
 assert.equal(H.PARTS_POST.flatMap(p=>p.events).filter(e=>e.sourceLaneCorrection).length,4);
+assert.equal(H.BOUNDARY_PART.events.length,11);
+assert.equal(H.BOUNDARY_PART.sourceStart,58.3);
+assert.equal(H.BOUNDARY_PART.sourceEnd,65.6);
 assert.equal(H.ANGULAR_SPEED,8*Math.PI/180*60);
+const video=H.create(null,111,115,{order:'video'});
+assert.equal(video.waves.length,134,'all reference crossing events survive in video mode');
+assert.equal(video.orderMode,'video');
+assert.deepEqual(video.waves.map(w=>w.sourceGameSecond),H.SOURCE_EVENTS.map(e=>e.time));
+assert(video.partOrder.every(p=>p.rotation===0));
+assert.equal(video.partOrder.filter(p=>p.anchored).length,1);
+assert(video.waves.find(w=>w.sourceGameSecond===60.7).start<60);
 const left=H.cameraAt(59.93),right=H.cameraAt(60);
 const mag=a=>Math.hypot(a[0],a[1]);
 assert(Math.abs(mag(right)/mag(left)-1)<.10,'world zoom does not jump at 60');
@@ -41,12 +51,15 @@ for(const seed of [1,2,3,4,5,7,11,2026,12345,81201]){
  assert(d.waves.filter(w=>d.partOrder[w.group].era===1).every(w=>w.impact>=60&&w.start>=60));
  const wavePart=new Map();
  for(const w of d.waves){
-  const part=(d.partOrder[w.group].era?H.PARTS_POST:H.PARTS_PRE)
+  const part=w.partId===H.BOUNDARY_PART.id?H.BOUNDARY_PART:
+   (d.partOrder[w.group].era?H.PARTS_POST:H.PARTS_PRE)
     .find(x=>x.id===w.partId);
   assert(part);
   assert.equal(w.thickness,part.events[w.partEvent].width);
   if(!wavePart.has(w.partId+':'+w.group))wavePart.set(w.partId+':'+w.group,w.partRotation);
   assert.equal(w.partRotation,wavePart.get(w.partId+':'+w.group));
+  assert.equal(w.partRotation,0,'source sectors cannot be rotated');
+  assert.deepEqual(w.sectors,w.sourceSectors,'no mirror or per-wall lane shift');
  }
  orders.push(d.partOrder.map(p=>p.id).join(','));
  let reachable=new Array(n).fill(false),next=new Array(n).fill(false);
@@ -68,4 +81,4 @@ for(const seed of [1,2,3,4,5,7,11,2026,12345,81201]){
 }
 assert.notEqual(orders[0],orders[1],'whole dodge parts, not camera, shuffle');
 assert.deepEqual(H.cameraAt(23),H.cameraAt(23),'camera deterministic');
-console.log('PASS: 134 video events, 15+10 parts, 4 fixed lane calibrations, 10 seeded 0–108s reachable paths; hue/zoom/controls boundary and part immutability');
+console.log('PASS: 134 video events, 14+bridge+9 full source phrases, fixed 58.3–65.6 crossing, unrotated shuffles, 10 seeded 0–108s paths');
