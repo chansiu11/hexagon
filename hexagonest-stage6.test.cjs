@@ -33,8 +33,8 @@ for(const seed of [1,2,3,5,7,11,2026,12432]){
  const dt=.04,step=Math.ceil(g.playerSpeed*dt/(2*Math.PI/144));
  for(let t=60;t<=75;t+=dt){
   g.time=t;g.sampleWalls();
-  assert(g.walls.every(w=>w.actors.every(a=>
-   a.renderPoly.every(p=>p.every(Number.isFinite)))));
+  assert(g.walls.every(w=>w.renderPoly.every(p=>p.every(Number.isFinite))),
+   'finite collision/render polygon coordinates');
   const hit=new Set(g.walls.filter(w=>w.r<=66&&w.r+w.thickness>=66).map(w=>w.sector));
   assert(hit.size<6,'no completely sealed orbit');
   for(let lane=0;lane<144;lane++){
