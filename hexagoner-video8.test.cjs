@@ -16,7 +16,7 @@ assert.equal(H.PARTS_POST.length,10);
 assert.equal(H.PARTS_PRE.flatMap(p=>p.events).length,70);
 assert.equal(H.PARTS_POST.flatMap(p=>p.events).length,64);
 assert.equal(H.PARTS_POST.flatMap(p=>p.events).filter(e=>e.sourceLaneCorrection).length,4);
-assert.equal(H.ANGULAR_SPEED,7*Math.PI/180*60);
+assert.equal(H.ANGULAR_SPEED,8*Math.PI/180*60);
 const left=H.cameraAt(59.93),right=H.cameraAt(60);
 const mag=a=>Math.hypot(a[0],a[1]);
 assert(Math.abs(mag(right)/mag(left)-1)<.10,'world zoom does not jump at 60');
