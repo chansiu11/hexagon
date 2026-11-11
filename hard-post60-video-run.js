@@ -37,7 +37,7 @@ function extendSchedule(before,cues,duration,rate){
  return out;
 }
 function shapeCues(shift){
- const cues=[[PARTS[0].originalStart+shift-1.22,PARTS[0].sides]];
+ const cues=[[PARTS[0].originalStart+shift-.87,PARTS[0].sides]];
  for(let i=1;i<PARTS.length;i++){
   const prev=PARTS[i-1],next=PARTS[i];
   const a=prev.events.at(-1),b=next.events[0];
