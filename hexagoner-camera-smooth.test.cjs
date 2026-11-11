@@ -10,7 +10,7 @@ const H=require('./hexagoner-video8');
 const E=require('./engine');
 const matrixGap=(a,b)=>Math.hypot(...a.slice(0,4).map((v,i)=>v-b[i]));
 assert.equal(E.ORIGINAL_ARROW_DEGREES_PER_TICK[1],7);
-assert.equal(H.ANGULAR_SPEED,420*Math.PI/180);
+assert.equal(H.ANGULAR_SPEED,480*Math.PI/180);
 assert(H.beatScale(0)>1.10);
 assert(H.beatScale(.2)<.91);
 assert(H.beatScale(.445)>1.09);
@@ -89,4 +89,4 @@ for(const seed of [1,7,2026,81201]){
  }
  assert(specials>0,'random play must include video-derived special walls');
 }
-console.log('PASS: camera orthogonal + song-pulse zoom, task 3/4 special walls, source-speed 420deg/s, stage 1/5-like side collision, beat shake and controls');
+console.log('PASS: camera orthogonal + song-pulse zoom, task 3/4 special walls, requested midpoint speed 480deg/s, stage 1/5-like side collision, beat shake and controls');
