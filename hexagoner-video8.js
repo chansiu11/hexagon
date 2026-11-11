@@ -253,6 +253,37 @@ class HexagonerGame extends E.Game{
  }
  get playerSpeed(){return ANGULAR_SPEED}
  get targetSides(){return 6}
+ // Same center-point collision and lateral-wall hugging as task 1/5.
+ // The triangle's visible steering lean must not change the hit point.
+ hit(angle=this.angle){
+  const pt=E.playerHitPoint(angle);
+  return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(pt,w.points));
+ }
+ freezeDeathCamera(){
+  if(this.deathCamera)return;
+  this.deathCamera={rotation:this.rotation,zoom:this.zoom,tilt:this.tilt,
+   time:this.time,affine:this.lastDrawCamera?.slice()||this.recordedCamera?.slice()||null};
+ }
+ die(w){
+  if(!w||this.dead)return;
+  this.dead=true;
+  const pt=E.playerHitPoint(this.angle);
+  this.death={time:this.time,angle:this.angle,wallId:w.id,
+   player:E.playerPoly(this.angle),wall:w.points.map(p=>p.slice()),
+   holes:[],contact:pt.slice()};
+  this.freezeDeathCamera();
+ }
+ stepSector(direction){
+  const moved=super.stepSector(direction);
+  if(moved)this.die(this.hit());
+  return moved;
+ }
+ selectSector(sector){
+  const moved=super.selectSector(sector);
+  // Base selectSector detects an instantaneous hit; freeze it immediately.
+  if(moved&&this.dead)this.freezeDeathCamera();
+  return moved;
+ }
  sampleWalls(){
   if(!this._spawns)return;
   const t=this.time;
@@ -287,10 +318,29 @@ class HexagonerGame extends E.Game{
   this.fromSides=6;this.sides=6;this.morph=1;
  }
  update(dt,input=0){
-  const wasDead=this.dead;super.update(dt,input);
-  if(!wasDead&&this.dead){
-   this.deathCamera={rotation:this.rotation,zoom:this.zoom,tilt:this.tilt,
-    time:this.time,affine:this.recordedCamera?.slice()||null};
+  if(this.dead||this.timelineEnded||!(dt>0))return;
+  // Replicate task-1/5 wall-contact semantics at 240Hz:
+  // rotating into a stationary wall stops against its side rather than
+  // instantly killing the player; advancing wall impact is still lethal.
+  const steps=Math.max(1,Math.ceil(dt*240)),h=dt/steps;
+  for(let i=0;i<steps;i++){
+   if(this.controlMode===1&&input){
+    const from=this.angle,to=E.wrap(from+input*this.playerSpeed*h);
+    if(!this.hit(to))this.angle=to;
+    else if(!this.hit(from)){
+     let lo=0,hi=1;
+     for(let j=0;j<12;j++){
+      const u=(lo+hi)*.5;
+      if(this.hit(E.wrap(from+input*this.playerSpeed*h*u)))hi=u;else lo=u;
+     }
+     this.angle=E.wrap(from+input*this.playerSpeed*h*lo);
+    }
+   }
+   // Base mechanics advance walls and perform center-point hit detection.
+   // Neutral input prevents double movement after our clipped turn.
+   super.update(h,0);
+   if(this.dead){this.freezeDeathCamera();break}
+   if(this.timelineEnded)break;
   }
  }
 }
