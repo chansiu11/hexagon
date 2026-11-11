@@ -105,6 +105,41 @@ for(const part of PARTS){
   });
  }
 }
+// Estimate the truly safe lane in three aliased 10Hz source samples.
+// A camera turn can rotate a visible opening by multiple sectors between
+// video samples, but a player cannot cross a thick ring in that interval.
+// Correct such impossible changes ONCE, in the static measured part bank.
+// Do not vary them with RNG or alter wall timing, width, event count, or
+// the sequence of complete dodge parts. Keep original masks as metadata.
+let SOURCE_LANE_CORRECTIONS=0;
+for(const p of COMPLETE_PARTS){
+ const n=p.sides;
+ const orbit=(a,b)=>Math.min(mod(a-b,n),mod(b-a,n));
+ const openings=e=>Array.from({length:n},(_,k)=>k).filter(k=>!e.blocked.includes(k));
+ let previous=openings(p.events[0])[0];
+ for(let j=1;j<p.events.length;j++){
+  const prior=p.events[j-1],curr=p.events[j];
+  const remaining=Math.max(0,curr.offset-prior.offset-prior.width/360-.07);
+  const maxReach=remaining*(7*Math.PI/180*60)/(TAU/n);
+  let corrected=curr;
+  if(Math.min(...openings(curr).map(k=>orbit(k,previous)))>maxReach+.01){
+   let best=null;
+   for(let shift=1;shift<n;shift++){
+    const blocked=curr.blocked.map(x=>mod(x+shift,n)).sort((a,b)=>a-b);
+    const opens=Array.from({length:n},(_,k)=>k).filter(k=>!blocked.includes(k));
+    const distance=Math.min(...opens.map(k=>orbit(k,previous)));
+    const score=distance*100+Math.min(shift,n-shift)*4+shift*.1;
+    if(!best||score<best.score)best={shift,blocked,score};
+   }
+   corrected=Object.freeze({...curr,originalBlocked:curr.blocked,
+    blocked:Object.freeze(best.blocked),sourceLaneCorrection:best.shift});
+   p.events[j]=corrected;
+   SOURCE_LANE_CORRECTIONS++;
+  }
+  const choices=openings(corrected);
+  previous=choices.reduce((a,b)=>orbit(b,previous)<orbit(a,previous)?b:a,choices[0]);
+ }
+}
 for(const part of COMPLETE_PARTS){
  Object.freeze(part.fragments);Object.freeze(part.events);Object.freeze(part);
 }
@@ -119,7 +154,8 @@ const ORIGINAL_SEQUENCE=Object.freeze(PARTS.flatMap(part=>part.events.map(e=>({
 }))).sort((a,b)=>a.videoSeconds-b.videoSeconds));
 const API=Object.freeze({PARTS,COMPLETE_PARTS,ORIGINAL_SEQUENCE,CAMERA,referenceSpin,
  VIDEO_ZERO,CLOCK_RATE,SOURCE:'1557(7).mp4 01:01.7–01:53.9',
- CLIP_COUNT:PARTS.length,EVENT_COUNT:ORIGINAL_SEQUENCE.length});
+ CLIP_COUNT:PARTS.length,COMPLETE_CLIP_COUNT:COMPLETE_PARTS.length,
+ SOURCE_LANE_CORRECTIONS,EVENT_COUNT:ORIGINAL_SEQUENCE.length});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHardPost60VideoParts=API;
 })(typeof window!=='undefined'?window:globalThis);
