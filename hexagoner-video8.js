@@ -26,11 +26,19 @@ function palette(t){
  return t<60?[keyAt(D.PRE_HUES,t),94,[6,16,63]]:
   [keyAt(D.POST_HUES,t),88,[96,86,47]];
 }
+function measuredZoom(series,t){
+ const frame=Math.max(0,Math.min(series.length-1,t));
+ const k=Math.floor(frame),u=frame-k;
+ return (series[k]*(1-u)+series[Math.min(k+1,series.length-1)]*u)/100;
+}
 function cameraAt(t){
  if(t<60){
   const c=REF[1].camera;
   const index=Math.max(0,Math.min(c.frames.length-1,Math.floor(Math.max(0,t-c.start)*c.sampleRate+1e-8)));
-  return c.frames[index].slice();
+  const matrix=c.frames[index].slice(),sourceScale=Math.hypot(matrix[0],matrix[1])||1;
+  const factor=measuredZoom(D.PRE_ZOOM_100,t)/sourceScale;
+  for(let k=0;k<4;k++)matrix[k]*=factor;
+  return matrix;
  }
  const prior=P.cameraAt(t),base=P.cameraAt(60),before=cameraAt(59.9333);
  const a0=Math.atan2(base[1],base[0]),a1=Math.atan2(prior[1],prior[0]);
@@ -41,7 +49,7 @@ function cameraAt(t){
  // rather than relying on atan2's +/-180 wraparound for large turns.
  const thetaTable=P.CAMERA,theta=interpolateSpin(thetaTable,t)-interpolateSpin(thetaTable,60);
  const angle=Math.atan2(before[1],before[0])+theta;
- const zoom=Math.max(.80,Math.min(1.19,keyAt(D.CORE_ZOOM,t)));
+ const zoom=Math.max(.72,Math.min(1.22,measuredZoom(D.POST_ZOOM_100,t-60)));
  const compression=.96+.019*Math.sin(t*.52),shear=.02*Math.sin(t*.71);
  const c=Math.cos(angle),s=Math.sin(angle);
  return [(c+shear*s)*zoom,(s*compression)*zoom,
