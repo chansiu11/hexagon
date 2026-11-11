@@ -50,6 +50,23 @@ for(const seed of seeds){
  assert.equal(first.length,10);
  assert.deepEqual(first.map(p=>p.id),Bank.COMPLETE_PARTS.map(p=>p.id),
   'first source replay preserves the original video phrase order');
+ assert(first.every(p=>p.rotation===0),
+  'first replay must not rotate recorded source wall directions');
+ const firstWaves=generated.filter(w=>w.cycle===0);
+ assert.equal(firstWaves.length,58,
+  'all 58 recorded first-cycle wall events should appear');
+ for(const wall of firstWaves){
+  const source=Bank.COMPLETE_PARTS.find(p=>p.id===wall.partId);
+  const recorded=source.events[wall.partEvent];
+  assert.deepEqual(wall.sectors,recorded.blocked,
+   'source polygon lanes must not rotate in the first replay');
+  assert.equal(wall.sourceMask,recorded.screenMask);
+  assert.equal(wall.thickness,recorded.width);
+  assert(Math.abs(wall.sourceOffset-recorded.offset)<1e-9,
+   'preserve exact relative wall times inside each phrase');
+ }
+ // Even when the first playback is faithful, later cycles should only
+ // reorder WHOLE phrases and only within the matching 4/5/6-side family.
  const cycle2=data.post60Parts.filter(p=>p.cycle===1);
  assert(cycle2.length>0);
  assert(cycle2.every(p=>
