@@ -90,7 +90,7 @@ function videoMaskToWorld(event){
 const SOURCE_EVENTS=D.EVENTS.map(e=>{
  const camera=cameraAt(e.time),magnification=Math.hypot(camera[0],camera[1])||1;
  const width=Math.max(22,Math.min(116,Math.round(2*e.widthPx/magnification)));
- return Object.freeze({time:e.time,videoSecond:e.videoSecond,width,
+ return Object.freeze({id:e.id,time:e.time,videoSecond:e.videoSecond,width,
   sectors:Object.freeze(videoMaskToWorld(e)),sourceMask:e.screenMask,
   widthPixels:e.widthPx});
 });
@@ -146,7 +146,18 @@ function groupParts(era){
   events:Object.freeze(chunk.map(e=>Object.freeze({...e,offset:e.time-chunk[0].time})))
  });});
 }
-const PARTS_PRE=groupParts(0),PARTS_POST=groupParts(1);
+// An uninterrupted source dodge spans HUD 60s: 58.3-65.6.
+const PRE_RAW=groupParts(0),POST_RAW=groupParts(1);
+if(POST_RAW[0].sourceStart-PRE_RAW.at(-1).sourceEnd>=RECOVERY)throw Error('No source bridge');
+const PARTS_PRE=Object.freeze(PRE_RAW.slice(0,-1));
+const PARTS_POST=Object.freeze(POST_RAW.slice(1));
+const BOUNDARY_PART=Object.freeze({
+ id:'HX-60-BRIDGE',era:'bridge',sourceStart:PRE_RAW.at(-1).sourceStart,
+ sourceEnd:POST_RAW[0].sourceEnd,sourceVideoStart:PRE_RAW.at(-1).sourceVideoStart,
+ sourceVideoEnd:POST_RAW[0].sourceVideoEnd,
+ events:Object.freeze([...PRE_RAW.at(-1).events,...POST_RAW[0].events].map(
+  e=>Object.freeze({...e,offset:e.time-PRE_RAW.at(-1).sourceStart})))
+});
 // Reference video shows nested C-shapes, staggered side flanks and narrow
 // parallel rails. Reproduce their radial silhouette within existing source
 // bands rather than inventing extra impassable sectors or collision paths.
@@ -171,84 +182,86 @@ function newSeed(){const a=new Uint32Array(1);
 function findOpen(sectors){
  return Array.from({length:6},(_,i)=>i).filter(k=>!sectors.includes(k));
 }
-function chooseShift(part,previousSafe){
- if(previousSafe===null)return 0;
- let best=0,cost=Infinity;
- for(let shift=0;shift<6;shift++){
-  const sectors=part.events[0].sectors.map(s=>modulo(s+shift,6));
-  const openness=findOpen(sectors);
-  if(!openness.length)continue;
-  const value=Math.min(...openness.map(k=>circularDistance(k,previousSafe)));
-  if(value<cost){cost=value;best=shift}
- }
- return best;
+// Change complete phrase ORDER only: no rotation, reflection or retiming
+// inside any source phrase. Slot recovery gaps are recorded from the video.
+function shuffled(parts,random,firstFixed=false){
+ const pool=firstFixed?parts.slice(1):parts.slice();
+ for(let i=pool.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
+ return firstFixed?[parts[0],...pool]:pool;
 }
-function create(sourceTimeline=null,seed=newSeed(),duration=900){
- const random=randomFrom(seed),waves=[],partOrder=[];
- let waveId=0,previousSafe=null,previousImpact=0,previousWidth=50;
- function append(era,parts,limit){
-  let bag=[],lastPart='',at=era===0?PARTS_PRE[0].sourceStart:
-   Math.max(62.75,previousImpact+(previousWidth+105)/SPEED+.37);
-  function refill(){
-   bag=parts.slice();
-   for(let i=bag.length-1;i>0;i--){
-    const j=Math.floor(random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];
-   }
-  }
-  let counter=0;
-  while(at<limit-.15&&waveId<9000&&counter++<5000){
-   if(!bag.length)refill();
-   let part;
-   if(era===0&&partOrder.length===0){
-    part=parts[0];bag=bag.filter(p=>p!==part);
-   }else{
-    let candidates=bag.filter(p=>p.sourceEnd-p.sourceStart<=limit-at-.07);
-    if(!candidates.length){at+=.20;continue}
-    part=candidates.find(p=>p.id!==lastPart)||candidates[0];
-    bag.splice(bag.indexOf(part),1);
-   }
-   const shift=chooseShift(part,previousSafe),firstImpact=at;
-   let lastWave=null;
-   for(let j=0;j<part.events.length;j++){
-    const event=part.events[j],impact=firstImpact+event.offset;
-    if(impact>=limit-.005)break;
-    const sectorList=event.sectors.map(s=>modulo(s+shift,6)).sort((a,b)=>a-b);
-    const open=findOpen(sectorList);
-    if(!open.length||!sectorList.length)continue;
-    const safe=open.reduce((best,s)=>previousSafe===null||
-     circularDistance(s,previousSafe)<circularDistance(best,previousSafe)?s:best,open[0]);
-    // Outer rings enter from beyond the field where possible. At the 60s
-    // boundary no newly selected post60 wall is already inside the screen.
-    const radius=Math.min(SPAWN,66+SPEED*Math.max(.09,impact-(era?60.06:.03)));
-    const birth=impact-(radius-66)/SPEED;
-    if(era===1&&birth<60-1e-6)continue;
-    const special=(j%3!==2&&event.width>=35)?SPECIAL_PARTS[part.id]||null:null;
-    const w={id:waveId++,group:partOrder.length,partId:part.id,special,
-     partEvent:j,sourceVideo:'1557(8).mp4',sourceVideoSecond:event.videoSecond,
-     sourceGameSecond:event.time,sourceOffset:event.offset,partRotation:shift,
-     sourceSectors:event.sectors.slice(),sourceWidthPx:event.widthPixels,
-     sides:6,sectors:sectorList,safeSector:safe,safeAngle:(safe+.5)*SECTOR,
-     impact,r:radius,speed:SPEED,thickness:event.width,start:birth,
-     end:birth+(radius+event.width-24)/SPEED};
-    waves.push(w);lastWave=w;previousSafe=safe;
-   }
-   if(!lastWave){at+=.20;continue}
-   partOrder.push({id:part.id,era,special:SPECIAL_PARTS[part.id]||null,at:firstImpact,end:lastWave.impact,
-    sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
-    sourceVideoStart:part.sourceVideoStart,sourceVideoEnd:part.sourceVideoEnd,
-    played:part.events.length,rotation:shift,exitSector:previousSafe});
-   previousImpact=lastWave.impact;previousWidth=lastWave.thickness;
-   lastPart=part.id;
-   at=lastWave.impact+Math.max(.48,(previousWidth+82)/SPEED+.19);
-  }
+function schedule(parts,order,first){
+ const gaps=parts.slice(1).map((p,i)=>p.sourceStart-parts[i].sourceEnd);
+ let at=first;return order.map((part,i)=>{const entry={part,at};at+=part.sourceEnd-part.sourceStart+(gaps[i]||0);return entry});
+}
+function arrange(random,original,duration){
+ const pre=schedule(PARTS_PRE,original?PARTS_PRE:shuffled(PARTS_PRE,random,true),PARTS_PRE[0].sourceStart);
+ let post=[],first=PARTS_POST[0].sourceStart,cycle=0;
+ const span=PARTS_POST.at(-1).sourceEnd-PARTS_POST[0].sourceStart;
+ while(duration>60&&first<duration&&cycle<100){
+  post.push(...schedule(PARTS_POST,original?PARTS_POST:shuffled(PARTS_POST,random),first)
+   .map(v=>({...v,cycle})));
+  if(original)break;first+=span+1.2;cycle++;
  }
- append(0,PARTS_PRE,Math.min(duration,60));
- if(duration>60)append(1,PARTS_POST,duration);
+ return [...pre,{part:BOUNDARY_PART,at:BOUNDARY_PART.sourceStart},...post].filter(p=>p.at<duration);
+}
+function plausibleJoin(groups){
+ // Conservative six-sector temporal reachability screen for rearranged seams.
+ let lanes=new Set([4]),previous={impact:0,width:0};
+ for(const {part,at} of groups)for(const e of part.events){
+  const impact=at+e.offset;if(impact>108.3)break;
+  const travel=Math.max(0,impact-previous.impact-previous.width/SPEED*.5);
+  const available=findOpen(e.sectors).filter(k=>[...lanes].some(s=>circularDistance(k,s)<=travel*8+.65));
+  if(!available.length)return false;
+  lanes=new Set(available);previous={impact,width:e.width};
+ }
+ return true;
+}
+function create(sourceTimeline=null,seed=newSeed(),duration=900,options={}){
+ const orderMode=options?.order==='video'||
+  /(?:^|[?&])hexagonerOrder=video(?:&|$)/.test(root.location?.search||'')?'video':'random';
+ const random=randomFrom(seed);
+ let groups=arrange(random,orderMode==='video',duration);
+ if(orderMode==='random'&&!plausibleJoin(groups)){
+  let matched=false;
+  for(let i=0;i<96;i++){const attempt=arrange(random,false,duration);
+   if(plausibleJoin(attempt)){groups=attempt;matched=true;break}}
+  if(!matched)groups=arrange(randomFrom(0),true,duration);
+ }
+ const waves=[],partOrder=[];let waveId=0,previousSafe=null;
+ for(const {part,at,cycle=0} of groups){
+  if(at>=duration)continue;
+  const group=partOrder.length;let lastWave=null;
+  for(let j=0;j<part.events.length;j++){
+   const e=part.events[j],impact=at+e.offset;if(impact>=duration)break;
+   const sectors=e.sectors.slice(),open=findOpen(sectors);
+   if(!sectors.length||!open.length)continue;
+   const safe=open.reduce((best,s)=>previousSafe===null||
+    circularDistance(s,previousSafe)<circularDistance(best,previousSafe)?s:best,open[0]);
+   // A bridge wall arriving just after 60 must be born before 60; don't
+   // truncate its lifespan or clip its outer cap at the screen boundary.
+   const radius=Math.min(SPAWN,66+SPEED*impact),birth=impact-(radius-66)/SPEED;
+   const special=j%3!==2&&e.width>=35?SPECIAL_PARTS[part.id]||null:null;
+   const w={id:waveId++,group,partId:part.id,special,partEvent:j,
+    sourceEventId:e.id,sourceVideo:'1557(8).mp4',sourceVideoSecond:e.videoSecond,
+    sourceGameSecond:e.time,sourceOffset:e.offset,partRotation:0,
+    sourceSectors:e.sectors.slice(),sourceWidthPx:e.widthPixels,sides:6,sectors,
+    safeSector:safe,safeAngle:(safe+.5)*SECTOR,impact,r:radius,speed:SPEED,
+    thickness:e.width,start:birth,end:birth+(radius+e.width-24)/SPEED};
+   waves.push(w);lastWave=w;previousSafe=safe;
+  }
+  if(!lastWave)continue;
+  partOrder.push({id:part.id,era:part.era,special:SPECIAL_PARTS[part.id]||null,
+   at,end:lastWave.impact,sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
+   sourceVideoStart:part.sourceVideoStart,sourceVideoEnd:part.sourceVideoEnd,
+   played:lastWave.partEvent+1,rotation:0,exitSector:previousSafe,
+   anchored:part===BOUNDARY_PART,cycle});
+ }
  return {mode:'hexagoner-video8',kind:'hexagoner-video8',seed:seed>>>0,
-  duration,source:'1557(8).mp4',sourceVideoSegment:[119.5,223.5],
+  duration,orderMode,source:'1557(8).mp4',sourceVideoSegment:[119.5,223.5],
   sourceTimeline,shapeSchedule:[[0,6]],waves,partOrder,
   sourceEventCount:SOURCE_EVENTS.length,preSourcePartCount:PARTS_PRE.length,
-  post60PartCount:PARTS_POST.length,playerSpeedReference:ANGULAR_SPEED};
+  boundarySourcePartCount:1,post60PartCount:PARTS_POST.length,
+  playerSpeedReference:ANGULAR_SPEED};
 }
 class HexagonerGame extends E.Game{
  constructor(data=create()){
@@ -260,7 +273,7 @@ class HexagonerGame extends E.Game{
    shapeBands(w).map(([start,end],band)=>({
     id:w.id+':'+sector+':'+band,waveId:w.id,sector,sides:6,band,
     special:w.special,r:w.r,
-    radialOffset:w.thickness*start+(w.special==='staircase'?((sector+w.id)%3-1)*5:0),
+    radialOffset:w.thickness*start+(w.special==='staircase'?((sector+w.sourceEventId)%3-1)*5:0),
     thickness:w.thickness*(end-start),
     points:[[0,0],[0,0],[0,0],[0,0]]
    }))
@@ -371,7 +384,7 @@ function audioShakeAt(audioSeconds,pulse,enabled=true){
  return [dir*3.8*kick,(beat%3===0?1:-1)*2.6*kick];
 }
 const API={HexagonerGame,create,palette,cameraAt,beatScale,sourceAngle,audioShakeAt,SPEED,ANGULAR_SPEED,
- PARTS_PRE,PARTS_POST,SOURCE_EVENTS,SPECIAL_PARTS,shapeBands,RECOVERY,VIDEO_START:D.VIDEO_START};
+ PARTS_PRE,PARTS_POST,BOUNDARY_PART,SOURCE_EVENTS,SPECIAL_PARTS,shapeBands,RECOVERY,VIDEO_START:D.VIDEO_START};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHexagonerVideo8=API;
 })(typeof window!=='undefined'?window:globalThis);
