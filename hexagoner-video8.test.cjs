@@ -1,33 +1,33 @@
 'use strict';
 /* Node regression for HEXAGONER tasks 3,4 only.
  * Run: node hexagoner-video8.test.cjs
- * 1557(8).mp4 sampled at 480x300, 10fps. Values approximate.
+ * 1557(10).mp4 sampled at 576x360, 20fps. Values approximate.
  */
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const H=require('./hexagoner-video8');
-const D=require('./hexagoner-video8-data');
+const D=require('./hexagoner-video10-data');
 const E=require('./engine');
-assert.equal(D.EVENTS.length,134);
-assert.equal(D.EVENTS.filter(e=>e.time<60).length,70);
-assert.equal(D.EVENTS.filter(e=>e.time>=60).length,64);
-assert.equal(H.PARTS_PRE.length,14);
-assert.equal(H.PARTS_POST.length,9);
-assert.equal(H.PARTS_PRE.flatMap(p=>p.events).length,67);
-assert.equal(H.PARTS_POST.flatMap(p=>p.events).length,56);
-assert.equal(H.PARTS_POST.flatMap(p=>p.events).filter(e=>e.sourceLaneCorrection).length+
- H.BOUNDARY_PART.events.filter(e=>e.sourceLaneCorrection).length,2);
-assert.equal(H.BOUNDARY_PART.events.length,11);
-assert.equal(H.BOUNDARY_PART.sourceStart,58.3);
-assert.equal(H.BOUNDARY_PART.sourceEnd,65.6);
+assert.equal(D.EVENTS.length,148);
+assert.equal(D.EVENTS.filter(e=>e.time<60).length,79);
+assert.equal(D.EVENTS.filter(e=>e.time>=60).length,69);
+assert.equal(H.PARTS_PRE.length,13);
+assert.equal(H.PARTS_POST.length,10);
+assert.equal(H.PARTS_PRE.flatMap(p=>p.events).length,73);
+assert.equal(H.PARTS_POST.flatMap(p=>p.events).length,60);
+assert.equal(D.PHASE_CENTI.length,1037);
+assert.equal(D.ZOOM_100.length,110);
+assert.equal(H.BOUNDARY_PART.events.length,15);
+assert.equal(H.BOUNDARY_PART.sourceStart,56.2);
+assert.equal(H.BOUNDARY_PART.sourceEnd,65.94);
 assert.equal(H.ANGULAR_SPEED,8*Math.PI/180*60);
 const video=H.create(null,111,115,{order:'video'});
-assert.equal(video.waves.length,134,'all reference crossing events survive in video mode');
+assert.equal(video.waves.length,148,'all new reference crossing cues survive in video mode');
 assert.equal(video.orderMode,'video');
 assert.deepEqual(video.waves.map(w=>w.sourceGameSecond),H.SOURCE_EVENTS.map(e=>e.time));
 assert(video.partOrder.every(p=>p.rotation===0));
 assert.equal(video.partOrder.filter(p=>p.anchored).length,1);
-assert(video.waves.find(w=>w.sourceGameSecond===60.7).start<60);
+assert(video.waves.find(w=>w.sourceGameSecond===60).start<60);
 const left=H.cameraAt(59.93),right=H.cameraAt(60);
 const mag=a=>Math.hypot(a[0],a[1]);
 assert(Math.abs(mag(right)/mag(left)-1)<.10,'world zoom does not jump at 60');
@@ -40,7 +40,7 @@ const index=fs.readFileSync('index.html','utf8');
 assert(script.includes('new HexHexagonerVideo8.HexagonerGame(timeline)'));
 assert(script.includes('if(level===1)return HexHexagonerVideo8.create();'));
 assert(script.includes('game.controlMode===1?(game.visualTurn||0):game.playerLean'));
-assert(index.indexOf('hexagoner-video8-data.js')<index.indexOf('hexagoner-video8.js'));
+assert(index.indexOf('hexagoner-video10-data.js')<index.indexOf('hexagoner-video8.js'));
 const n=144,dt=.05,step=Math.floor(H.ANGULAR_SPEED*dt/(2*Math.PI/n));
 const orders=[];
 for(const seed of [1,2,3,4,5,7,11,2026,12345,81201]){
@@ -82,4 +82,4 @@ for(const seed of [1,2,3,4,5,7,11,2026,12345,81201]){
 }
 assert.notEqual(orders[0],orders[1],'whole dodge parts, not camera, shuffle');
 assert.deepEqual(H.cameraAt(23),H.cameraAt(23),'camera deterministic');
-console.log('PASS: 134 video events, 14+bridge+9 full source phrases, fixed 58.3–65.6 crossing, unrotated shuffles, 10 seeded 0–108s paths');
+console.log('PASS: 148 new video10 events, 13+bridge+10 source phrases, fixed 56.20–65.94 passage, 480deg/s, 10 seeded 0–108s paths');
