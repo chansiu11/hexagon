@@ -82,7 +82,7 @@ function build(g){
  },{impact:60,thickness:42,safe:Math.floor((g.angle%(TAU)+TAU)%(TAU)/STEP)});
  let impact=Math.max(61.72,tail.impact+Math.max(.55,tail.thickness/SPEED+.30));
  const waves=[],order=[];let serial=1000000,bag=[],lastPart=null,last=tail;
- while(impact<previousTimeline.duration-3&&serial<40000){
+ while(impact<previousTimeline.duration-3&&waves.length<40000){
   if(!bag.length)bag=makeBag(random);
   let ix=bag.pop();if(ix===lastPart&&bag.length){bag.unshift(ix);ix=bag.pop()}
   const part=PARTS[ix];
