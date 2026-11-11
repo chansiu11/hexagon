@@ -74,6 +74,43 @@ const SOURCE_EVENTS=D.EVENTS.map(e=>{
   sectors:Object.freeze(videoMaskToWorld(e)),sourceMask:e.screenMask,
   widthPixels:e.widthPx});
 });
+function stabilizePostVideoMasks(raw){
+ // The source screenshot gives screen-relative lanes; camera phase after
+ // 60s is not reliably recoverable at each crossing. Correct ambiguous
+ // adjacent lane jumps ONCE as part of the extracted data, then keep each
+ // corrected source clip fixed through all subsequent randomized replays.
+ let last=null;
+ return raw.map(source=>{
+  const e={...source,sectors:source.sectors.slice()};
+  if(last){
+   const safeChoices=findOpen(e.sectors),previous=last.safe;
+   const nearest=safeChoices.reduce((a,b)=>
+    circularDistance(b,previous)<circularDistance(a,previous)?b:a,safeChoices[0]);
+   const elapsed=e.time-last.time;
+   const movementTime=Math.max(.10,elapsed-last.width/SPEED);
+   const maxShift=Math.max(1,Math.floor(movementTime*ANGULAR_SPEED/SECTOR+.05));
+   if(circularDistance(nearest,previous)>maxShift){
+    let best=null;
+    for(let shift=1;shift<6;shift++){
+     const shifted=e.sectors.map(s=>modulo(s+shift,6)).sort((a,b)=>a-b);
+     const opens=findOpen(shifted);
+     const distance=Math.min(...opens.map(s=>circularDistance(s,previous)));
+     const score=distance*100+Math.min(shift,6-shift)*3+shift*.01;
+     if(!best||score<best.score)best={shift,shifted,score};
+    }
+    if(best&&Math.min(...findOpen(best.shifted).map(s=>
+       circularDistance(s,previous)))<=maxShift){
+     e.sectors=best.shifted;e.sourceLaneCorrection=best.shift;
+    }
+   }
+  }
+  const choices=findOpen(e.sectors);
+  const safe=last?choices.reduce((a,b)=>
+   circularDistance(b,last.safe)<circularDistance(a,last.safe)?b:a,choices[0]):choices[0];
+  last={time:e.time,width:e.width,safe};
+  return e;
+ });
+}
 function groupParts(era){
  const candidates=SOURCE_EVENTS.filter(w=>era===0?w.time<60:w.time>=60);
  let chunks=[],buf=[];
@@ -82,12 +119,12 @@ function groupParts(era){
   buf.push(w);
  }
  if(buf.length)chunks.push(buf);
- return chunks.map((chunk,i)=>Object.freeze({
+ return chunks.map((rawChunk,i)=>{const chunk=era===1?stabilizePostVideoMasks(rawChunk):rawChunk;return Object.freeze({
   id:'HX'+(era?4:3)+'-'+String(i+1).padStart(2,'0'),era,
   sourceStart:chunk[0].time,sourceEnd:chunk.at(-1).time,
   sourceVideoStart:chunk[0].videoSecond,sourceVideoEnd:chunk.at(-1).videoSecond,
   events:Object.freeze(chunk.map(e=>Object.freeze({...e,offset:e.time-chunk[0].time})))
- }));
+ });});
 }
 const PARTS_PRE=groupParts(0),PARTS_POST=groupParts(1);
 function randomFrom(seed){let s=(seed^0x7a8c3d91)>>>0;return ()=>{
