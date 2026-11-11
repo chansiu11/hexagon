@@ -106,7 +106,7 @@ function drawBackdrop(game,dark,light,playing){
   ctx.save();ctx.globalAlpha*=opacity;
   for(let i=0;i<sides;i++){
    // Slight angular overlap prevents background seam aliasing at camera zoom.
-   const pad=game?.hexagonerSource8?.0005:0;
+   const pad=game&&game.hexagonerSource8?0.0005:0;
    const a=i*Math.PI*2/sides-pad,b=(i+1)*Math.PI*2/sides+pad;
    polygon([[0,0],[Math.cos(a)*1800,Math.sin(a)*1800],
     [Math.cos(b)*1800,Math.sin(b)*1800]],i%2?dark:light);
