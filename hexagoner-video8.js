@@ -269,8 +269,8 @@ class HexagonerGame extends E.Game{
   this.profile=null;this.fromSides=6;this.sides=6;this.morph=1;
   // Allocate every wall panel and its four collision vertices only once.
   // During physics ticks mutate positions in place, with zero new polygons.
-  this._spawns=data.waves.map(w=>({...w,actors:w.sectors.flatMap(sector=>
-   shapeBands(w).map(([start,end],band)=>({
+  this._spawns=data.waves.map(w=>({...w,actors:shapeBands(w).flatMap(([start,end],band)=>
+   w.sectors.map(sector=>({
     id:w.id+':'+sector+':'+band,waveId:w.id,sector,sides:6,band,
     special:w.special,r:w.r,
     radialOffset:w.thickness*start+(w.special==='staircase'?((sector+w.sourceEventId)%3-1)*5:0),
