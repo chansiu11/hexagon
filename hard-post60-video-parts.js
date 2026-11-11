@@ -80,6 +80,35 @@ const PARTS=PACKED.map((row,i)=>{
   events:Object.freeze(events)
  });
 });
+// A connected dodge run continues across brief occlusions even when the
+// raw color-band detector split it into small snippets. Rejoin adjacent
+// source snippets of the SAME original polygon shape. Exactly ten complete
+// dodge phrases remain, corresponding to the ten source shape intervals.
+const COMPLETE_PARTS=[];
+for(const part of PARTS){
+ const last=COMPLETE_PARTS.at(-1);
+ if(last&&last.sides===part.sides){
+  const offset=part.originalStart-last.originalStart;
+  last.fragments.push(part.id);
+  for(const e of part.events)last.events.push(Object.freeze({
+   ...e,offset:e.offset+offset
+  }));
+  last.length=last.events.at(-1).offset;
+  last.sourceVideoEnd=part.sourceVideoEnd;
+ }else{
+  COMPLETE_PARTS.push({
+   id:'H2-C'+String(COMPLETE_PARTS.length+1).padStart(2,'0'),
+   originalOrder:COMPLETE_PARTS.length,fragments:[part.id],
+   sides:part.sides,originalStart:part.originalStart,
+   sourceVideoStart:part.sourceVideoStart,sourceVideoEnd:part.sourceVideoEnd,
+   length:part.length,events:part.events.slice()
+  });
+ }
+}
+for(const part of COMPLETE_PARTS){
+ Object.freeze(part.fragments);Object.freeze(part.events);Object.freeze(part);
+}
+Object.freeze(COMPLETE_PARTS);
 const ORIGINAL_SEQUENCE=Object.freeze(PARTS.flatMap(part=>part.events.map(e=>({
  partId:part.id,videoSeconds:e.sourceVideoSeconds,
  gameSeconds:e.sourceGameSeconds,
@@ -88,7 +117,7 @@ const ORIGINAL_SEQUENCE=Object.freeze(PARTS.flatMap(part=>part.events.map(e=>({
  sides:part.sides,
  width:e.width
 }))).sort((a,b)=>a.videoSeconds-b.videoSeconds));
-const API=Object.freeze({PARTS,ORIGINAL_SEQUENCE,CAMERA,referenceSpin,
+const API=Object.freeze({PARTS,COMPLETE_PARTS,ORIGINAL_SEQUENCE,CAMERA,referenceSpin,
  VIDEO_ZERO,CLOCK_RATE,SOURCE:'1557(7).mp4 01:01.7–01:53.9',
  CLIP_COUNT:PARTS.length,EVENT_COUNT:ORIGINAL_SEQUENCE.length});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
