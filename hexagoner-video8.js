@@ -14,7 +14,7 @@ const TAU=Math.PI*2,SECTOR=TAU/6,SPEED=355,SPAWN=1100,RECOVERY=1.0;
 const SECTOR_UNITS=Array.from({length:7},(_,i)=>[Math.cos(i*SECTOR),Math.sin(i*SECTOR)]);
 const modulo=(n,m)=>(n%m+m)%m;
 const circularDistance=(a,b)=>Math.min(modulo(a-b,6),modulo(b-a,6));
-const ANGULAR_SPEED=7*TAU/360*60; // documented 7° per 60Hz tick for this mode.
+const ANGULAR_SPEED=8*TAU/360*60; // between HEXAGON 7° and HEXAGONEST 9° per 60Hz tick.
 function keyAt(keys,t){
  if(t<=keys[0][0])return keys[0][1];
  for(let i=1;i<keys.length;i++)if(t<=keys[i][0]){
