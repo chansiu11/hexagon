@@ -105,7 +105,9 @@ function drawBackdrop(game,dark,light,playing){
  const paint=(sides,opacity)=>{
   ctx.save();ctx.globalAlpha*=opacity;
   for(let i=0;i<sides;i++){
-   const a=i*Math.PI*2/sides,b=(i+1)*Math.PI*2/sides;
+   // Slight angular overlap prevents background seam aliasing at camera zoom.
+   const pad=game?.hexagonerSource8?.0005:0;
+   const a=i*Math.PI*2/sides-pad,b=(i+1)*Math.PI*2/sides+pad;
    polygon([[0,0],[Math.cos(a)*1800,Math.sin(a)*1800],
     [Math.cos(b)*1800,Math.sin(b)*1800]],i%2?dark:light);
   }
@@ -413,6 +415,36 @@ function drawHexagonestWalls(walls,color){
 }
 
 function drawWallField(walls,color,game){
+ if(game.hexagonerSource8){
+  // One contour for adjacent HEXAGONER sectors: the same actor.points
+  // are shared by collision and drawing, without antialias edge cracks.
+  ctx.fillStyle=color;
+  for(let i=0;i<walls.length;){
+   let end=i+1;
+   while(end<walls.length&&walls[end].waveId===walls[i].waveId&&
+    walls[end].band===walls[i].band&&walls[end].thickness===walls[i].thickness)end++;
+   let panels=walls.slice(i,end);
+   // A wall spanning sectors 5→0 should also be one contour.
+   if(panels.length>1&&panels[0].sector===0&&panels.at(-1).sector===5){
+    for(let j=0;j<panels.length-1;j++)if(panels[j+1].sector!==panels[j].sector+1){
+     panels=panels.slice(j+1).concat(panels.slice(0,j+1));break;
+    }
+   }
+   for(let j=0;j<panels.length;){
+    let k=j+1;
+    while(k<panels.length&&panels[k].r===panels[k-1].r&&
+     panels[k].thickness===panels[k-1].thickness&&
+     panels[k].sector===(panels[k-1].sector+1)%6)k++;
+    ctx.beginPath();ctx.moveTo(...panels[j].points[0]);
+    for(let n=j;n<k;n++)ctx.lineTo(...panels[n].points[1]);
+    ctx.lineTo(...panels[k-1].points[2]);
+    for(let n=k-1;n>=j;n--)ctx.lineTo(...panels[n].points[3]);
+    ctx.closePath();ctx.fill();j=k;
+   }
+   i=end;
+  }
+  return;
+ }
  if(game.hexagonestMode){drawHexagonestWalls(walls,color);return}
  if(game.level===6||game.hardMode){
   // Draw each connected run as one contour. Collision uses the convex
