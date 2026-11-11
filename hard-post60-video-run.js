@@ -100,7 +100,7 @@ function build(g,cameraEvents){
   return choices.length?choices[Math.floor(random()*choices.length)]:slot;
  }
  function rotationFor(clip,cycle){
-  if(cycle===0&&order.length===0)return 0;
+  if(cycle===0)return 0; // keep every source-video clip's native orientation on first replay
   const n=clip.sides,candidates=[];
   let best=Infinity;
   for(let offset=0;offset<n;offset++){
