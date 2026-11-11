@@ -1,58 +1,92 @@
 'use strict';
-/* node hexagoner-camera-smooth.test.cjs
- * Regression for task-3/4 arena/background smoothness only. The original
- * 15Hz measured camera poses remain reference anchor points, while rendering
- * can now interpolate at 60, 90 or 120Hz independent of the player's orbit.
+/* Task 3/4 only. Run: node hexagoner-camera-smooth.test.cjs
+ * Reference video 1557(8).mp4, 119–224s:
+ * bass onsets ~0.445s apart; ring radius +10% on kick and -9% at +0.2s.
+ * New camera must be a uniform rotation + music-onset zoom, not a shear.
  */
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const H=require('./hexagoner-video8');
-const Profiles=require('./stage-profiles');
 const E=require('./engine');
-const camera=Profiles[1].camera;
-const matDiff=(a,b)=>Math.hypot(...a.slice(0,4).map((v,i)=>v-b[i]));
-assert.equal(E.ORIGINAL_ARROW_DEGREES_PER_TICK[1],7,'character rotation speed unchanged');
-const script=fs.readFileSync('play.js','utf8');
-assert(script.includes('HexHexagonerVideo8.cameraAt(game.time)'),
- 'render-time camera must not be capped by cached 60fps physics camera');
-assert(script.includes('game.controlMode===1?(game.visualTurn||0):game.playerLean'),
- 'character lean display unchanged');
-assert(script.includes('audioShakeAt(music.position,music.pulse,musicReady)'),
- 'music beat shake preserved');
-assert(script.includes('game.dead?(game.deathCamera?.affine||game.recordedCamera)'),
- 'camera motion must stop on death');
-assert(script.includes('game.hexagonerSource8&&!launch?'),
- 'camera fix must be limited to HEXAGONER only');
-// Every keyframe must agree with the original source orientation and shear
-// after the separately measured video-game zoom multiplier is applied.
-for(let j=0;j<Math.min(camera.frames.length,899);j++){
- const t=camera.start+j/camera.sampleRate;
- if(t>=60)break;
- const original=camera.frames[j],actual=H.cameraAt(t);
- const length=Math.hypot(original[0],original[1])||1;
- const reconstructed=[...actual.slice(0,4)].map(v=>v*(length/Math.hypot(actual[0],actual[1])));
- assert(matDiff(reconstructed,original)<1e-7,
-  'original video source keyframe orientation/shear must be preserved');
+const matrixGap=(a,b)=>Math.hypot(...a.slice(0,4).map((v,i)=>v-b[i]));
+assert.equal(E.ORIGINAL_ARROW_DEGREES_PER_TICK[1],7);
+assert.equal(H.ANGULAR_SPEED,420*Math.PI/180);
+assert(H.beatScale(0)>1.10);
+assert(H.beatScale(.2)<.91);
+assert(H.beatScale(.445)>1.09);
+assert.equal(H.beatScale(Infinity),1);
+for(let t=0;t<109;t+=.013){
+ const m=H.cameraAt(t);
+ const x=Math.hypot(m[0],m[1]),y=Math.hypot(m[2],m[3]);
+ assert(m.every(Number.isFinite));
+ assert(Math.abs(x-y)<1e-9,'no uneven stretching');
+ assert(Math.abs(m[0]*m[2]+m[1]*m[3])<1e-9,'no perspective skew/tilt');
+ assert.equal(m[4],0);assert.equal(m[5],0);
 }
-let peak=0;
-for(let t=0;t<59.99;t+=1/120){
- const a=H.cameraAt(t),b=H.cameraAt(t+1/120);
- assert(a.every(Number.isFinite)&&b.every(Number.isFinite));
- peak=Math.max(peak,matDiff(a,b));
+assert(matrixGap(H.cameraAt(59.999),H.cameraAt(60))<.02,
+ 'camera has no 60-second discontinuity');
+let maxJump=0;
+for(let t=0;t<59.99;t+=1/120)
+ maxJump=Math.max(maxJump,matrixGap(H.cameraAt(t),H.cameraAt(t+1/120)));
+assert(maxJump<.07,'camera motion is smooth at 120fps');
+const play=fs.readFileSync('play.js','utf8');
+assert(play.includes('HexHexagonerVideo8.cameraAt(game.time,settings.sound&&music.active'),
+ 'real audio onset drives camera zoom');
+assert(play.includes('music.context.currentTime-music.lastHit'),
+ 'no synthetic BPM timebase');
+assert(play.includes('game.controlMode===1?(game.visualTurn||0):game.playerLean'),
+ 'visual triangle steering unchanged');
+assert(play.includes('audioShakeAt(music.position,music.pulse,musicReady)'),
+ 'short music-hit screen shake still active');
+assert(play.includes('game.dead?(game.deathCamera?.affine||game.recordedCamera)'),
+ 'death camera frozen');
+const special=H.SPECIAL_PARTS;
+assert(special['HX3-08']==='staircase'&&special['HX3-14']==='double-rail');
+assert(special['HX4-02']==='double-rail'&&special['HX4-04']==='comb');
+const delta=2*Math.PI/6;
+function fixture(){
+ const game=new H.HexagonerGame(H.create(null,318,112));
+ const wall={id:'test',sector:0,sides:6,r:48,thickness:62};
+ wall.points=E.wallVisualPoly(wall);
+ game.walls=[wall];game.sampleWalls=()=>{};
+ return {game,wall};
 }
-assert(peak<.07,'no 15Hz wall/background orientation snap visible at 120fps: '+peak);
-assert(matDiff(H.cameraAt(15.51),H.cameraAt(15.5183333333))>1e-5,
- 'the pre-60 camera should move at sub-60fps intervals');
-assert(matDiff(H.cameraAt(82.005),H.cameraAt(82.0133333333))>1e-5,
- 'post-60 camera should move at sub-60fps intervals');
-assert.deepEqual(H.audioShakeAt(42,0,true),[0,0]);
-assert.deepEqual(H.audioShakeAt(42,.9,false),[0,0]);
-assert(H.audioShakeAt(42,.9,true).some(v=>v!==0));
-for(const seed of [1,7,2026]){
- const game=new H.HexagonerGame(H.create(null,seed,112));
- for(let t=0;t<108;t+=.14){
-  game.time=t;game.sampleWalls();
-  assert(game.walls.every(w=>w.points.every(p=>p.every(Number.isFinite))));
+{
+ const {game}=fixture();game.angle=2*Math.PI-.008;
+ game.update(1/240,1);
+ assert(!game.dead,'side contact must clip the orbit rather than kill');
+ assert(game.angle>=2*Math.PI-.008&&game.angle<2*Math.PI);
+ assert(!game.hit(),'clipped position is not inside a wall');
+}
+{
+ const {game,wall}=fixture();game.angle=delta*.5;wall.r=68;
+ wall.points=E.wallVisualPoly(wall);
+ game.sampleWalls=()=>{wall.r=64;wall.points=E.wallVisualPoly(wall)};
+ game.update(1/240,0);
+ assert(game.dead&&game.deathCamera,'wall advancing into player kills');
+}
+{
+ const {game}=fixture();game.setControlMode(2);game.angle=delta*5.5;
+ assert(game.stepSector(1)&&game.dead&&game.deathCamera);
+}
+{
+ const {game}=fixture();game.setControlMode(3);game.angle=delta*5.5;
+ assert(game.selectSector(0)&&game.dead&&game.deathCamera);
+}
+// Render and collision must use the same preallocated wall quads,
+// including stair offsets, striped comb layers, and double rails.
+for(const seed of [1,7,2026,81201]){
+ const g=new H.HexagonerGame(H.create(null,seed,116));let specials=0;
+ for(let t=0;t<108;t+=.13){
+  g.time=t;g.sampleWalls();
+  for(const w of g.walls){
+   if(w.special)specials++;
+   const poly=E.wallVisualPoly(w);
+   for(let i=0;i<4;i++)for(let xy=0;xy<2;xy++)
+    assert(Math.abs(poly[i][xy]-w.points[i][xy])<1e-7,
+     'special wall drawing and hitbox use identical vertices');
+  }
  }
+ assert(specials>0,'random play must include video-derived special walls');
 }
-console.log('PASS HEXAGONER smooth camera: original keyframes retained, 120fps smooth arena, beat shake/death freeze, player controls and wall geometry unaffected; peak subframe change '+peak.toFixed(5));
+console.log('PASS: camera orthogonal + song-pulse zoom, task 3/4 special walls, source-speed 420deg/s, stage 1/5-like side collision, beat shake and controls');
