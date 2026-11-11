@@ -7,13 +7,6 @@ const M=typeof module!=='undefined'?require('./mixed-transition'):root.HexMixedT
 const MOTION=typeof module!=='undefined'?require('./hard-motion'):root.HexHardMotion;
 const VIDEO=typeof module!=='undefined'?require('./hard-video-parts'):root.HexHardVideoParts;
 const TAU=Math.PI*2,MORPH=.18;
-const MORPH_RECHECK=.085;
-// The wall clock freezes during morph; after it resumes, old wall rings
-// should still have time to clear the player's changing polygonal lane.
-const MORPH_SAFETY_SAMPLES=Object.freeze([
- ...Array.from({length:13},(_,i)=>[i/12,0]),
- [1,.12],[1,.26],[1,.38],[1,.5],[1,.63]
-]);
 function rng(seed){let s=seed>>>0;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=Math.imul(s^s>>>15,1|s);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
 function seedNow(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){root.crypto.getRandomValues(a);return a[0]}return (Date.now()^Math.random()*0xffffffff)>>>0}
 const delta=(a,b)=>(b-a+Math.PI*3)%TAU-Math.PI;
@@ -107,10 +100,14 @@ function create(seed=seedNow(),duration=3600){
       impact=Math.max(impact,realTimeAtClock(clock(clear+travel)+(73/.60-66+innerExtra)/speed,schedule));
      }
     }
+    // Shape transitions keep their original source timing. Never let a
+    // spawned ring reach or remain on the player's orbit during morph.
+    // Reschedule the future ring BEFORE birth, not a visible wall or player.
     for(const [a]of schedule.slice(1)){
-     if(a<impact-2)continue;if(a>impact+2)break;
-     const after=realTimeAtClock(clock(a+MORPH+.18+.10)+(73/.60-66+innerExtra)/speed,schedule);
-     if(impact>=a-(66+thickness+outerExtra-59)/speed-.12&&impact<after)impact=after;
+     if(a<impact-2.5)continue;if(a>impact+2.5)break;
+     const earliest=a-(thickness+outerExtra)/speed-.35;
+     const latest=a+MORPH+.18+.60;
+     if(impact>=earliest&&impact<latest)impact=latest;
     }
     if(Math.abs(impact-before)<1e-9)break;
    }
@@ -148,74 +145,8 @@ function create(seed=seedNow(),duration=3600){
 }
 class HardGame extends E.Game{
  constructor(data=create()){
-  super(0);this.hardMode=true;
-  // Postponing a shape boundary is attempt-local, never a mutation of the
-  // shared video-derived source library or the next attempt's schedule.
-  this.timeline={...data,shapeSchedule:data.shapeSchedule.map(e=>e.slice())};
-  this._shapeGateReleasedIndex=0;this.shapeMorphDelays=0;
-  this.profile=null;this._actors=data.waves.map(w=>({...w,actors:w.sectors.flatMap(s=>M.panels(w.sides,s).map(([a,b],i)=>({id:w.id+':'+s+':'+i,waveId:w.id,band:'main',sector:s,sides:w.sides,thickness:w.profiles?.[s]?.thickness??w.thickness,offset:w.profiles?.[s]?.offset||0,mixedStart:a,mixedEnd:b,hardPanel:true,renderPoly:[[0,0],[0,0],[0,0],[0,0]]})))}));
+  super(0);this.hardMode=true;this.timeline=data;this.profile=null;this._actors=data.waves.map(w=>({...w,actors:w.sectors.flatMap(s=>M.panels(w.sides,s).map(([a,b],i)=>({id:w.id+':'+s+':'+i,waveId:w.id,band:'main',sector:s,sides:w.sides,thickness:w.profiles?.[s]?.thickness??w.thickness,offset:w.profiles?.[s]?.offset||0,mixedStart:a,mixedEnd:b,hardPanel:true,renderPoly:[[0,0],[0,0],[0,0],[0,0]]})))}));
   this._actors.sort((a,b)=>a.start-b.start);this._cursor=0;this._active=[];this._lastClock=-Infinity;this.sampleWalls();
- }
- // Preview the player's actual path through 6/5/4 polygon changes.
- // Use the very same morph tracks, wall-panel geometry and radial hit point
- // as the live 240Hz simulation, including the early wall approach afterwards.
- morphThreatensCurrentLane(eventIndex){
-  const schedule=this.timeline.shapeSchedule,entry=schedule[eventIndex];
-  const from=schedule[eventIndex-1][1],to=entry[1];
-  const clock=wallClock(entry[0],schedule);
-  const track=M.trackAtAngle(from,to,0,this.angle);
-  let targetTrack=track;
-  if(this.controlMode!==1){
-   const endAngle=M.angleAt(to,to,1,track);
-   const sector=Math.floor(E.wrap(endAngle)/TAU*to);
-   targetTrack=M.sectorT(to,sector);
-  }
-  for(const [progress,advance] of MORPH_SAFETY_SAMPLES){
-   const u=progress*progress*(3-2*progress);
-   const ride=track+(targetTrack-track)*u;
-   const angle=M.angleAt(from,to,progress,ride);
-   const hitPoint=E.playerHitPoint(angle),futureClock=clock+advance;
-   for(const wave of this._actors){
-    if(wave.start>futureClock+1e-8)break;
-    if(wave.end<=futureClock)continue;
-    const r=wave.r-wave.speed*(futureClock-wave.start);
-    if(r>210||r+wave.thickness<25)continue;
-    for(const panel of wave.actors){
-     const inner=Math.max(0,r+panel.offset);
-     const outer=Math.max(inner,inner+panel.thickness);
-     if(inner>130||outer<26)continue;
-     const a=M.pointAt(from,to,progress,panel.mixedStart);
-     const b=M.pointAt(from,to,progress,panel.mixedEnd);
-     if(E.pointInPolygon(hitPoint,[
-      [a[0]*inner,a[1]*inner],[b[0]*inner,b[1]*inner],
-      [b[0]*outer,b[1]*outer],[a[0]*outer,a[1]*outer]
-     ]))return true;
-    }
-   }
-  }
-  return false;
- }
- postponeUnsafeMorph(nextTime){
-  // Level 2 (HEXAGONEST) inherits the class; it must remain untouched.
-  if(this.level!==0)return false;
-  const schedule=this.timeline?.shapeSchedule;
-  if(!schedule)return false;
-  for(let i=this._shapeGateReleasedIndex+1;i<schedule.length;i++){
-   const entry=schedule[i];
-   if(entry[0]>nextTime+1e-8)break;
-   if(entry[0]<this.time-1e-8){this._shapeGateReleasedIndex=i;continue}
-   if(entry[1]===schedule[i-1][1]){this._shapeGateReleasedIndex=i;continue}
-   if(!this.morphThreatensCurrentLane(i)){this._shapeGateReleasedIndex=i;return false}
-   // Keep wall locations continuous: slide this shape boundary and later
-   // boundaries together, never teleport/hide/replace an approaching wall.
-   const target=Math.max(entry[0],nextTime)+MORPH_RECHECK;
-   const delay=target-entry[0];
-   if(entry.originalAt===undefined)entry.originalAt=entry[0];
-   for(let k=i;k<schedule.length;k++)schedule[k][0]+=delay;
-   this.shapeMorphDelays+=delay;
-   return true;
-  }
-  return false;
  }
  get targetSides(){return shapeAt(this.time,this.timeline.shapeSchedule).to}
  sectorAngle(s,sides=this.sides){return E.wrap(M.angleAt(this.fromSides,this.sides,this.morph,M.sectorT(sides,s)))}
@@ -264,7 +195,6 @@ class HardGame extends E.Game{
     if(!this.hit(to))this.angle=to;else{let lo=0,hi=1;for(let k=0;k<12;k++){const u=(lo+hi)/2;if(this.hit(E.wrap(from+input*this.playerSpeed*h*u)))hi=u;else lo=u}this.angle=E.wrap(from+input*this.playerSpeed*h*lo)}
    }
    const track=M.trackAtAngle(this.fromSides,this.sides,this.morph,this.angle),oldTo=this.sides,oldProgress=this.morph;
-   this.postponeUnsafeMorph(this.time+clockStep);
    this.time=Math.min(this.time+clockStep,this.timeline.duration);this.sampleWalls();
    if(this.morph!==oldProgress||this.sides!==oldTo){
     if(this.controlMode===1)this.angle=E.wrap(M.angleAt(this.fromSides,this.sides,this.morph,track));
