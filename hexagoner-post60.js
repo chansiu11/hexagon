@@ -135,10 +135,18 @@ class HexagonerGame extends BASE.HexagonerGame{
  }
  update(dt,input=0){
   if(this.dead||this.timelineEnded)return;
-  // Allow the original game to carry the pre-60 actors through the boundary;
-  // never delete actors that have already spawned.
+  if(!this._stage4Active&&this.time<START&&this.time+dt>=START){
+   // Split the frame exactly at the 60-second boundary: no new pre-60
+   // source parts can spawn after the cutoff, but visible walls survive.
+   const before=Math.max(0,START-this.time);
+   if(before>0)super.update(before,input);
+   if(!this.dead&&!this.timelineEnded)build(this);
+   const after=dt-before;
+   if(after>0&&!this.dead&&!this.timelineEnded)super.update(after,input);
+   return;
+  }
+  if(!this._stage4Active&&this.time>=START)build(this);
   super.update(dt,input);
-  if(this.time>=START&&!this._stage4Active&&!this.dead)build(this);
  }
 }
 const API={HexagonerGame,PARTS,CAMERA,HUES,palette,cameraAt,build};
