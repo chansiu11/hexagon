@@ -1,6 +1,6 @@
-/* HEXAGONER 0–60 / 60+ reconstruction from 1557(8).mp4.
+/* HEXAGONER 0–60 / 60+ reconstruction from 1557(10).mp4.
  * Strictly level 1 (tasks 3 & 4). Other stages and storage are untouched.
- * 134 video-derived approximate wall crossings grouped as continuous dodge
+ * 148 video-derived approximate wall crossings grouped as continuous dodge
  * parts. Only whole-part ORDER and a constant whole-part orientation change.
  * Internal mask/width/source offset are immutable. Video-time color and
  * camera matrices have no random inputs. No video/audio redistributed.
@@ -9,8 +9,8 @@
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const REF=typeof module!=='undefined'?require('./stage-profiles'):root.StageProfiles;
 const P=typeof module!=='undefined'?require('./hexagoner-post60'):root.HexHexagonerPost60;
-const D=typeof module!=='undefined'?require('./hexagoner-video8-data'):root.HexHexagonerVideo8Data;
-const TAU=Math.PI*2,SECTOR=TAU/6,SPEED=355,SPAWN=1100,RECOVERY=1.0;
+const D=typeof module!=='undefined'?require('./hexagoner-video10-data'):root.HexHexagonerVideo10Data;
+const TAU=Math.PI*2,SECTOR=TAU/6,SPEED=355,SPAWN=1100,RECOVERY=.90;
 const SECTOR_UNITS=Array.from({length:7},(_,i)=>[Math.cos(i*SECTOR),Math.sin(i*SECTOR)]);
 const modulo=(n,m)=>(n%m+m)%m;
 const circularDistance=(a,b)=>Math.min(modulo(a-b,6),modulo(b-a,6));
@@ -24,8 +24,8 @@ function keyAt(keys,t){
  return keys.at(-1)[1];
 }
 function palette(t){
- return t<60?[keyAt(D.PRE_HUES,t),94,[6,16,63]]:
-  [keyAt(D.POST_HUES,t),88,[96,86,47]];
+ return t<60?[keyAt([[0,150],[5,150],[10,148],[15,135],[20,110],[25,72],[30,48],[35,33],[40,30],[45,36],[50,56],[55,85],[59.5,124]],t),94,[6,16,63]]:
+  [keyAt([[60,233],[62,248],[65,270],[69,300],[73,318],[78,330],[84,331],[90,313],[95,289],[100,258],[104,233],[109,226]],t),88,[96,86,47]];
 }
 function measuredZoom(series,t){
  const frame=Math.max(0,Math.min(series.length-1,t));
@@ -48,24 +48,13 @@ function beatScale(age){
  const fade=age<=.50?1:Math.max(0,1-(age-.50)/.15);
  return 1+.105*fade*Math.cos(TAU*age/.445);
 }
-function sourceAngle(t){
- const c=REF[1].camera,p=Math.max(0,Math.min(c.frames.length-1,(t-c.start)*c.sampleRate));
- const i=Math.floor(p),u=p-i,a=c.frames[i],b=c.frames[Math.min(i+1,c.frames.length-1)];
- const theta0=Math.atan2(a[1],a[0]),theta1=Math.atan2(b[1],b[0]);
- const delta=modulo(theta1-theta0+Math.PI,TAU)-Math.PI;
- return theta0+delta*u;
-}
+function sourceAngle(t){return D.angleAt(Math.max(0,t))}
 function cameraAt(t,beatAge=Infinity){
- const tm=Math.max(0,t);
- const angle=tm<60?sourceAngle(tm):
-  sourceAngle(59.9333)+interpolateSpin(P.CAMERA,tm)-interpolateSpin(P.CAMERA,60);
- const preEnd=baselineZoom(D.PRE_ZOOM_100,59.999);
- const u=Math.max(0,Math.min(1,(tm-60)/.7)),e=u*u*(3-2*u);
- const zoom0=tm<60?baselineZoom(D.PRE_ZOOM_100,tm):
-  preEnd*(1-e)+baselineZoom(D.POST_ZOOM_100,tm-60)*e;
- const z=zoom0*beatScale(beatAge),c=Math.cos(angle),sn=Math.sin(angle);
- // Remove shear, squeeze and tilted perspective; keep camera spin only.
- return [c*z,sn*z,-sn*z,c*z,0,0];
+ const tm=Math.max(0,t),end=D.REFERENCE_GAME_END;
+ const measured=Math.min(tm,end),tailRate=D.angleAt(end)-D.angleAt(end-1);
+ const angle=D.angleAt(measured)+(tm>end?(tm-end)*tailRate:0);
+ const zoom=D.zoomAt(measured)*beatScale(beatAge),c=Math.cos(angle),sn=Math.sin(angle);
+ return [c*zoom,sn*zoom,-sn*zoom,c*zoom,0,0];
 }
 function interpolateSpin(keys,t){
  if(t<=keys[0][0])return keys[0][1];
@@ -88,11 +77,11 @@ function videoMaskToWorld(event){
  return lanes.sort((a,b)=>a-b);
 }
 const SOURCE_EVENTS=D.EVENTS.map(e=>{
- const camera=cameraAt(e.time),magnification=Math.hypot(camera[0],camera[1])||1;
- const width=Math.max(22,Math.min(116,Math.round(2*e.widthPx/magnification)));
- return Object.freeze({id:e.id,time:e.time,videoSecond:e.videoSecond,width,
-  sectors:Object.freeze(videoMaskToWorld(e)),sourceMask:e.screenMask,
-  widthPixels:e.widthPx});
+ const sectors=Array.from({length:6},(_,i)=>i).filter(i=>e.worldMask&(1<<i));
+ if(!sectors.length||sectors.length>=6)throw Error('Invalid video10 sector mask '+e.id);
+ return Object.freeze({id:e.id,time:e.time,videoSecond:e.videoSecond,
+  width:e.width,sectors:Object.freeze(sectors),
+  sourceMask:e.worldMask,widthPixels:Math.round(e.width/2)});
 });
 function stabilizePostVideoMasks(raw){
  // The source screenshot gives screen-relative lanes; camera phase after
@@ -139,7 +128,7 @@ function groupParts(era){
   buf.push(w);
  }
  if(buf.length)chunks.push(buf);
- return chunks.map((rawChunk,i)=>{const chunk=era===1?stabilizePostVideoMasks(rawChunk):rawChunk;return Object.freeze({
+ return chunks.map((rawChunk,i)=>{const chunk=rawChunk;return Object.freeze({
   id:'HX'+(era?4:3)+'-'+String(i+1).padStart(2,'0'),era,
   sourceStart:chunk[0].time,sourceEnd:chunk.at(-1).time,
   sourceVideoStart:chunk[0].videoSecond,sourceVideoEnd:chunk.at(-1).videoSecond,
@@ -148,22 +137,26 @@ function groupParts(era){
 }
 // An uninterrupted source dodge spans HUD 60s: 58.3-65.6.
 const PRE_RAW=groupParts(0),POST_RAW=groupParts(1);
-if(POST_RAW[0].sourceStart-PRE_RAW.at(-1).sourceEnd>=RECOVERY)throw Error('No source bridge');
+const POST_BRIDGE=POST_RAW.filter(p=>p.sourceStart<66);
+if(!POST_BRIDGE.length||POST_BRIDGE[0].sourceStart-PRE_RAW.at(-1).sourceEnd>RECOVERY)
+ throw Error('Missing video10 boundary passage');
 const PARTS_PRE=Object.freeze(PRE_RAW.slice(0,-1));
-const PARTS_POST=Object.freeze(POST_RAW.slice(1));
+const PARTS_POST=Object.freeze(POST_RAW.slice(POST_BRIDGE.length));
 const BOUNDARY_PART=Object.freeze({
- id:'HX-60-BRIDGE',era:'bridge',sourceStart:PRE_RAW.at(-1).sourceStart,
- sourceEnd:POST_RAW[0].sourceEnd,sourceVideoStart:PRE_RAW.at(-1).sourceVideoStart,
- sourceVideoEnd:POST_RAW[0].sourceVideoEnd,
- events:Object.freeze([...PRE_RAW.at(-1).events,...POST_RAW[0].events].map(
+ id:'HX-60-BRIDGE',era:'bridge',
+ sourceStart:PRE_RAW.at(-1).sourceStart,sourceEnd:POST_BRIDGE.at(-1).sourceEnd,
+ sourceVideoStart:PRE_RAW.at(-1).sourceVideoStart,
+ sourceVideoEnd:POST_BRIDGE.at(-1).sourceVideoEnd,
+ events:Object.freeze([...PRE_RAW.at(-1).events,...POST_BRIDGE.flatMap(p=>p.events)].map(
   e=>Object.freeze({...e,offset:e.time-PRE_RAW.at(-1).sourceStart})))
 });
 // Reference video shows nested C-shapes, staggered side flanks and narrow
 // parallel rails. Reproduce their radial silhouette within existing source
 // bands rather than inventing extra impassable sectors or collision paths.
 const SPECIAL_PARTS=Object.freeze({
- 'HX3-08':'staircase','HX3-12':'staircase','HX3-14':'double-rail',
- 'HX4-02':'double-rail','HX4-04':'comb','HX4-09':'comb'
+ 'HX3-06':'double-rail','HX3-10':'comb','HX3-11':'comb',
+ 'HX-60-BRIDGE':'staircase','HX4-02':'staircase','HX4-07':'comb',
+ 'HX4-08':'double-rail','HX4-09':'comb'
 });
 function shapeBands(w){
  if(w.special==='double-rail'&&w.thickness>=35)return [[0,.40],[.52,1]];
@@ -242,7 +235,7 @@ function create(sourceTimeline=null,seed=newSeed(),duration=900,options={}){
    const radius=Math.min(SPAWN,66+SPEED*impact),birth=impact-(radius-66)/SPEED;
    const special=j%3!==2&&e.width>=35?SPECIAL_PARTS[part.id]||null:null;
    const w={id:waveId++,group,partId:part.id,special,partEvent:j,
-    sourceEventId:e.id,sourceVideo:'1557(8).mp4',sourceVideoSecond:e.videoSecond,
+    sourceEventId:e.id,sourceVideo:'1557(10).mp4',sourceVideoSecond:e.videoSecond,
     sourceGameSecond:e.time,sourceOffset:e.offset,partRotation:0,
     sourceSectors:e.sectors.slice(),sourceWidthPx:e.widthPixels,sides:6,sectors,
     safeSector:safe,safeAngle:(safe+.5)*SECTOR,impact,r:radius,speed:SPEED,
@@ -257,7 +250,7 @@ function create(sourceTimeline=null,seed=newSeed(),duration=900,options={}){
    anchored:part===BOUNDARY_PART,cycle});
  }
  return {mode:'hexagoner-video8',kind:'hexagoner-video8',seed:seed>>>0,
-  duration,orderMode,source:'1557(8).mp4',sourceVideoSegment:[119.5,223.5],
+  duration,orderMode,source:'1557(10).mp4',sourceVideoSegment:[119.25,223.3],
   sourceTimeline,shapeSchedule:[[0,6]],waves,partOrder,
   sourceEventCount:SOURCE_EVENTS.length,preSourcePartCount:PARTS_PRE.length,
   boundarySourcePartCount:1,post60PartCount:PARTS_POST.length,
