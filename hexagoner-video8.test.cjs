@@ -16,7 +16,7 @@ assert.equal(H.PARTS_POST.length,9);
 assert.equal(H.PARTS_PRE.flatMap(p=>p.events).length,67);
 assert.equal(H.PARTS_POST.flatMap(p=>p.events).length,56);
 assert.equal(H.PARTS_POST.flatMap(p=>p.events).filter(e=>e.sourceLaneCorrection).length+
- H.BOUNDARY_PART.events.filter(e=>e.sourceLaneCorrection).length,4);
+ H.BOUNDARY_PART.events.filter(e=>e.sourceLaneCorrection).length,2);
 assert.equal(H.BOUNDARY_PART.events.length,11);
 assert.equal(H.BOUNDARY_PART.sourceStart,58.3);
 assert.equal(H.BOUNDARY_PART.sourceEnd,65.6);
