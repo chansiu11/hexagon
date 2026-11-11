@@ -33,20 +33,9 @@ const PARTS=RAW.map((v,i)=>({id:'H2-'+String(i+1).padStart(2,'0'),start:v[0],end
 const SHAPES=[[60.45,6],[67.2,5],[72.0,4],[76.8,5],[80.7,4],[85.1,5],[91.2,6],[98.8,5],[104.8,4],[111.4,5]];
 const CAMERA=[[60,1,.02],[64.9,-1,-.38],[69.6,1,.41],[73.1,-1,-.35],[77.6,1,.46],[81.5,-1,-.43],[85.8,1,.31],[90.5,-1,-.36],[94.7,1,.42],[98.8,-1,-.30],[103.7,1,.39],[108.8,-1,-.41],[112.3,1,.28]];
 function appendSchedule(before,events,duration,parse){
- // Task-1 safe morphs can be delayed across 60s. Keep those pending
- // original-pre-60 events instead of dropping the transition mid-change.
- const isShape=Array.isArray(before[0]);
- const copy=before.filter(x=>(Array.isArray(x)?(x.originalAt??x[0]):x.at)<START)
-  .map(x=>Array.isArray(x)?Object.assign(x.slice(),
-   x.originalAt===undefined?{}:{originalAt:x.originalAt}):{...x});
- // When a delayed original transition crosses 60s, start the observed
- // later pattern only after its .18s morph has finished. The whole post-60
- // shape schedule shifts together, retaining the measured relative spacing.
- const last=copy.length?Math.max(...copy.map(x=>Array.isArray(x)?x[0]:x.at)):0;
- const shift=isShape?Math.max(0,last+H.MORPH_SECONDS+.24-events[0][0]):0;
+ const copy=before.filter(x=>(Array.isArray(x)?x[0]:x.at)<START).map(x=>Array.isArray(x)?x.slice():{...x});
  for(let cycle=0;cycle*54<duration-START;cycle++)for(const e of events){
-  const t=e[0]+54*cycle+shift;
-  if(t<duration)copy.push(parse(t,e));
+  const t=e[0]+54*cycle;if(t<duration)copy.push(parse(t,e));
  }
  return copy.sort((a,b)=>(Array.isArray(a)?a[0]:a.at)-(Array.isArray(b)?b[0]:b.at));
 }
@@ -60,6 +49,28 @@ function createContinuation(g){
  // Preserve every actor that was actually born by 60s, even if still far out.
  const old=g._actors.filter(w=>w.start<=limit+1e-9);
  const schedule=appendSchedule(original.shapeSchedule,SHAPES,original.duration,(t,e)=>[t,e[1]]);
+ // Existing task-1 walls remain visible at the 60-second handoff.
+ // Choose the first actual task-2 shape change only after those rings
+ // clear the player's collision orbit. Do this ONCE at setup; no
+ // mid-play movement or teleportation of existing geometry.
+ const firstChanged=schedule.findIndex((e,i)=>i>0&&e[0]>=START&&e[1]!==schedule[i-1][1]);
+ if(firstChanged>=0){
+  const nominal=schedule[firstChanged][0],baseClock=H.wallClock(START,schedule);
+  let proposed=nominal;
+  for(let guard=0;guard<150;guard++){
+   const clock=baseClock+(proposed-START);
+   const danger=old.some(w=>{
+    if(w.start>clock||w.end<=clock)return false;
+    const r=w.r-w.speed*(clock-w.start);
+    if(r>200)return false;
+    return w.actors.some(a=>r+a.offset+a.thickness>=46);
+   });
+   if(!danger)break;
+   proposed+=.06;
+  }
+  const shift=proposed-nominal;
+  if(shift>1e-8)for(let i=firstChanged;i<schedule.length;i++)schedule[i][0]+=shift;
+ }
  const groups=appendSchedule(original.groups,CAMERA,original.duration,(t,e)=>({at:t,rate:e[1],tilt:e[2],post60:true}));
  const prev=old.reduce((a,b)=>b.impact>a.impact?b:a,{impact:60,thickness:50,safeAngle:g.angle});
  let cursor=Math.max(60.45,prev.impact+(prev.thickness+140)/360+.27);
@@ -70,10 +81,26 @@ function createContinuation(g){
  while(cursor<original.duration-4&&serial<18000){
   if(!bag.length)refill();
   let idx=bag.pop();if(idx===recent&&bag.length){bag.unshift(idx);idx=bag.pop()}
-  const p=PARTS[idx],first=cursor;let last=null;
+  const p=PARTS[idx],first=cursor;let last=null,extraLag=0;
   let baseGap=Math.floor(wrap(exitAngle)/TAU*H.shapeAt(first,schedule).to);
   for(let j=0;j<p.events.length;j++){
-   const [offset,turn,mask,width]=p.events[j],impact=first+offset;
+   const [offset,turn,mask,width]=p.events[j];
+   let impact=first+offset+extraLag;
+   // If a wall would cross the collision orbit while the polygon is
+   // morphing, delay it BEFORE birth. Continue the rest of this part
+   // with the same added pause; never pop a wall already on screen.
+   for(let pass=0;pass<25;pass++){
+    const before=impact;
+    for(let i=1;i<schedule.length;i++){
+     const a=schedule[i][0];
+     if(a<impact-2.5)continue;if(a>impact+2.5)break;
+     if(schedule[i][1]===schedule[i-1][1])continue;
+     const earliest=a-width/360-.35,latest=a+H.MORPH_SECONDS+.18+.60;
+     if(impact>=earliest&&impact<latest)impact=latest;
+    }
+    if(impact-before<1e-8)break;
+   }
+   extraLag+=impact-(first+offset+extraLag);
    if(impact>=original.duration)break;
    const sides=H.shapeAt(impact,schedule).to;
    if(j===0)baseGap=Math.floor(wrap(exitAngle)/TAU*sides);
