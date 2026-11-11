@@ -24,7 +24,11 @@ const CORE_ZOOM=[[60,1.06],[62,.95],[64,1.04],[66,.98],[68,1.13],
  [70,.87],[72,1.00],[74,1.05],[76,1.08],[78,1.00],[80,1.09],[82,1.00],
  [84,1.06],[86,1.01],[88,1.09],[90,.93],[92,1.04],[94,.93],[96,.95],
  [98,.82],[100,1.09],[102,.92],[104,1.11],[106,.9],[108,1.0]];
-const API=Object.freeze({EVENTS:Object.freeze(events),PRE_HUES,POST_HUES,CORE_ZOOM,
+// Source video ring-radius median at 480x300, one-second intervals.
+ // Each value is world zoom *100, independent of canvas size.
+ const PRE_ZOOM_100='82,82,111,104,82,84,110,108,79,75,113,113,88,77,84,103,94,77,81,108,94,76,75,100,100,79,77,106,109,91,73,88,95,89,92,92,111,89,79,79,114,95,85,87,95,95,92,93,99,99,95,80,111,112,98,86,93,115,97,77'.split(',').map(Number);
+ const POST_ZOOM_100='77,116,104,88,88,118,118,98,99,113,107,87,89,95,105,106,98,113,111,106,93,107,109,99,101,101,108,104,100,100,115,100,93,90,104,107,93,80,80,111,84,84,106,113,97,92,105,111,99,82'.split(',').map(Number);
+const API=Object.freeze({EVENTS:Object.freeze(events),PRE_HUES,POST_HUES,CORE_ZOOM,PRE_ZOOM_100,POST_ZOOM_100,
  REFERENCE_VIDEO:'1557(8).mp4',VIDEO_START:119.5,VIDEO_FINISH:223.5,
  SAMPLE_FPS:10,WIDTH_REFERENCE_VIEW:[480,300]});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
