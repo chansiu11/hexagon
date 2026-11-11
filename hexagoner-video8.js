@@ -35,12 +35,21 @@ function measuredZoom(series,t){
 function cameraAt(t){
  if(t<60){
   const c=REF[1].camera;
-  const index=Math.max(0,Math.min(c.frames.length-1,Math.floor(Math.max(0,t-c.start)*c.sampleRate+1e-8)));
-  const matrix=c.frames[index].slice(),sourceScale=Math.hypot(matrix[0],matrix[1])||1;
+  // Source camera frames were recorded at 15Hz. Sampling with floor()
+  // made the arena/background snap four times slower than the player's
+  // continuously integrated rotation, particularly on 90/120Hz displays.
+  // Interpolate the measured affine basis (including lean/perspective)
+  // before restoring the independent measured center-ring zoom.
+  const position=Math.max(0,Math.min(c.frames.length-1,
+   (t-c.start)*c.sampleRate));
+  const index=Math.floor(position),u=position-index;
+  const a=c.frames[index],b=c.frames[Math.min(index+1,c.frames.length-1)];
+  const matrix=[0,0,0,0,0,0];
+  for(let k=0;k<4;k++)matrix[k]=a[k]+(b[k]-a[k])*u;
+  const sourceScale=Math.hypot(matrix[0],matrix[1])||1;
   const factor=measuredZoom(D.PRE_ZOOM_100,t)/sourceScale;
   for(let k=0;k<4;k++)matrix[k]*=factor;
-  // Remove video-estimated idle jitter: actual music drives only camera shake.
-  matrix[4]=0;matrix[5]=0;
+  // Idle video-estimated translations stay off: actual music drives kicks.
   return matrix;
  }
  const prior=P.cameraAt(t),base=P.cameraAt(60),before=cameraAt(59.9333);
