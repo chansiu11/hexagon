@@ -32,40 +32,40 @@ function measuredZoom(series,t){
  const k=Math.floor(frame),u=frame-k;
  return (series[k]*(1-u)+series[Math.min(k+1,series.length-1)]*u)/100;
 }
-function cameraAt(t){
- if(t<60){
-  const c=REF[1].camera;
-  // Source camera frames were recorded at 15Hz. Sampling with floor()
-  // made the arena/background snap four times slower than the player's
-  // continuously integrated rotation, particularly on 90/120Hz displays.
-  // Interpolate the measured affine basis (including lean/perspective)
-  // before restoring the independent measured center-ring zoom.
-  const position=Math.max(0,Math.min(c.frames.length-1,
-   (t-c.start)*c.sampleRate));
-  const index=Math.floor(position),u=position-index;
-  const a=c.frames[index],b=c.frames[Math.min(index+1,c.frames.length-1)];
-  const matrix=[0,0,0,0,0,0];
-  for(let k=0;k<4;k++)matrix[k]=a[k]+(b[k]-a[k])*u;
-  const sourceScale=Math.hypot(matrix[0],matrix[1])||1;
-  const factor=measuredZoom(D.PRE_ZOOM_100,t)/sourceScale;
-  for(let k=0;k<4;k++)matrix[k]*=factor;
-  // Idle video-estimated translations stay off: actual music drives kicks.
-  return matrix;
- }
- const prior=P.cameraAt(t),base=P.cameraAt(60),before=cameraAt(59.9333);
- const a0=Math.atan2(base[1],base[0]),a1=Math.atan2(prior[1],prior[0]);
- // Reference camera after 60s has different absolute rotation. Keep the
- // measured 60-second angular continuity and the post-60 reversal timetable.
- let delta=a1-a0;delta=(delta+Math.PI)%(2*Math.PI);if(delta<0)delta+=2*Math.PI;delta-=Math.PI;
- // Beyond 60s the post module provides a phase-unwrapped rotation in CAMERA,
- // rather than relying on atan2's +/-180 wraparound for large turns.
- const thetaTable=P.CAMERA,theta=interpolateSpin(thetaTable,t)-interpolateSpin(thetaTable,60);
- const angle=Math.atan2(before[1],before[0])+theta;
- const zoom=Math.max(.72,Math.min(1.22,measuredZoom(D.POST_ZOOM_100,t-60)));
- const compression=.96+.019*Math.sin(t*.52),shear=.02*Math.sin(t*.71);
- const c=Math.cos(angle),s=Math.sin(angle);
- return [(c+shear*s)*zoom,(s*compression)*zoom,
-  (-s+shear*c)*zoom,(c*compression)*zoom,0,0];
+// The user video has music-bass onsets every ~0.445 video seconds.
+// Its center ring peaks +10% at each kick, dips ~9% after 0.2s.
+// Avoid letting one-second zoom samples invent a different pulse rhythm.
+function baselineZoom(samples,t){
+ const avg=i=>{let total=0,weight=0;for(let k=-2;k<=2;k++){
+  const j=Math.max(0,Math.min(samples.length-1,i+k)),w=3-Math.abs(k);
+  total+=samples[j]*w;weight+=w;
+ }return total/weight/100;};
+ const x=Math.max(0,Math.min(samples.length-1,t)),i=Math.floor(x),f=x-i,u=f*f*(3-2*f);
+ return avg(i)*(1-u)+avg(Math.min(i+1,samples.length-1))*u;
+}
+function beatScale(age){
+ if(!Number.isFinite(age)||age<0||age>.65)return 1;
+ const fade=age<=.50?1:Math.max(0,1-(age-.50)/.15);
+ return 1+.105*fade*Math.cos(TAU*age/.445);
+}
+function sourceAngle(t){
+ const c=REF[1].camera,p=Math.max(0,Math.min(c.frames.length-1,(t-c.start)*c.sampleRate));
+ const i=Math.floor(p),u=p-i,a=c.frames[i],b=c.frames[Math.min(i+1,c.frames.length-1)];
+ const theta0=Math.atan2(a[1],a[0]),theta1=Math.atan2(b[1],b[0]);
+ const delta=modulo(theta1-theta0+Math.PI,TAU)-Math.PI;
+ return theta0+delta*u;
+}
+function cameraAt(t,beatAge=Infinity){
+ const tm=Math.max(0,t);
+ const angle=tm<60?sourceAngle(tm):
+  sourceAngle(59.9333)+interpolateSpin(P.CAMERA,tm)-interpolateSpin(P.CAMERA,60);
+ const preEnd=baselineZoom(D.PRE_ZOOM_100,59.999);
+ const u=Math.max(0,Math.min(1,(tm-60)/.7)),e=u*u*(3-2*u);
+ const zoom0=tm<60?baselineZoom(D.PRE_ZOOM_100,tm):
+  preEnd*(1-e)+baselineZoom(D.POST_ZOOM_100,tm-60)*e;
+ const z=zoom0*beatScale(beatAge),c=Math.cos(angle),sn=Math.sin(angle);
+ // Remove shear, squeeze and tilted perspective; keep camera spin only.
+ return [c*z,sn*z,-sn*z,c*z,0,0];
 }
 function interpolateSpin(keys,t){
  if(t<=keys[0][0])return keys[0][1];
@@ -302,7 +302,7 @@ function audioShakeAt(audioSeconds,pulse,enabled=true){
  const dir=beat%2?1:-1;
  return [dir*3.8*kick,(beat%3===0?1:-1)*2.6*kick];
 }
-const API={HexagonerGame,create,palette,cameraAt,audioShakeAt,SPEED,ANGULAR_SPEED,
+const API={HexagonerGame,create,palette,cameraAt,beatScale,sourceAngle,audioShakeAt,SPEED,ANGULAR_SPEED,
  PARTS_PRE,PARTS_POST,SOURCE_EVENTS,RECOVERY,VIDEO_START:D.VIDEO_START};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHexagonerVideo8=API;
