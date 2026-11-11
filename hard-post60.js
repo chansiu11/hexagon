@@ -33,9 +33,20 @@ const PARTS=RAW.map((v,i)=>({id:'H2-'+String(i+1).padStart(2,'0'),start:v[0],end
 const SHAPES=[[60.45,6],[67.2,5],[72.0,4],[76.8,5],[80.7,4],[85.1,5],[91.2,6],[98.8,5],[104.8,4],[111.4,5]];
 const CAMERA=[[60,1,.02],[64.9,-1,-.38],[69.6,1,.41],[73.1,-1,-.35],[77.6,1,.46],[81.5,-1,-.43],[85.8,1,.31],[90.5,-1,-.36],[94.7,1,.42],[98.8,-1,-.30],[103.7,1,.39],[108.8,-1,-.41],[112.3,1,.28]];
 function appendSchedule(before,events,duration,parse){
- const copy=before.filter(x=>(Array.isArray(x)?x[0]:x.at)<START).map(x=>Array.isArray(x)?x.slice():{...x});
+ // Task-1 safe morphs can be delayed across 60s. Keep those pending
+ // original-pre-60 events instead of dropping the transition mid-change.
+ const isShape=Array.isArray(before[0]);
+ const copy=before.filter(x=>(Array.isArray(x)?(x.originalAt??x[0]):x.at)<START)
+  .map(x=>Array.isArray(x)?Object.assign(x.slice(),
+   x.originalAt===undefined?{}:{originalAt:x.originalAt}):{...x});
+ // When a delayed original transition crosses 60s, start the observed
+ // later pattern only after its .18s morph has finished. The whole post-60
+ // shape schedule shifts together, retaining the measured relative spacing.
+ const last=copy.length?Math.max(...copy.map(x=>Array.isArray(x)?x[0]:x.at)):0;
+ const shift=isShape?Math.max(0,last+H.MORPH_SECONDS+.24-events[0][0]):0;
  for(let cycle=0;cycle*54<duration-START;cycle++)for(const e of events){
-  const t=e[0]+54*cycle;if(t<duration)copy.push(parse(t,e));
+  const t=e[0]+54*cycle+shift;
+  if(t<duration)copy.push(parse(t,e));
  }
  return copy.sort((a,b)=>(Array.isArray(a)?a[0]:a.at)-(Array.isArray(b)?b[0]:b.at));
 }
