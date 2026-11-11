@@ -147,6 +147,18 @@ function groupParts(era){
  });});
 }
 const PARTS_PRE=groupParts(0),PARTS_POST=groupParts(1);
+// Reference video shows nested C-shapes, staggered side flanks and narrow
+// parallel rails. Reproduce their radial silhouette within existing source
+// bands rather than inventing extra impassable sectors or collision paths.
+const SPECIAL_PARTS=Object.freeze({
+ 'HX3-08':'staircase','HX3-12':'staircase','HX3-14':'double-rail',
+ 'HX4-02':'double-rail','HX4-04':'comb','HX4-09':'comb'
+});
+function shapeBands(w){
+ if(w.special==='double-rail'&&w.thickness>=35)return [[0,.40],[.52,1]];
+ if(w.special==='comb'&&w.thickness>=60)return [[0,.23],[.36,.57],[.70,1]];
+ return [[0,1]];
+}
 function randomFrom(seed){let s=(seed^0x7a8c3d91)>>>0;return ()=>{
  s=(s+0x6d2b79f5)>>>0;
  let v=Math.imul(s^s>>>15,1|s);v^=v+Math.imul(v^v>>>7,61|v);
@@ -210,7 +222,8 @@ function create(sourceTimeline=null,seed=newSeed(),duration=900){
     const radius=Math.min(SPAWN,66+SPEED*Math.max(.09,impact-(era?60.06:.03)));
     const birth=impact-(radius-66)/SPEED;
     if(era===1&&birth<60-1e-6)continue;
-    const w={id:waveId++,group:partOrder.length,partId:part.id,
+    const special=(j%3!==2&&event.width>=35)?SPECIAL_PARTS[part.id]||null:null;
+    const w={id:waveId++,group:partOrder.length,partId:part.id,special,
      partEvent:j,sourceVideo:'1557(8).mp4',sourceVideoSecond:event.videoSecond,
      sourceGameSecond:event.time,sourceOffset:event.offset,partRotation:shift,
      sourceSectors:event.sectors.slice(),sourceWidthPx:event.widthPixels,
@@ -220,7 +233,7 @@ function create(sourceTimeline=null,seed=newSeed(),duration=900){
     waves.push(w);lastWave=w;previousSafe=safe;
    }
    if(!lastWave){at+=.20;continue}
-   partOrder.push({id:part.id,era,at:firstImpact,end:lastWave.impact,
+   partOrder.push({id:part.id,era,special:SPECIAL_PARTS[part.id]||null,at:firstImpact,end:lastWave.impact,
     sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
     sourceVideoStart:part.sourceVideoStart,sourceVideoEnd:part.sourceVideoEnd,
     played:part.events.length,rotation:shift,exitSector:previousSafe});
@@ -243,10 +256,15 @@ class HexagonerGame extends E.Game{
   this.profile=null;this.fromSides=6;this.sides=6;this.morph=1;
   // Allocate every wall panel and its four collision vertices only once.
   // During physics ticks mutate positions in place, with zero new polygons.
-  this._spawns=data.waves.map(w=>({...w,actors:w.sectors.map(sector=>({
-   id:w.id+':'+sector,waveId:w.id,sector,sides:6,r:w.r,
-   thickness:w.thickness,points:[[0,0],[0,0],[0,0],[0,0]]
-  }))})).sort((a,b)=>a.start-b.start);
+  this._spawns=data.waves.map(w=>({...w,actors:w.sectors.flatMap(sector=>
+   shapeBands(w).map(([start,end],band)=>({
+    id:w.id+':'+sector+':'+band,waveId:w.id,sector,sides:6,band,
+    special:w.special,r:w.r,
+    radialOffset:w.thickness*start+(w.special==='staircase'?((sector+w.id)%3-1)*5:0),
+    thickness:w.thickness*(end-start),
+    points:[[0,0],[0,0],[0,0],[0,0]]
+   }))
+  )})).sort((a,b)=>a.start-b.start);
   this._active=[];this._cursor=0;this._sampleTime=-Infinity;
   this._lastCameraFrame=-1;
   this.recordedCamera=null;this.referenceCamera=null;this.sampleWalls();
@@ -304,9 +322,9 @@ class HexagonerGame extends E.Game{
   this.walls.length=0;
   for(const wave of this._active){
    const radius=wave.r-wave.speed*(t-wave.start);
-   const inner=Math.max(0,radius),outer=Math.max(inner,radius+wave.thickness);
    for(const w of wave.actors){
-    w.r=radius;
+    w.r=radius+w.radialOffset;
+    const inner=Math.max(0,w.r),outer=Math.max(inner,w.r+w.thickness);
     const a=SECTOR_UNITS[w.sector],b=SECTOR_UNITS[w.sector+1],pts=w.points;
     pts[0][0]=a[0]*inner;pts[0][1]=a[1]*inner;
     pts[1][0]=b[0]*inner;pts[1][1]=b[1]*inner;
@@ -353,7 +371,7 @@ function audioShakeAt(audioSeconds,pulse,enabled=true){
  return [dir*3.8*kick,(beat%3===0?1:-1)*2.6*kick];
 }
 const API={HexagonerGame,create,palette,cameraAt,beatScale,sourceAngle,audioShakeAt,SPEED,ANGULAR_SPEED,
- PARTS_PRE,PARTS_POST,SOURCE_EVENTS,RECOVERY,VIDEO_START:D.VIDEO_START};
+ PARTS_PRE,PARTS_POST,SOURCE_EVENTS,SPECIAL_PARTS,shapeBands,RECOVERY,VIDEO_START:D.VIDEO_START};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHexagonerVideo8=API;
 })(typeof window!=='undefined'?window:globalThis);
