@@ -23,53 +23,84 @@ function seedNow(){let a=new Uint32Array(1);if(root.crypto?.getRandomValues){roo
  return (Date.now()^(Math.random()*0xffffffff))>>>0;}
 const SOURCE_EVENTS=Object.freeze(D.EVENTS.map(e=>Object.freeze({...e,
  sectors:Object.freeze(Array.from({length:SIDES},(_,i)=>i).filter(i=>e.mask&(1<<i)))})));
-function groupParts(list,era,prefix,gap=1.46){let chunks=[],buffer=[];
- for(const e of list){if(buffer.length&&e.time-buffer.at(-1).time>=gap){chunks.push(buffer);buffer=[]}buffer.push(e)}
- if(buffer.length)chunks.push(buffer);
- return Object.freeze(chunks.map((es,i)=>Object.freeze({
-  id:prefix+String(i+1).padStart(2,'0'),era,anchored:false,
-  sourceStart:es[0].time,sourceEnd:es.at(-1).time,
-  sourceVideoStart:es[0].videoSecond,sourceVideoEnd:es.at(-1).videoSecond,
-  events:Object.freeze(es.map(e=>Object.freeze({...e,offset:e.time-es[0].time})))
- })));
+
+/* The VIDEO order is authoritative: group its measured wall cues only
+ * AFTER preserving all 64 original (time, mask, width) triples.
+ * These contiguous source indices were cut at separate dodge phrases.
+ * No wall, direction or timing is edited within a phrase. */
+const PRE_RANGES=[[0,0],[1,3],[4,6],[7,7],[8,10],[11,14],[15,16],
+ [17,18],[19,21],[22,22],[23,26],[27,30],[31,31],[32,35],[36,38]];
+const BRIDGE_RANGE=[39,43];
+const POST_RANGES=[[44,47],[48,51],[52,52],[53,56],[57,57],[58,60],[61,63]];
+function partsFromRanges(ranges,era,prefix){
+ return Object.freeze(ranges.map(([a,b],i)=>{
+  const events=SOURCE_EVENTS.slice(a,b+1);
+  if(events.length!==b-a+1)throw Error('Incomplete video segment');
+  return Object.freeze({
+   id:prefix+String(i+1).padStart(2,'0'),era,anchored:false,
+   sourceStart:events[0].time,sourceEnd:events.at(-1).time,
+   sourceVideoStart:events[0].videoSecond,sourceVideoEnd:events.at(-1).videoSecond,
+   sourceIndices:[a,b],
+   events:Object.freeze(events.map(e=>Object.freeze({...e,offset:e.time-events[0].time})))
+  });
+ }));
 }
-const BRIDGE_FROM=57.55,BRIDGE_UNTIL=62.33;
-const PRE_PARTS=groupParts(SOURCE_EVENTS.filter(e=>e.time<BRIDGE_FROM),9,'H9-');
-const POST_PARTS=groupParts(SOURCE_EVENTS.filter(e=>e.time>BRIDGE_UNTIL),10,'H10-');
-const bridgeEvents=SOURCE_EVENTS.filter(e=>e.time>=BRIDGE_FROM&&e.time<=BRIDGE_UNTIL);
-const BRIDGE=Object.freeze({id:'H9-10-BRIDGE',era:'bridge',anchored:true,
+const PRE_PARTS=partsFromRanges(PRE_RANGES,9,'H9-');
+const POST_PARTS=partsFromRanges(POST_RANGES,10,'H10-');
+const bridgeEvents=SOURCE_EVENTS.slice(BRIDGE_RANGE[0],BRIDGE_RANGE[1]+1);
+const BRIDGE=Object.freeze({
+ id:'H9-10-BRIDGE',era:'bridge',anchored:true,
  sourceStart:bridgeEvents[0].time,sourceEnd:bridgeEvents.at(-1).time,
  sourceVideoStart:bridgeEvents[0].videoSecond,sourceVideoEnd:bridgeEvents.at(-1).videoSecond,
- events:Object.freeze(bridgeEvents.map(e=>Object.freeze({...e,offset:e.time-bridgeEvents[0].time})))});
+ sourceIndices:BRIDGE_RANGE,
+ events:Object.freeze(bridgeEvents.map(e=>Object.freeze({...e,offset:e.time-bridgeEvents[0].time})))
+});
 const ALL_PARTS=Object.freeze([...PRE_PARTS,BRIDGE,...POST_PARTS]);
-const SOURCE_COUNT=ALL_PARTS.reduce((n,p)=>n+p.events.length,0);
-if(SOURCE_COUNT!==64||BRIDGE.events.length!==5)throw Error('Unexpected task9/10 video event inventory');
-function shuffle(items,random,lockFirst=false){const first=lockFirst?items.slice(0,1):[],pool=items.slice(first.length);
- for(let k=pool.length-1;k>0;k--){const j=Math.floor(random()*(k+1));[pool[j],pool[k]]=[pool[k],pool[j]]}
- return [...first,...pool];
+const SOURCE_COUNT=ALL_PARTS.reduce((total,p)=>total+p.events.length,0);
+if(SOURCE_COUNT!==64||BRIDGE.events.length!==5||
+ ALL_PARTS.flatMap(p=>p.events).some((e,i)=>e.id!==i))
+ throw Error('Task 9/10 recorded source must contain each cue once in order');
+function shuffle(parts,random){
+ const arr=parts.slice();
+ for(let k=arr.length-1;k>0;k--){const j=Math.floor(random()*(k+1));[arr[j],arr[k]]=[arr[k],arr[j]];}
+ return arr;
 }
-function arrangeEra(parts,random,video,keepFirst){const picked=video?parts:shuffle(parts,random,keepFirst),result=[];
- let current=parts[0]?.sourceStart||0;
- for(let i=0;i<picked.length;i++){
-  const part=picked[i],slot=parts[i];result.push({part,at:current});
-  const gap=i+1<parts.length?Math.max(.12,parts[i+1].sourceStart-slot.sourceEnd):0;
-  current+=part.sourceEnd-part.sourceStart+gap;
+// Assign every source phrase exactly once into a video-timed slot.
+// Randomized matching respects length constraints; the 60-second
+// phrase never moves or changes. No rotation, reflection or wall edits.
+const PHRASE_GAP=.27;
+function arrangeEra(parts,random,video,endTime,keepFirst){
+ if(video)return parts.map(part=>({part,at:part.sourceStart}));
+ const N=parts.length,capacity=parts.map((p,i)=>
+  (i+1<N?parts[i+1].sourceStart:endTime)-p.sourceStart-PHRASE_GAP);
+ const owner=new Int16Array(N).fill(-1),assigned=new Int16Array(N).fill(-1);
+ if(keepFirst){owner[0]=0;assigned[0]=0;}
+ const slots=shuffle(Array.from({length:N},(_,i)=>i).filter(i=>!keepFirst||i!==0),random)
+  .sort((a,b)=>capacity[a]-capacity[b]);
+ function dfs(slot,seen){
+  const candidates=shuffle(Array.from({length:N},(_,i)=>i).filter(i=>
+   (!keepFirst||i!==0)&&parts[i].sourceEnd-parts[i].sourceStart<=capacity[slot]+1e-8),random)
+   .sort((a,b)=>(owner[a]===-1?0:1)-(owner[b]===-1?0:1));
+  for(const part of candidates){
+   if(seen.has(part))continue;seen.add(part);
+   if(owner[part]===-1||dfs(owner[part],seen)){
+    owner[part]=slot;assigned[slot]=part;return true;
+   }
+  }
+  return false;
  }
- return result;
+ for(const slot of slots)if(!dfs(slot,new Set()))throw Error('No legal whole-phrase assignment');
+ return Array.from(assigned,(ix,i)=>({part:parts[ix],at:parts[i].sourceStart}));
 }
 function arrangement(seed,video){const random=rng(seed);
- return [...arrangeEra(PRE_PARTS,random,video,true),{part:BRIDGE,at:BRIDGE.sourceStart},
- ...arrangeEra(POST_PARTS,random,video,false)];
+ return [...arrangeEra(PRE_PARTS,random,video,BRIDGE.sourceStart,true),
+  {part:BRIDGE,at:BRIDGE.sourceStart},
+  ...arrangeEra(POST_PARTS,random,video,REF_END+.01,false)];
 }
-const SPECIAL=Object.freeze({
- 'H9-05':'double-rail','H9-07':'staircase','H9-09':'comb',
- 'H9-11':'double-rail','H10-01':'double-rail','H10-03':'comb',
- 'H10-05':'staircase'
-});
-function bands(w){if(w.special==='double-rail'&&w.thickness>=50)return [[0,.40],[.57,1]];
- if(w.special==='comb'&&w.thickness>=68)return [[0,.25],[.37,.61],[.75,1]];
- return [[0,1]];
-}
+// Never fabricate comb / triple-strip geometry from a part label.
+// Recorded simultaneous or consecutive source events create visible
+// multi-rail patterns; the original-order comparison uses raw wall quads.
+const SPECIAL=Object.freeze({});
 function wallFrom(e,at,id,group,part){const impact=at+e.offset;
  const radius=Math.min(MAX_RADIUS,ORBIT+SPEED*Math.max(0,impact-.14)),start=impact-(radius-ORBIT)/SPEED;
  return {id,group,partId:part.id,partEvent:part.events.indexOf(e),
@@ -78,7 +109,7 @@ function wallFrom(e,at,id,group,part){const impact=at+e.offset;
   sides:SIDES,sectors:e.sectors.slice(),safeSector:e.sectors.length<SIDES?
    Array.from({length:SIDES},(_,i)=>i).find(i=>!e.sectors.includes(i)):null,
   impact,r:radius,start,speed:SPEED,thickness:e.width,
-  special:SPECIAL[part.id]||null,end:impact+(e.width+ORBIT-25)/SPEED};
+  special:null,end:impact+(e.width+ORBIT-25)/SPEED};
 }
 function assemble(entries,seed,video,duration,extended=false){const waves=[],partOrder=[];
  for(const {part,at} of entries){if(at>=duration)break;
@@ -96,7 +127,8 @@ function assemble(entries,seed,video,duration,extended=false){const waves=[],par
    for(const part of shuffle(POST_PARTS,random)){if(at>=duration)break;
     const group=partOrder.length;let count=0;
     for(const e of part.events){if(at+e.offset>=duration)break;
-     waves.push(wallFrom(e,at,waves.length,group,part));count++;
+     const copy=wallFrom(e,at,waves.length,group,part);copy.repeatedAfterReference=true;
+     waves.push(copy);count++;
     }
     partOrder.push({id:part.id,era:10,at,sourceStart:part.sourceStart,sourceEnd:part.sourceEnd,
      sourceVideoStart:part.sourceVideoStart,sourceVideoEnd:part.sourceVideoEnd,count,
@@ -213,11 +245,11 @@ function deathScale(age){const t=Math.max(0,age),d=DEATH_TIMING;
 class HyperHexagonerGame extends E.Game{
  constructor(data=create()){
   super(LEVEL,data);this.hyperHexagonerSource910=true;
-  this._spawns=data.waves.map(w=>({...w,actors:bands(w).flatMap(([lo,hi],band)=>w.sectors.map(sector=>({
-   id:w.id+':'+sector+':'+band,waveId:w.id,sector,band,sides:SIDES,
-   r:w.r,thickness:(hi-lo)*w.thickness,offset:lo*w.thickness,
+  this._spawns=data.waves.map(w=>({...w,actors:w.sectors.map(sector=>({
+   id:w.id+':'+sector,waveId:w.id,sector,band:0,sides:SIDES,
+   r:w.r,thickness:w.thickness,offset:0,collapsed:false,
    points:[[0,0],[0,0],[0,0],[0,0]]
-  })))})).sort((a,b)=>a.start-b.start);
+  }))})).sort((a,b)=>a.start-b.start);
   this._active=[];this._cursor=0;this._last=-Infinity;
   this.sides=SIDES;this.fromSides=SIDES;this.morph=1;
   this.recordedCamera=null;this.referenceCamera=null;this.sampleWalls();
