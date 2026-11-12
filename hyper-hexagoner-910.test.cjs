@@ -8,6 +8,7 @@ const mockEngine={
  stepSector(){return false}selectSector(){return false}},
  wrap:a=>(a%TAU+TAU)%TAU,
  playerHitPoint:a=>[Math.cos(a)*66,Math.sin(a)*66],
+ playerPoly:a=>[[66*Math.cos(a),66*Math.sin(a)],[64*Math.cos(a+.1),64*Math.sin(a+.1)],[64*Math.cos(a-.1),64*Math.sin(a-.1)]],
  pointInPolygon:(p,poly)=>{let hit=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&(p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0]))hit=!hit;}return hit},
  wallVisualPoly:w=>{const a=w.sector*TAU/w.sides,b=(w.sector+1)*TAU/w.sides;return [[Math.cos(a)*w.r,Math.sin(a)*w.r],[Math.cos(b)*w.r,Math.sin(b)*w.r],[Math.cos(b)*(w.r+w.thickness),Math.sin(b)*(w.r+w.thickness)],[Math.cos(a)*(w.r+w.thickness),Math.sin(a)*(w.r+w.thickness)]];}
 };
@@ -33,7 +34,20 @@ for(let s of [1,2,3,4,7,11,12,2026,2027,81201]){
  for(let t=0;t<=87;t+=.2){g.time=t;g.sampleWalls();assert(g.walls.every(w=>w.points.every(p=>p.every(Number.isFinite))));}
 }
 assert.notEqual(orders[0],orders[1]);
-assert.equal(M.PLAYER_SPEED,mockEngine.PLAYER_SPEED_BY_LEVEL[4]);
+assert.equal(M.PLAYER_SPEED,540*Math.PI/180);
+assert.equal(M.PLAYER_DEGREES_PER_TICK,9);
+assert.equal(M.DEATH_TIMING.resultStart,.267);
+assert.equal(M.DEATH_TIMING.zoomStart,.018);
+assert.equal(M.deathScale(0),1);
+assert(M.deathScale(.20)>4);
 for(let t=0;t<88;t+=.033){const c=M.cameraAt(t);assert(c.length===6&&c.every(Number.isFinite));}
+{
+ const g=new M.HyperHexagonerGame(M.create(null,17,110,{order:'video'}));
+ g.time=8;g.sampleWalls();const source=g.recordedCamera.slice();
+ g.freezeDeath();
+ assert(g.death&&g.death.sides===6&&g.death.contact.length===2);
+ assert.deepEqual(g.deathCamera.affine,source);
+ g.time=8.5;g.sampleWalls();assert.deepEqual(g.deathCamera.affine,source);
+}
 console.log('PASS tasks 9/10',JSON.stringify(parts),'video events 64, safe sample geometry, 10 shuffled seeds');
 console.log('route source',M.hasCoarseRoute(video.waves),'fallbacks',Array.from({length:8},(_,i)=>M.create(null,i+1,115).routeFallback||'none'));
