@@ -12,7 +12,8 @@ const D=typeof module!=='undefined'?require('./hyper-hexagoner-910-data'):root.H
 if(!E?.Game||!D?.EVENTS)throw Error('HYPER HEXAGONER dependencies missing');
 const LEVEL=4,TAU=2*Math.PI,SIDES=6,ORBIT=66,SPEED=382,MAX_RADIUS=1290,
  REF_END=D.REFERENCE_GAME_END,SEC=TAU/6;
-const PLAYER_DEGREES_PER_TICK=7; // source-informed HYPER HEXAGONER mode 1: 7° at 60Hz
+// Equal to the user-visible 9-degree/60Hz input speed of HEXAGONEST.
+const PLAYER_DEGREES_PER_TICK=9;
 const PLAYER_SPEED=PLAYER_DEGREES_PER_TICK*TAU/360*60;
 const mod=(a,n)=>(a%n+n)%n,clamp=(a,b,c)=>Math.max(b,Math.min(c,a));
 function rng(seed){let x=(seed^0x7af927d3)>>>0;return ()=>{x=(x+0x6d2b79f5)>>>0;
@@ -200,8 +201,15 @@ function shakeAt(audioTime,pulse,enabled){if(!enabled||!Number.isFinite(audioTim
  const phase=((audioTime*160/60)%1+1)%1,env=strength*Math.sin(Math.PI*phase)**2;
  return [3.1*env*Math.sin(TAU*phase),2.1*env*Math.sin(2*TAU*phase)];
 }
-function deathScale(age){if(age<.933333)return 1;if(age<1.1)return 1+4.1*(age-.933333)/(.166667);
- return 5.1-.2*clamp((age-1.1)/.1,0,1);}
+// Video ~488.950–489.217: unlike HYPER HEXAGON's slow game-over,
+// the HEXAGONER ring expands IMMEDIATELY and the score panel appears
+// about 0.27s after impact. Avoid the generic 1.20s delayed zoom.
+const DEATH_TIMING=Object.freeze({flashEnd:.018,zoomStart:.018,zoomEnd:.178,resultStart:.267,peakScale:5.1});
+function deathScale(age){const t=Math.max(0,age),d=DEATH_TIMING;
+ if(t<=d.zoomStart)return 1;
+ if(t<d.zoomEnd)return 1+(d.peakScale-1)*(t-d.zoomStart)/(d.zoomEnd-d.zoomStart);
+ return d.peakScale-.2*clamp((t-d.zoomEnd)/(d.resultStart-d.zoomEnd),0,1);
+}
 class HyperHexagonerGame extends E.Game{
  constructor(data=create()){
   super(LEVEL,data);this.hyperHexagonerSource910=true;
@@ -236,12 +244,19 @@ class HyperHexagonerGame extends E.Game{
   return this.walls.find(w=>E.pointInPolygon(center,w.points))||false;
  }
  freezeDeath(){if(this.deathCamera)return;
-  this.deathCamera={rotation:this.rotation,zoom:this.zoom,tilt:this.tilt,time:this.time,
-   affine:this.lastDrawCamera?.slice()||this.recordedCamera?.slice()};
+  const camera=this.recordedCamera?.slice()||this.lastDrawCamera?.slice()||cameraAt(this.time);
+  const struck=this.hit();
+  if(!this.death)this.death={time:this.time,angle:this.angle,sides:this.sides,
+   wallId:struck?.id||null,player:E.playerPoly(this.angle).map(p=>p.slice()),
+   wall:struck?.points?.map(p=>p.slice())||[],holes:[],contact:E.playerHitPoint(this.angle).slice()};
+  this.deathCamera={rotation:Math.atan2(camera[1],camera[0]),zoom:this.zoom,
+   tilt:this.tilt,time:this.time,sides:this.sides,angle:this.angle,affine:camera};
   this.rotationSpeed=0;
  }
- stepSector(direction){const moved=super.stepSector(direction);if(moved&&this.hit()){this.dead=true;this.freezeDeath()}return moved;}
- selectSector(sector){const moved=super.selectSector(sector);if(moved){this.dead=!!this.hit();if(this.dead)this.freezeDeath()}return moved;}
+ stepSector(direction){const moved=super.stepSector(direction);
+  if(moved&&(this.dead||this.hit())){this.dead=true;this.freezeDeath()}return moved;}
+ selectSector(sector){const moved=super.selectSector(sector);
+  if(moved&&(this.dead||this.hit())){this.dead=true;this.freezeDeath()}return moved;}
  update(dt,input=0){if(this.dead||this.timelineEnded||dt<=0)return;
   const count=Math.max(1,Math.ceil(dt*240)),h=dt/count;
   for(let i=0;i<count;i++){
@@ -263,7 +278,7 @@ class HyperHexagonerGame extends E.Game{
  }
 }
 const API=Object.freeze({HyperHexagonerGame,create,PRE_PARTS,BRIDGE,POST_PARTS,ALL_PARTS,
- SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,cameraAt,palette,shakeAt,deathScale,
+ SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,cameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
  hasCoarseRoute});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper910=API;
