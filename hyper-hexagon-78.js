@@ -13,7 +13,8 @@ const OLD=typeof module!=='undefined'?require('./hyper-hexagon-stage7'):root.Hex
 const D=typeof module!=='undefined'?require('./hyper-hexagon-78-data'):root.HexHyper78Data;
 if(!OLD||!D)throw Error('HYPER HEXAGON task7/8 source modules are missing');
 const TAU=Math.PI*2,LEVEL=3,SECTOR_RADIUS=66,MAX_R=1400,
- SPEED=OLD.SPEED,PLAYER_SPEED=(E.ORIGINAL_ARROW_DEGREES_PER_TICK?.[LEVEL]||7)*TAU/360*60;
+ SPEED=OLD.SPEED,PLAYER_DEGREES_PER_TICK=7,
+ PLAYER_SPEED=PLAYER_DEGREES_PER_TICK*TAU/360*60;
 const EPS=1e-7,REF_END=D.videoResultGameSeconds;
 const wrap=(x,n)=>(x%n+n)%n;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -175,24 +176,71 @@ function create(sourceTimeline=null,seed=newSeed(),duration=3600,options={}){
  return result;
 }
 const cameraKeys=D.cameraPost60;
+const BASE_FPS=15,POST_EPS=1e-8;
+const angleDelta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+function smoothSlope(before,value,after){
+ const d0=value-before,d1=after-value;
+ return d0*d1<=0?0:Math.sign(d1)*Math.min(Math.abs((d0+d1)/2),3*Math.min(Math.abs(d0),Math.abs(d1)));
+}
+function smoothKey(values,i,u){
+ const last=values.length-1,a=values[i],b=values[Math.min(last,i+1)];
+ const delta=b-a;if(!delta)return a;
+ const m0=smoothSlope(values[Math.max(0,i-1)],a,b);
+ const m1=smoothSlope(a,b,values[Math.min(last,i+2)]);
+ const u2=u*u,u3=u2*u;
+ return (2*u3-3*u2+1)*a+(u3-2*u2+u)*m0+
+  (-2*u3+3*u2)*b+(u3-u2)*m1;
+}
+const postAngles=cameraKeys.map(v=>v[1]);
+const postZoom=cameraKeys.map((_,i)=>{
+ // Single-frame tracking noise looked like a sudden zoom/tilt pop.
+ // Bass-hit zoom is supplied separately from live audio, not sample noise.
+ let v=0,total=0;
+ for(let j=-2;j<=2;j++){const k=clamp(i+j,0,cameraKeys.length-1),w=3-Math.abs(j);
+  v+=cameraKeys[k][2]*w;total+=w;
+ }
+ return v/total;
+});
 function sampleCamera(t){
- if(t<=cameraKeys[0][0])return cameraKeys[0].slice(1);
- if(t>=cameraKeys.at(-1)[0])return cameraKeys.at(-1).slice(1);
+ if(t<=cameraKeys[0][0])return [postAngles[0],postZoom[0],cameraKeys[0][3]];
+ if(t>=cameraKeys.at(-1)[0])return [postAngles.at(-1),postZoom.at(-1),cameraKeys.at(-1)[3]];
  let lo=0,hi=cameraKeys.length-1;
  while(hi-lo>1){const mid=(lo+hi)>>1;if(cameraKeys[mid][0]<=t)lo=mid;else hi=mid}
- const a=cameraKeys[lo],b=cameraKeys[hi],u=(t-a[0])/(b[0]-a[0]);
- return [a[1]+(b[1]-a[1])*u,a[2]+(b[2]-a[2])*u,a[3]+(b[3]-a[3])*u];
+ const f=(t-cameraKeys[lo][0])/(cameraKeys[hi][0]-cameraKeys[lo][0]);
+ // Interpolate measured angles continuously, without replacing source
+ // wall timings or smoothing the avatar's input.
+ const angle=smoothKey(postAngles,lo,f);
+ const zoom=smoothKey(postZoom,lo,f);
+ const hue=cameraKeys[lo][3]+(cameraKeys[hi][3]-cameraKeys[lo][3])*f;
+ return [angle,zoom,hue];
+}
+function preCamera(t){
+ // OLD.cameraAt() floors the stage-profile camera at 15Hz. The whole
+ // playfield was therefore frozen for 3/4 of the 60Hz draw frames.
+ const frame=Math.max(0,t)*BASE_FPS,k=Math.floor(frame),u=frame-k;
+ const prev=OLD.cameraAt(k/BASE_FPS),next=OLD.cameraAt((k+1)/BASE_FPS);
+ return prev.map((v,i)=>v+(next[i]-v)*u);
+}
+function joinCamera(previous,angle,zoom,progress){
+ // Blend orientation on the shortest angular arc; direct affine lerp can
+ // squash the world when 60s camera phases straddle ±PI.
+ const u=clamp(progress,0,1),v=u*u*(3-2*u);
+ const a=Math.atan2(previous[1],previous[0]),radius=Math.hypot(previous[0],previous[1])||1;
+ const alpha=a+angleDelta(a,angle)*v,mag=radius+(zoom-radius)*v;
+ const c=Math.cos(alpha),si=Math.sin(alpha),base=[Math.cos(a)*radius,Math.sin(a)*radius,
+  -Math.sin(a)*radius,Math.cos(a)*radius,0,0];
+ const target=[c*mag,si*mag,-si*mag,c*mag,0,0];
+ return target.map((x,i)=>x+(previous[i]-base[i])*(1-v));
 }
 function cameraAt(t,audioPulse=0){
  const time=Math.max(0,t);
- if(time<60)return OLD.cameraAt(time).slice();
- const [angle,zoom]=sampleCamera(time),beat=clamp(audioPulse,0,1);
- const z=zoom*(1+.025*beat),c=Math.cos(angle),s=Math.sin(angle);
- const target=[c*z,s*z,-s*z,c*z,0,0];
- // The 60s cut changes camera acquisition method, not world physics.
- if(time<60.24){const before=OLD.cameraAt(59.93),v=(time-60)/.24;
-  return before.map((x,i)=>x*(1-v)+target[i]*v);
- }
+ if(time<60)return preCamera(time);
+ const before=preCamera(60),baseAngle=Math.atan2(before[1],before[0]);
+ const sourceStart=sampleCamera(60)[0];
+ const [raw,zoom]=sampleCamera(time),angle=raw+(baseAngle-sourceStart);
+ const z=zoom*(1+.025*clamp(audioPulse,0,1));
+ const c=Math.cos(angle),si=Math.sin(angle),target=[c*z,si*z,-si*z,c*z,0,0];
+ if(time<60.24)return joinCamera(before,angle,z,(time-60)/.24);
  return target;
 }
 function palette(t){
@@ -201,9 +249,11 @@ function palette(t){
 }
 function shakeAt(audioSeconds,pulse,enabled){
  if(!enabled||!(pulse>0)||!Number.isFinite(audioSeconds))return [0,0];
- const strength=clamp(pulse,0,1);
- const beat=Math.floor(audioSeconds*140/60);
- return [(beat%2?1:-1)*2.8*strength,(beat%3?1:-1)*1.8*strength];
+ const phase=((audioSeconds*140/60)%1+1)%1;
+ // Continuous oscillation returns to zero at a beat boundary. Do not
+ // alternate a signed integer at each kick: that displaced every pixel.
+ const envelope=clamp(pulse,0,1)*Math.sin(Math.PI*phase)**2;
+ return [2.8*envelope*Math.sin(TAU*phase),1.8*envelope*Math.sin(2*TAU*phase)];
 }
 function deathScale(age){
  const t=Math.max(0,age);if(t<=.933333)return 1;
@@ -293,7 +343,7 @@ class HyperGame extends E.Game{
  }
 }
 const API={HyperGame,create,PRE_PARTS,POST_PARTS,BRIDGE,ALL_PARTS,SHAPES,
- SOURCE_WALLS,PLAYER_SPEED,SPEED,REF_END,cameraAt,palette,shakeAt,deathScale,
+ SOURCE_WALLS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,cameraAt,palette,shakeAt,deathScale,
  hasCoarseRoute,sidesAt};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper78=API;
