@@ -1,6 +1,6 @@
 /* HYPER HEXAGONER — task 9 (<60 HUD seconds) and task 10 (>=60).
  * Source 1557(10).mp4 video ~06:43.47–08:08.10; recorded game-over timer 88.04.
- * 63 pre-death optical crossing cues, HUD-time calibrated, then grouped into intact dodge phrases.
+ * 63 pre-death orbit crossings + additional photographed colored wall bands, HUD-timed and grouped into intact dodge phrases.
  * Only phrase ORDER can shuffle; never rotate, mirror, change event mask,
  * reorder events within a phrase, or split the 60s boundary phrase.
  * This module is independent of tasks 1–8, 11–12 and RANDOM.
@@ -31,6 +31,8 @@ const SOURCE_EVENTS=Object.freeze(D.EVENTS.map(e=>Object.freeze({...e,
 const PRE_RANGES=[[0,0],[1,3],[4,6],[7,7],[8,10],[11,14],[15,16],
  [17,18],[19,21],[22,22],[23,26],[27,30],[31,31],[32,35],[36,38]];
 const BRIDGE_RANGE=[39,43];
+const BRIDGE_RANGE_TIME=[D.EVENTS[BRIDGE_RANGE[0]].time,
+ D.EVENTS[BRIDGE_RANGE[1]].time];
 const POST_RANGES=[[44,47],[48,51],[52,52],[53,56],[57,57],[58,60],[61,62]];
 function partsFromRanges(ranges,era,prefix){
  return Object.freeze(ranges.map(([a,b],i)=>{
@@ -45,8 +47,29 @@ function partsFromRanges(ranges,era,prefix){
   });
  }));
 }
-const PRE_PARTS=partsFromRanges(PRE_RANGES,9,'H9-');
-const POST_PARTS=partsFromRanges(POST_RANGES,10,'H10-');
+const PRE_RECORDED=partsFromRanges(PRE_RANGES,9,'H9-');
+const POST_RECORDED=partsFromRanges(POST_RANGES,10,'H10-');
+// The narrow orbit-only detector missed additional colored bands in
+// reference frames (e.g. HUD 4.07, 12.56, 23.24 and 28.12). Treat these
+// frame-derived estimates as short, complete phrases in the SAME shuffle
+// bank, not fixed scripted walls that would repeat in every random run.
+const GAP_EVENTS=Object.freeze(D.GAP_OBSERVATIONS.map(e=>Object.freeze({
+ ...e,sectors:Object.freeze(Array.from({length:SIDES},(_,i)=>i)
+  .filter(i=>e.mask&(1<<i)))
+})));
+function gapPart(e,i,era){return Object.freeze({
+ id:'H'+era+'-V'+String(i+1).padStart(2,'0'),era,anchored:false,
+ opticalGap:true,sourceStart:e.time,sourceEnd:e.time,
+ sourceVideoStart:e.videoSecond,sourceVideoEnd:e.videoSecond,
+ sourceIndices:[e.id,e.id],
+ events:Object.freeze([Object.freeze({...e,offset:0})])
+});}
+const PRE_PARTS=Object.freeze([...PRE_RECORDED,
+ ...GAP_EVENTS.filter(e=>e.time<BRIDGE_RANGE_TIME[0])
+  .map((e,i)=>gapPart(e,i,9))].sort((a,b)=>a.sourceStart-b.sourceStart));
+const POST_PARTS=Object.freeze([...POST_RECORDED,
+ ...GAP_EVENTS.filter(e=>e.time>BRIDGE_RANGE_TIME[1])
+  .map((e,i)=>gapPart(e,i,10))].sort((a,b)=>a.sourceStart-b.sourceStart));
 const bridgeEvents=SOURCE_EVENTS.slice(BRIDGE_RANGE[0],BRIDGE_RANGE[1]+1);
 const BRIDGE=Object.freeze({
  id:'H9-10-BRIDGE',era:'bridge',anchored:true,
@@ -57,9 +80,12 @@ const BRIDGE=Object.freeze({
 });
 const ALL_PARTS=Object.freeze([...PRE_PARTS,BRIDGE,...POST_PARTS]);
 const SOURCE_COUNT=ALL_PARTS.reduce((total,p)=>total+p.events.length,0);
-if(SOURCE_COUNT!==63||BRIDGE.events.length!==5||
- ALL_PARTS.flatMap(p=>p.events).some((e,i)=>e.id!==i))
- throw Error('Task 9/10 recorded source must contain each cue once in order');
+const ORDERED_EVENT_IDS=ALL_PARTS.flatMap(p=>p.events.map(e=>e.id));
+if(SOURCE_COUNT!==D.EVENTS.length+GAP_EVENTS.length||BRIDGE.events.length!==5||
+ new Set(ORDERED_EVENT_IDS).size!==SOURCE_COUNT||
+ D.EVENTS.some(e=>!ORDERED_EVENT_IDS.includes(e.id))||
+ GAP_EVENTS.some(e=>!ORDERED_EVENT_IDS.includes(e.id)))
+ throw Error('Task 9/10 source missed or duplicated a recorded wall band');
 function shuffle(parts,random){
  const arr=parts.slice();
  for(let k=arr.length-1;k>0;k--){const j=Math.floor(random()*(k+1));[arr[j],arr[k]]=[arr[k],arr[j]];}
@@ -105,6 +131,7 @@ function wallFrom(e,at,id,group,part){const impact=at+e.offset;
  const radius=Math.min(MAX_RADIUS,ORBIT+SPEED*Math.max(0,impact-.14)),start=impact-(radius-ORBIT)/SPEED;
  return {id,group,partId:part.id,partEvent:part.events.indexOf(e),
   sourceGameSecond:e.time,sourceVideoSecond:e.videoSecond,sourceEventId:e.id,
+  opticalGap:!!e.estimated,referenceVideoSecond:e.referenceVideoSecond||null,
   sourceMask:e.mask,sourceWidth:e.width,partRotation:0,mirrored:false,
   sides:SIDES,sectors:e.sectors.slice(),safeSector:e.sectors.length<SIDES?
    Array.from({length:SIDES},(_,i)=>i).find(i=>!e.sectors.includes(i)):null,
@@ -234,7 +261,10 @@ function cameraAt(t,pulse=0){
  return m;
 }
 function palette(t){const hue=D.hueAt(Math.max(0,Math.min(REF_END,t)));
- return [hue,90,[15,29,98]];
+ // Reference video uses a WHITE and pastel stage with strongly saturated
+ // blue / magenta / purple walls. The previous [15,29,98] rendered the
+ // BACKDROP dark and the WALLS almost white, making walls invisible.
+ return [hue,90,[98,91,50]];
 }
 function shakeAt(audioTime,pulse,enabled){if(!enabled||!Number.isFinite(audioTime))return [0,0];
  const strength=clamp(pulse,0,1);if(strength<.02)return [0,0];
