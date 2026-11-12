@@ -74,7 +74,12 @@ for(const seed of [1,2,3,5,7,11,2026,77777,12345,81201]){
   const slot=d.partOrder[i],sourceSlot=video.partOrder[i],next=d.partOrder[i+1];
   assert.equal(slot.at,sourceSlot.at,'random phrase must use video-slot impact clock');
   if(next&&!slot.anchored)assert(slot.end<=next.at-.27,'phrase must fit without crossing the next phrase');
-  if(!slot.anchored)assert.equal(slot.sides,sourceSlot.sides,'match source shape at every slot');
+  if(!slot.anchored){
+   assert.equal(slot.sides,sourceSlot.sides,'match source shape at every slot');
+   const nextMorph=H.SHAPES.find(([at])=>at>slot.at+1e-7)?.[0]??Infinity;
+   assert(slot.end<=nextMorph-.27,
+    'random part must finish before the next shape morph; preserve its open lane');
+  }
  }
  assert.equal(d.partOrder.filter(p=>p.id==='H78-BRIDGE').length,1);
  // Random mode uses compatible whole phrases from the bank; reuse and
