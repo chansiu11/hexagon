@@ -110,7 +110,7 @@ function updatePalette(dt){
 function palette(){return displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)')}
 
 function drawBackdrop(game,dark,light,playing){
- if(playing&&(game.level===6||game.hardMode)&&game.morph<1&&game.fromSides!==game.sides){
+ if(playing&&(game.level===6||game.hardMode||game.hyperHexagonSource78)&&game.morph<1&&game.fromSides!==game.sides){
   const u=game.morph*game.morph*(3-2*game.morph),knots=HexMixedTransition.KNOTS;
   const point=t=>{const a=HexMixedTransition.unitAt(game.fromSides,t),b=HexMixedTransition.unitAt(game.sides,t);return [(a[0]*(1-u)+b[0]*u)*1800,(a[1]*(1-u)+b[1]*u)*1800]};
   for(let i=0;i<knots.length-1;i++){
@@ -435,7 +435,7 @@ function mixedCoreMesh(n){
  });
  mixedCoreUnits.set(n,points);return points;
 }
-function drawCore(g,r,fill,stroke){if(g.level===6||g.hardMode||g.hexagonestMode){
+function drawCore(g,r,fill,stroke){if(g.level===6||g.hardMode||g.hexagonestMode||g.hyperHexagonSource78){
  const a=mixedCoreMesh(g.fromSides),b=mixedCoreMesh(g.sides),u=g.morph*g.morph*(3-2*g.morph);
  const points=g.mixedCorePoints||(g.mixedCorePoints=Array.from({length:60},()=>[0,0]));
  for(let i=0;i<60;i++){points[i][0]=(a[i][0]*(1-u)+b[i][0]*u)*r;points[i][1]=(a[i][1]*(1-u)+b[i][1]*u)*r;}
