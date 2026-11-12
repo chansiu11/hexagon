@@ -384,7 +384,10 @@ class HyperGame extends E.Game{
     v[3][0]=p[0]*outer;v[3][1]=p[1]*outer;
     a.collapsed=Math.abs((v[1][0]-v[0][0])*(v[2][1]-v[0][1])-
       (v[1][1]-v[0][1])*(v[2][0]-v[0][0]))<1e-8;
-    this.walls.push(a);
+    // A merged polygon corner can collapse a track to a line. Stage 1/2
+    // excludes these zero-area panels from hits. Keep them out of the base
+    // engine collision list as well, so touching a vanished edge is safe.
+    if(!a.collapsed)this.walls.push(a);
    }
   }
  }
