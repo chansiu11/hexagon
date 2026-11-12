@@ -60,8 +60,9 @@ function arrangement(seed,video){const random=rng(seed);
  ...arrangeEra(POST_PARTS,random,video,false)];
 }
 const SPECIAL=Object.freeze({
- 'H9-05':'double-rail','H9-08':'staircase','H9-12':'comb',
- 'H10-02':'double-rail','H10-05':'comb','H10-07':'staircase'
+ 'H9-05':'double-rail','H9-07':'staircase','H9-09':'comb',
+ 'H9-11':'double-rail','H10-01':'double-rail','H10-03':'comb',
+ 'H10-05':'staircase'
 });
 function bands(w){if(w.special==='double-rail'&&w.thickness>=50)return [[0,.40],[.57,1]];
  if(w.special==='comb'&&w.thickness>=68)return [[0,.25],[.37,.61],[.75,1]];
