@@ -109,7 +109,11 @@ function scheduleEra(parts,random,original,eraEnd){
   let chosen=slot;
   if(!original&&!slot.anchored){
    const slotDuration=phraseLength(slot);
-   const maxLength=Math.max(0,next-at-.28);
+   const nextMorph=SHAPES.find(([boundary])=>boundary>at+EPS)?.[0]??Infinity;
+   // Random phrases are source-shape compatible AND cannot overrun the
+   // next polygon boundary. Cross-shape phrases occur only in fixed
+   // recorded bridges; otherwise an opening may collapse into all walls.
+   const maxLength=Math.max(0,Math.min(next-.28,nextMorph-.28)-at);
    // Bound added dead air to <=0.68s beyond the recorded source gap.
    const minLength=slotDuration>.01?Math.max(.12,slotDuration-.68):0;
    let bank=parts.filter(p=>!p.anchored&&p.sides===slot.sides&&
