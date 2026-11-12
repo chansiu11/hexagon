@@ -17,6 +17,7 @@ class Game{
 const E={Game,ORIGINAL_ARROW_DEGREES_PER_TICK:[7,7,9,7,7,9],
  wrap:x=>((x%(2*Math.PI))+2*Math.PI)%(2*Math.PI),
  playerHitPoint:a=>[66*Math.cos(a),66*Math.sin(a)],
+ playerPoly:a=>[[66*Math.cos(a),66*Math.sin(a)],[64*Math.cos(a+.1),64*Math.sin(a+.1)],[64*Math.cos(a-.1),64*Math.sin(a-.1)]],
  pointInPolygon(p,poly){const [x,y]=p;let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
  const a=poly[j],b=poly[i];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])inside=!inside;
  }return inside;},
@@ -39,7 +40,11 @@ assert.equal(H.PRE_PARTS.length,18);assert.equal(H.POST_PARTS.length,11);
 assert.equal(H.ALL_PARTS.length,30);assert.equal(H.SOURCE_WALLS,112);
 assert.equal(H.BRIDGE.sourceStart,59.6);assert.equal(H.BRIDGE.sourceEnd,63.75);
 assert.equal(H.BRIDGE.events.length,6);
-assert.equal(H.PLAYER_SPEED,420*Math.PI/180);
+assert.equal(H.PLAYER_SPEED,540*Math.PI/180);
+assert.equal(H.PLAYER_DEGREES_PER_TICK,9);
+assert.equal(H.DEATH_TIMING.zoomStart,.83);
+assert.equal(H.DEATH_TIMING.resultStart,1.20);
+assert.equal(H.deathScale(.5),1);
 const video=H.create(null,311,200,{order:'video'});
 assert.equal(video.orderMode,'video');assert.equal(video.waves.length,112);
 assert.equal(video.partOrder.filter(p=>p.anchored).length>=1,true);
@@ -73,7 +78,15 @@ for(let t=0;t<99;t+=.16){
 const near=H.cameraAt(60),after=H.cameraAt(60.01);
 assert(Math.hypot(...near.map((x,i)=>x-after[i]))<.15,'camera 60s handoff is continuous');
 assert.equal(H.deathScale(0),1);assert(H.deathScale(1.15)>4);
+{
+ const g=new H.HyperGame(H.create(null,12,115,{order:'video'}));
+ g.time=20;g.sampleWalls();const source=g.recordedCamera.slice();
+ g.freezeDeathCamera();
+ assert(g.death&&g.death.sides===g.sides&&g.death.contact.length===2);
+ assert.deepEqual(g.deathCamera.affine,source,'capture the impact physics frame, not a stale rendered frame');
+ g.time=20.2;g.sampleWalls();assert.deepEqual(g.deathCamera.affine,source);
+}
 assert.deepEqual(H.shakeAt(2,1,false),[0,0]);
 fs.writeFileSync(__dirname+'/parts-derived.json',JSON.stringify(H.ALL_PARTS.map(p=>({id:p.id,era:p.era,anchored:!!p.anchored,sourceStart:p.sourceStart,sourceEnd:p.sourceEnd,sourceVideoStart:p.sourceVideoStart,sourceVideoEnd:p.sourceVideoEnd,sides:p.sides,count:p.events.length})),null,2));
 console.log('RANDOM distinct:',new Set(variants).size,'fallbacks:',fallback.filter(Boolean).length,'of',fallback.length);
-console.log('PASS hyper task7/8: video order 112 events, 18+bridge+11 source parts, no rotations, 60s bridge, 420deg/s, 7 shape states, cameras, 10 deterministic seeded shuffles');
+console.log('PASS hyper task7/8: video order 112 events, 18+bridge+11 source parts, no rotations, 60s bridge, 540deg/s, 7 shape states, cameras, 10 deterministic seeded shuffles');
