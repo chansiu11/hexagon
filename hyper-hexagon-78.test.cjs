@@ -53,11 +53,22 @@ assert(video.waves.filter(w=>w.sourceTime>=60&&w.sourceTime<63).every(w=>w.start
 for(let i=1;i<video.waves.length;i++)assert(video.waves[i].sourceTime>=video.waves[i-1].sourceTime);
 const sourceHashes=new Map(video.waves.map(w=>[w.sourceEventId+':'+w.partId,JSON.stringify([w.sourceMask,w.estimatedWidth,w.speed])]));
 const variants=[];const fallback=[];
+let shuffledSlots=0;
 for(const seed of [1,2,3,5,7,11,2026,77777,12345,81201]){
  const d=H.create(null,seed,200),g=new H.HyperGame(d);
  variants.push(d.partOrder.map(p=>p.id).join(','));fallback.push(d.routeFallback||null);
+ shuffledSlots+=d.partOrder.filter((p,i)=>p.id!==video.partOrder[i].id).length;
+ for(let i=0;i<d.partOrder.length;i++){
+  const slot=d.partOrder[i],sourceSlot=video.partOrder[i],next=d.partOrder[i+1];
+  assert.equal(slot.at,sourceSlot.at,'random phrase must use video-slot impact clock');
+  if(next&&!slot.anchored)assert(slot.end<=next.at-.27,'phrase must fit without crossing the next phrase');
+  if(!slot.anchored)assert.equal(slot.sides,sourceSlot.sides,'match source shape at every slot');
+ }
  assert.equal(d.partOrder.filter(p=>p.id==='H78-BRIDGE').length,1);
- assert.equal(d.waves.length,112);
+ // Random mode uses compatible whole phrases from the bank; reuse and
+ // differing event counts are expected. The original VIDEO bank has 112.
+ assert.equal(d.partOrder.length,30);
+ assert(d.waves.length>=75&&d.waves.length<=160);
  assert(d.waves.every(w=>w.partRotation===0&&w.sectors.every(k=>w.sourceMask&(1<<k))));
  for(const w of d.waves){
   assert.equal(sourceHashes.get(w.sourceEventId+':'+w.partId),JSON.stringify([w.sourceMask,w.estimatedWidth,w.speed]));
@@ -69,7 +80,9 @@ for(const seed of [1,2,3,5,7,11,2026,77777,12345,81201]){
   g.time=t;g.sampleWalls();assert(g.walls.every(w=>w.points.every(p=>p.every(Number.isFinite))));
  }
 }
-assert(new Set(variants).size>1,'at least two whole-part order permutations should occur');
+assert(new Set(variants).size>=8,'diverse whole-phrase permutations should occur');
+assert(shuffledSlots>=65,'on average more than 6 of the 30 part positions should change');
+assert(!fallback.some(Boolean),'10 deterministic seeds should not need source-order fallback');
 for(const [t,n] of [[59,5],[63.5,6],[70,5],[76,4],[83,5],[89,4],[95,5]])assert.equal(H.sidesAt(t),n);
 for(let t=0;t<99;t+=.16){
  const m=H.cameraAt(t);assert(m.every(Number.isFinite));
@@ -89,4 +102,4 @@ assert.equal(H.deathScale(0),1);assert(H.deathScale(1.15)>4);
 assert.deepEqual(H.shakeAt(2,1,false),[0,0]);
 fs.writeFileSync(__dirname+'/parts-derived.json',JSON.stringify(H.ALL_PARTS.map(p=>({id:p.id,era:p.era,anchored:!!p.anchored,sourceStart:p.sourceStart,sourceEnd:p.sourceEnd,sourceVideoStart:p.sourceVideoStart,sourceVideoEnd:p.sourceVideoEnd,sides:p.sides,count:p.events.length})),null,2));
 console.log('RANDOM distinct:',new Set(variants).size,'fallbacks:',fallback.filter(Boolean).length,'of',fallback.length);
-console.log('PASS hyper task7/8: video order 112 events, 18+bridge+11 source parts, no rotations, 60s bridge, 540deg/s, 7 shape states, cameras, 10 deterministic seeded shuffles');
+console.log('PASS hyper task7/8: VIDEO order 112 source cues, 18+bridge+11 source parts, 60s bridge fixed, 540deg/s, 10 well-shuffled phrase bags; random event count varies by part choice');
