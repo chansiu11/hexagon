@@ -17,23 +17,48 @@ const {createRequire}=require('node:module');const fs=require('node:fs');const v
 const src=fs.readFileSync(__dirname+'/hyper-hexagoner-910.js','utf8');const H={exports:{}};
 new Function('module','require',src)(H,p=>p==='./engine'?mockEngine:p==='./stage-profiles'?mockProfiles:p==='./hyper-hexagoner-910-data'?D:null);
 const M=H.exports;
-assert.equal(D.EVENTS.length,64);assert.equal(M.SOURCE_EVENTS.length,64);assert.equal(M.BRIDGE.events.length,5);
-assert.equal(M.BRIDGE.sourceStart,57.55);assert.equal(M.BRIDGE.sourceEnd,62.33);
+assert.equal(D.EVENTS.length,63);assert.equal(M.SOURCE_EVENTS.length,63);
+assert.equal(M.BRIDGE.events.length,5);
+assert.equal(M.PRE_PARTS.length,15);assert.equal(M.POST_PARTS.length,7);
+assert.equal(M.ALL_PARTS.length,23);
+assert.equal(M.SPECIAL&&Object.keys(M.SPECIAL).length,0,'do not invent striped source walls');
+assert.equal(M.BRIDGE.sourceStart,D.EVENTS[39].time);
+assert.equal(M.BRIDGE.sourceEnd,D.EVENTS[43].time);
+assert(D.EVENTS[39].time<60&&D.EVENTS[43].time>60);
+assert(Math.abs(D.EVENTS[0].time-2.29)<.03,'the filmed HUD first wall is at 2.29s');
+assert(D.EVENTS.at(-1).time<88.04,'post-death camera flash is not a video wall');
+assert(D.gameTimeAtVideo(488.31)===88.04,'old event 64 was observed after gameover');
 const video=M.create(null,25,90,{order:'video'});
-assert.equal(video.waves.length,64);assert.deepEqual(video.waves.map(w=>w.sourceGameSecond),D.EVENTS.map(e=>e.time));
+assert.equal(video.waves.length,63);
+assert(video.waves.every(w=>!w.repeatedAfterReference&&w.special===null));
+assert.deepEqual(video.waves.map(w=>w.sourceMask),D.EVENTS.map(e=>e.mask));
+assert.deepEqual(video.waves.map(w=>w.sourceWidth),D.EVENTS.map(e=>e.width));
+assert.deepEqual(M.ALL_PARTS.flatMap(p=>p.events.map(e=>e.id)),Array.from({length:63},(_,i)=>i));assert.deepEqual(video.waves.map(w=>w.sourceGameSecond),D.EVENTS.map(e=>e.time));
 assert(video.partOrder.every(p=>!p.rotation&&!p.mirrored));
 assert(video.partOrder.filter(p=>p.anchored).length===1);
 assert.deepEqual(video.waves.map(w=>w.sectors),M.SOURCE_EVENTS.map(e=>e.sectors));
-assert(video.waves.find(w=>w.sourceGameSecond===60.16).start<60);
+assert(video.waves.find(w=>w.sourceEventId===41).start<60);
 const parts={pre:M.PRE_PARTS.length,bridge:M.BRIDGE.events.length,post:M.POST_PARTS.length};
 let orders=[];
 for(let s of [1,2,3,4,7,11,12,2026,2027,81201]){
- const d=M.create(null,s,115);assert(d.waves.length>=64);assert(d.partOrder.filter(p=>p.anchored).length===1);
+ const d=M.create(null,s,115);
+ assert.equal(d.waves.filter(w=>!w.repeatedAfterReference).length,63,'all filmed cues once');
+ assert.equal(d.partOrder.filter(p=>p.anchored).length,1);
+ assert.equal(d.partOrder[15].id,M.BRIDGE.id);
+ const firstCycle=d.partOrder.filter(p=>!p.repeatedAfterReference);
+ assert.equal(firstCycle.length,23);
+ for(let i=0;i<firstCycle.length-1;i++){
+  const current=firstCycle[i],next=firstCycle[i+1];
+  assert(current.at+current.sourceEnd-current.sourceStart<=next.at-.26,'no cross-part overlap');
+ }
+ assert.equal(new Set(firstCycle.slice(0,15).map(p=>p.id)).size,15);
+ assert.equal(new Set(firstCycle.slice(16).map(p=>p.id)).size,7);
+ assert(d.waves.every(w=>w.partRotation===0&&!w.mirrored&&w.special===null));
  orders.push(d.partOrder.slice(0,parts.pre).map(p=>p.id).join('-'));
  const g=new M.HyperHexagonerGame(d);
  for(let t=0;t<=87;t+=.2){g.time=t;g.sampleWalls();assert(g.walls.every(w=>w.points.every(p=>p.every(Number.isFinite))));}
 }
-assert.notEqual(orders[0],orders[1]);
+assert(new Set(orders).size>=8,'whole phrase orders vary widely');
 assert.equal(M.PLAYER_SPEED,540*Math.PI/180);
 assert.equal(M.PLAYER_DEGREES_PER_TICK,9);
 assert.equal(M.DEATH_TIMING.resultStart,.267);
@@ -49,5 +74,5 @@ for(let t=0;t<88;t+=.033){const c=M.cameraAt(t);assert(c.length===6&&c.every(Num
  assert.deepEqual(g.deathCamera.affine,source);
  g.time=8.5;g.sampleWalls();assert.deepEqual(g.deathCamera.affine,source);
 }
-console.log('PASS tasks 9/10',JSON.stringify(parts),'video events 64, safe sample geometry, 10 shuffled seeds');
+console.log('PASS tasks 9/10',JSON.stringify(parts),'63 predeath HUD-calibrated video cues, 23 whole dodge phrases, 10 safe seeded shuffles, exact render quads');
 console.log('route source',M.hasCoarseRoute(video.waves),'fallbacks',Array.from({length:8},(_,i)=>M.create(null,i+1,115).routeFallback||'none'));
