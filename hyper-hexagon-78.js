@@ -9,6 +9,7 @@
  */
 (function(root){'use strict';
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
+const M=typeof module!=='undefined'?require('./mixed-transition'):root.HexMixedTransition;
 const OLD=typeof module!=='undefined'?require('./hyper-hexagon-stage7'):root.HexHyperStage7;
 const D=typeof module!=='undefined'?require('./hyper-hexagon-78-data'):root.HexHyper78Data;
 if(!OLD||!D)throw Error('HYPER HEXAGON task7/8 source modules are missing');
@@ -18,6 +19,9 @@ const TAU=Math.PI*2,LEVEL=3,SECTOR_RADIUS=66,MAX_R=1400,
  // internal rate is multiplied by 25/24 then advanced by dt/(25/24).
  PLAYER_DEGREES_PER_TICK=9,PLAYER_SPEED=PLAYER_DEGREES_PER_TICK*TAU/360*60;
 const EPS=1e-7,REF_END=D.videoResultGameSeconds;
+// Task 1/2: a single short polygon morph drives the core, wall mesh,
+// collision and player lane together. Source impact timestamps remain fixed.
+const MORPH_SECONDS=.18;
 const wrap=(x,n)=>(x%n+n)%n;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function randomFrom(seed){let s=(seed^0x38a17d93)>>>0;return ()=>{
@@ -30,6 +34,16 @@ function newSeed(){const a=new Uint32Array(1);if(root.crypto?.getRandomValues){r
 const videoAt=t=>D.startVideoSeconds+t/D.gameClockRate;
 const SHAPES=Object.freeze(D.shapeSchedule.map(v=>Object.freeze(v.slice())));
 function sidesAt(t){let sides=6;for(const [at,n] of SHAPES){if(at>t+EPS)break;sides=n}return sides}
+function shapeAt(t){
+ const state=E.shapeStateAt(t,SHAPES,MORPH_SECONDS);
+ state.at=0;for(let i=1;i<SHAPES.length&&SHAPES[i][0]<=t+EPS;i++)state.at=SHAPES[i][0];
+ return state;
+}
+// The original game holds walls briefly while the polygon changes. Reuse
+// task-1 wall hold/recovery, which returns to the *same* absolute source
+// clock and therefore cannot accumulate drift across 15 transitions.
+function wallClock(t){return E.wallTimelineTime(t,SHAPES);}
+
 function toPrePart(p){return Object.freeze({
  id:p.id,era:7,sourceStart:p.sourceStart,sourceEnd:p.sourceEnd,
  sourceVideoStart:videoAt(p.sourceStart),sourceVideoEnd:videoAt(p.sourceEnd),
@@ -277,17 +291,25 @@ function deathScale(age){
 class HyperGame extends E.Game{
  constructor(data=create()){
   super(LEVEL,data);this.hyperHexagonSource78=true;this.profile=this.profile||null;
-  this._spawns=data.waves.map(w=>({...w,actors:w.sectors.map(sector=>({
-   id:w.id+':'+sector,waveId:w.id,sector,sides:w.sides,
-   r:w.r,thickness:w.thickness,points:[[0,0],[0,0],[0,0],[0,0]]
-  }))})).sort((a,b)=>a.start-b.start);
+  this._spawns=data.waves.map(w=>({...w,actors:w.sectors.flatMap(sector=>
+   M.panels(w.sides,sector).map(([mixedStart,mixedEnd],i)=>({
+    id:w.id+':'+sector+':'+i,waveId:w.id,sector,sides:w.sides,
+    mixedStart,mixedEnd,r:w.r,thickness:w.thickness,collapsed:false,
+    points:[[0,0],[0,0],[0,0],[0,0]]
+   })))})).sort((a,b)=>a.start-b.start);
   this._cursor=0;this._active=[];this._sampleTime=-Infinity;
   this.fromSides=6;this.sides=6;this.morph=1;
+  this._previousShapeState=null;this._shapeRide=null;
   this.morphEventAt=0;this._lastSpokenSides=6;
   this.recordedCamera=null;this.referenceCamera=null;this.sampleWalls();
  }
  get targetSides(){return sidesAt(this.time)}
  get playerSpeed(){return PLAYER_SPEED}
+ // Follow the same six persistent source tracks as task 1/2, including
+ // all three control modes. A collapsed edge never creates a new lane.
+ sectorAngle(sector,sides=this.sides){
+  return E.wrap(M.angleAt(this.fromSides,this.sides,this.morph,M.sectorT(sides,sector)));
+ }
  hit(angle=this.angle){const p=E.playerHitPoint(angle);
   return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(p,w.points));
  }
@@ -305,41 +327,69 @@ class HyperGame extends E.Game{
  }
  sampleWalls(){
   if(!this._spawns)return;
-  const t=this.time;
-  if(t<this._sampleTime){this._cursor=0;this._active.length=0}
-  this._sampleTime=t;
-  this.wallFrame=Math.floor(t*60+1e-8);
-  // HYPER-specific source shape schedule is active also AFTER 60s.
-  // Unlike the generic level, do not postpone shape change until walls vanish.
-  if(t>=60){const target=sidesAt(t);
-   if(this.sides!==target){this.fromSides=this.sides;this.sides=target;
-    this.pendingSides=target;this.shapeWait=false;this.morph=0;}
-  }
-  if(this.sides!==this._lastSpokenSides){
-   const last=SHAPES.filter(([at,n])=>at<=t+EPS&&n===this.sides).at(-1);
-   this.morphEventAt=last?.[0]||t;
-   this._lastSpokenSides=this.sides;
-  }
-  this.recordedCamera=cameraAt(t);this.referenceCamera=this.recordedCamera;
-  while(this._cursor<this._spawns.length&&this._spawns[this._cursor].start<=t)
-   this._active.push(this._spawns[this._cursor++]);
-  for(let i=this._active.length-1;i>=0;i--)if(t>=this._active[i].end)this._active.splice(i,1);
-  this.walls.length=0;
-  for(const w of this._active){const r=w.r-w.speed*(t-w.start);
-   for(const a of w.actors){a.r=r;
-    const poly=E.wallVisualPoly(a,this.fromSides,this.sides,this.morph);
-    for(let j=0;j<a.points.length;j++){
-     a.points[j][0]=poly[j][0];a.points[j][1]=poly[j][1];
+  const t=this.time,shape=shapeAt(t),clock=wallClock(t);
+  const previous=this._previousShapeState;
+  if(previous&&(previous.from!==shape.from||previous.to!==shape.to||
+      Math.abs(previous.progress-shape.progress)>EPS)){
+   const track=M.trackAtAngle(previous.from,previous.to,previous.progress,this.angle);
+   if(this.controlMode===1){
+    this.angle=E.wrap(M.angleAt(shape.from,shape.to,shape.progress,track));
+    this._shapeRide=null;
+   }else{
+    if(!this._shapeRide||previous.to!==shape.to){
+     const destAngle=E.wrap(M.angleAt(shape.to,shape.to,1,track));
+     const destSector=Math.floor(destAngle/TAU*shape.to)%shape.to;
+     this._shapeRide={from:track,to:M.sectorT(shape.to,destSector)};
     }
+    const u=shape.progress*shape.progress*(3-2*shape.progress);
+    const ride=this._shapeRide;
+    this.angle=E.wrap(M.angleAt(shape.from,shape.to,shape.progress,
+     ride.from+(ride.to-ride.from)*u));
+    if(shape.progress>=1)this._shapeRide=null;
+   }
+  }
+  this._previousShapeState=shape;
+  this.fromSides=shape.from;this.sides=shape.to;this.morph=shape.progress;
+  this.pendingSides=shape.to;this.shapeWait=false;this.morphEventAt=shape.at;
+  this.wallMotionTime=clock;this.wallFrame=Math.floor(t*60+1e-8);
+  this._lastSpokenSides=shape.to;
+  this.recordedCamera=cameraAt(t);this.referenceCamera=this.recordedCamera;
+  if(clock<this._sampleTime-EPS){this._cursor=0;this._active.length=0}
+  this._sampleTime=clock;
+  while(this._cursor<this._spawns.length&&this._spawns[this._cursor].start<=clock+EPS)
+   this._active.push(this._spawns[this._cursor++]);
+  for(let i=this._active.length-1;i>=0;i--)if(clock>=this._active[i].end)
+   this._active.splice(i,1);
+  const worldKey=shape.from+':'+shape.to+':'+shape.progress;
+  if(this._unitKey!==worldKey){
+   this._unitKey=worldKey;
+   this._units=M.KNOTS.map(u=>M.pointAt(shape.from,shape.to,shape.progress,u));
+  }
+  this.walls.length=0;
+  for(const w of this._active){
+   const radial=w.r-w.speed*(clock-w.start);
+   for(const a of w.actors){
+    a.r=radial;
+    const p=this._units[Math.round(a.mixedStart*6)];
+    const q=this._units[Math.round(a.mixedEnd*6)];
+    const inner=Math.max(0,radial),outer=Math.max(inner,radial+a.thickness);
+    const v=a.points;
+    v[0][0]=p[0]*inner;v[0][1]=p[1]*inner;
+    v[1][0]=q[0]*inner;v[1][1]=q[1]*inner;
+    v[2][0]=q[0]*outer;v[2][1]=q[1]*outer;
+    v[3][0]=p[0]*outer;v[3][1]=p[1]*outer;
+    a.collapsed=Math.abs((v[1][0]-v[0][0])*(v[2][1]-v[0][1])-
+      (v[1][1]-v[0][1])*(v[2][0]-v[0][0]))<1e-8;
     this.walls.push(a);
    }
   }
  }
- stepSector(direction){const moved=super.stepSector(direction);if(moved){const w=this.hit();if(w){
-  this.dead=true;this.freezeDeathCamera();}}
+ stepSector(direction){const moved=super.stepSector(direction);
+  if(moved){this._shapeRide=null;const w=this.hit();if(w){this.dead=true;this.freezeDeathCamera();}}
   return moved;
  }
  selectSector(sector){const moved=super.selectSector(sector);
+  if(moved)this._shapeRide=null;
   if(this.dead)this.freezeDeathCamera();return moved;
  }
  update(dt,input=0){if(this.dead||this.timelineEnded||!(dt>0))return;
@@ -364,7 +414,7 @@ class HyperGame extends E.Game{
  }
 }
 const API={HyperGame,create,PRE_PARTS,POST_PARTS,BRIDGE,ALL_PARTS,SHAPES,
- SOURCE_WALLS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,cameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
+ SOURCE_WALLS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,MORPH_SECONDS,shapeAt,wallClock,cameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
  hasCoarseRoute,sidesAt};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper78=API;
