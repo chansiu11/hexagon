@@ -104,9 +104,16 @@ function arrangeEra(parts,random,video,endTime,keepFirst){
  const slots=shuffle(Array.from({length:N},(_,i)=>i).filter(i=>!keepFirst||i!==0),random)
   .sort((a,b)=>capacity[a]-capacity[b]);
  function dfs(slot,seen){
-  const candidates=shuffle(Array.from({length:N},(_,i)=>i).filter(i=>
-   (!keepFirst||i!==0)&&parts[i].sourceEnd-parts[i].sourceStart<=capacity[slot]+1e-8),random)
-   .sort((a,b)=>(owner[a]===-1?0:1)-(owner[b]===-1?0:1));
+  // Prefer source phrases with similar duration; otherwise a 0-second
+  // optical singleton can be dropped into a 3-second multi-wall phrase
+  // slot and leave the entire arena blank. Limit extra silence to 0.45s.
+  const slotDuration=parts[slot].sourceEnd-parts[slot].sourceStart;
+  const candidates=shuffle(Array.from({length:N},(_,i)=>i).filter(i=>{
+   const span=parts[i].sourceEnd-parts[i].sourceStart;
+   return (!keepFirst||i!==0)&&span<=capacity[slot]+1e-8&&
+    span>=Math.max(0,slotDuration-.45);
+  }),random).map(i=>({i,rank:parts[i].sourceEnd-parts[i].sourceStart+
+     random()*1})).sort((a,b)=>b.rank-a.rank).map(x=>x.i);
   for(const part of candidates){
    if(seen.has(part))continue;seen.add(part);
    if(owner[part]===-1||dfs(owner[part],seen)){
@@ -150,10 +157,11 @@ function assemble(entries,seed,video,duration,extended=false){const waves=[],par
    count,rotation:0,mirrored:false,anchored:!!part.anchored});
  }
  if(extended&&!video){
-  // Repeat only measured late phrases AFTER the actual source footage
-  // ends. A repeated outer wall must not become visible in the video
-  // reference window before its terminal 88.04s HUD freeze.
-  let at=REF_END+(MAX_RADIUS-ORBIT)/SPEED+.12,random=rng(seed^0x124ef8),loops=0;
+  // Extend ONLY randomized play with already-recorded late phrases.
+  // The video-comparison mode still ends at the filmed death. In normal
+  // play, the first repeated ring must appear as the last known one exits,
+  // otherwise a >3 second wall-free hole interrupts the game.
+  let at=REF_END+.8,random=rng(seed^0x124ef8),loops=0;
   while(at<duration&&loops++<48&&POST_PARTS.length){
    for(const part of shuffle(POST_PARTS,random)){if(at>=duration)break;
     const group=partOrder.length;let count=0;
