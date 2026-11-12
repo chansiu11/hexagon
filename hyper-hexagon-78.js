@@ -96,7 +96,8 @@ function scheduleEra(parts,random,original,eraEnd){
   if(!original&&!slot.anchored){
    const slotDuration=phraseLength(slot);
    const maxLength=Math.max(0,next-at-.28);
-   const minLength=slotDuration>.01?Math.max(.12,slotDuration*.58):0;
+   // Bound added dead air to <=0.68s beyond the recorded source gap.
+   const minLength=slotDuration>.01?Math.max(.12,slotDuration-.68):0;
    let bank=parts.filter(p=>!p.anchored&&p.sides===slot.sides&&
      phraseLength(p)<=maxLength+EPS&&phraseLength(p)+EPS>=minLength&&
      (slotDuration>.01||phraseLength(p)<=.60));
