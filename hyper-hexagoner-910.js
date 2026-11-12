@@ -268,44 +268,98 @@ class HyperHexagonerGame extends E.Game{
    for(const a of w.actors){a.r=rad+a.offset;
     const poly=E.wallVisualPoly(a);
     for(let j=0;j<4;j++){a.points[j][0]=poly[j][0];a.points[j][1]=poly[j][1]}
-    this.walls.push(a);
+    const p=a.points;
+    a.collapsed=Math.abs((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-
+      (p[1][1]-p[0][1])*(p[2][0]-p[0][0]))<1e-8;
+    // As in task 1, a vanished or zero-area panel never blocks the orbit.
+    if(!a.collapsed)this.walls.push(a);
    }
   }
  }
- hit(angle=this.angle){const center=E.playerHitPoint(angle);
-  return this.walls.find(w=>E.pointInPolygon(center,w.points))||false;
+ hit(angle=this.angle){
+  // Identical visible quadrilaterals and physical collision shapes:
+  // point in polygon at the small central avatar hitbox, not its outline.
+  const center=E.playerHitPoint(angle);
+  return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(center,w.points))||null;
+ }
+ die(w){
+  if(!w||this.dead)return false;
+  this.dead=true;
+  const contact=E.playerHitPoint(this.angle);
+  this.death={time:this.time,angle:this.angle,sides:this.sides,
+   wallId:w.id,player:E.playerPoly(this.angle).map(p=>p.slice()),
+   wall:w.points.map(p=>p.slice()),holes:[],contact:contact.slice()};
+  // Capture exact source frame before camera or walls can advance.
+  this.freezeDeath();
+  return true;
  }
  freezeDeath(){if(this.deathCamera)return;
   const camera=this.recordedCamera?.slice()||this.lastDrawCamera?.slice()||cameraAt(this.time);
-  const struck=this.hit();
-  if(!this.death)this.death={time:this.time,angle:this.angle,sides:this.sides,
-   wallId:struck?.id||null,player:E.playerPoly(this.angle).map(p=>p.slice()),
-   wall:struck?.points?.map(p=>p.slice())||[],holes:[],contact:E.playerHitPoint(this.angle).slice()};
+  if(!this.death){
+   const w=this.hit();
+   this.death={time:this.time,angle:this.angle,sides:this.sides,
+    wallId:w?.id||null,player:E.playerPoly(this.angle).map(p=>p.slice()),
+    wall:w?.points?.map(p=>p.slice())||[],holes:[],
+    contact:E.playerHitPoint(this.angle).slice()};
+  }
   this.deathCamera={rotation:Math.atan2(camera[1],camera[0]),zoom:this.zoom,
    tilt:this.tilt,time:this.time,sides:this.sides,angle:this.angle,affine:camera};
   this.rotationSpeed=0;
  }
- stepSector(direction){const moved=super.stepSector(direction);
-  if(moved&&(this.dead||this.hit())){this.dead=true;this.freezeDeath()}return moved;}
- selectSector(sector){const moved=super.selectSector(sector);
-  if(moved&&(this.dead||this.hit())){this.dead=true;this.freezeDeath()}return moved;}
- update(dt,input=0){if(this.dead||this.timelineEnded||dt<=0)return;
+ // Mode 2 inherits the sector-step effect, but ONLY this class' center
+ // point test determines a death, matching task 1's side-contact rules.
+ stepSector(direction){
+  const moved=super.stepSector(direction);
+  if(moved)this.die(this.hit());
+  return moved;
+ }
+ // Do not call the base selectSector(): it can set dead before this
+ // source-specific renderer captures an accurate collision frame.
+ selectSector(sector){
+  if(this.controlMode!==3||this.dead||this.timelineEnded||
+   !Number.isInteger(sector)||sector<0||sector>=this.sides)return false;
+  const from=this.angle,to=this.sectorAngle(sector);
+  this.angle=to;this.playerLean=0;
+  const turn=Math.atan2(Math.sin(to-from),Math.cos(to-from));
+  if(Math.abs(turn)>1e-9)this.stepEffect={from,to,
+   direction:Math.sign(turn),count:Math.abs(turn)/SEC,age:0,duration:.23};
+  this.die(this.hit());
+  return true;
+ }
+ update(dt,input=0){
+  if(this.dead||this.timelineEnded||!(dt>0))return;
   const count=Math.max(1,Math.ceil(dt*240)),h=dt/count;
   for(let i=0;i<count;i++){
-   if(this.stepEffect){this.stepEffect.age+=h;if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null}
-   this.teleportCooldown=Math.max(0,this.teleportCooldown-h);
-   this.time+=h;this.completed=this.time>=60;
-   if(this.time>=this.timeline.duration){this.time=this.timeline.duration;this.timelineEnded=true;break}
-   if(this.controlMode===1&&input){const from=this.angle,to=E.wrap(from+input*this.playerSpeed*h);
+   // Advance a held direction before the walls advance, as in HardGame.
+   // Lateral contact clips the movement to the last safe angle and is not
+   // a death by itself. A descending wall covering the hit point is fatal.
+   if(this.controlMode===1&&input){
+    const from=this.angle,to=E.wrap(from+input*this.playerSpeed*h);
     if(!this.hit(to))this.angle=to;
-    else if(!this.hit(from)){let lo=0,hi=1;for(let k=0;k<12;k++){
-     const u=(lo+hi)/2;if(this.hit(E.wrap(from+input*this.playerSpeed*h*u)))hi=u;else lo=u;
-    }this.angle=E.wrap(from+input*this.playerSpeed*h*lo)}
+    else if(!this.hit(from)){
+     let lo=0,hi=1;
+     for(let j=0;j<12;j++){
+      const m=(lo+hi)*.5;
+      if(this.hit(E.wrap(from+input*this.playerSpeed*h*m)))hi=m;else lo=m;
+     }
+     this.angle=E.wrap(from+input*this.playerSpeed*h*lo);
+    }
+   }
+   this.teleportCooldown=Math.max(0,this.teleportCooldown-h);
+   if(this.stepEffect){
+    this.stepEffect.age+=h;
+    if(this.stepEffect.age>=this.stepEffect.duration)this.stepEffect=null;
+   }
+   this.time+=h;
+   if(this.time>=this.timeline.duration){
+    this.time=this.timeline.duration;this.timelineEnded=true;break;
    }
    this.playerLean+=(input*.6-this.playerLean)*(1-Math.exp(-h/(input?.055:.085)));
-   this.rotation=Math.atan2(this.recordedCamera?.[1]||0,this.recordedCamera?.[0]||1);
+   this.completed=this.time>=60;
    this.sides=SIDES;this.fromSides=SIDES;this.morph=1;this.pendingSides=SIDES;
-   this.sampleWalls();if(this.hit()){this.dead=true;this.freezeDeath();break}
+   this.sampleWalls();
+   this.rotation=Math.atan2(this.recordedCamera?.[1]||0,this.recordedCamera?.[0]||1);
+   if(this.die(this.hit()))break;
   }
  }
 }
