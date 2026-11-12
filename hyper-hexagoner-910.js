@@ -1,5 +1,5 @@
 /* HYPER HEXAGONER — task 9 (<60 HUD seconds) and task 10 (>=60).
- * Source 1557(10).mp4 video 06:44.40–08:09.0, observed result ~88.04.
+ * Source 1557(10).mp4 video ~06:43.47–08:08.10; recorded game-over timer 88.04.
  * 63 pre-death optical crossing cues, HUD-time calibrated, then grouped into intact dodge phrases.
  * Only phrase ORDER can shuffle; never rotate, mirror, change event mask,
  * reorder events within a phrase, or split the 60s boundary phrase.
