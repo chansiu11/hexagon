@@ -36,6 +36,27 @@ const EVENTS=Object.freeze(Array.from({length:VIDEO_CUES},(_,i)=>{
   opticalTime,mask:decode(v.slice(3,5)),width:decode(v.slice(5,7)),
   videoSecond});
 }));
+// Video-frame gap reconstruction (additional optical observations).
+// The original orbit-crossing detector counted only 63 peaks at one small
+// radius. Purple/blue ring bands are visibly present in these video frames
+// during periods when that sparse data renders ZERO walls. Times below
+// estimate when each pictured band reaches the avatar orbit; masks/widths
+// are visual estimates, not original-game exact source instructions.
+// Never synthesize post-death walls. Keep optical provenance for later
+// frame-by-frame correction.
+const GAP_OBSERVATIONS=Object.freeze([
+ [4.29,50,48,407.40],[4.93,25,53,407.40],
+ [12.65,22,50,414.90],[15.52,42,48,417.00],
+ [23.82,38,55,425.90],[24.58,13,43,425.90],
+ [28.54,50,55,430.50],[36.72,52,48,439.50],
+ [46.12,40,52,447.00],[48.70,26,49,449.00],
+ [57.20,22,51,459.00],[72.70,38,54,473.05],
+ [79.50,26,50,479.00]
+].map(([time,mask,width,referenceVideoSecond],i)=>Object.freeze({
+ id:'gap-'+String(i+1).padStart(2,'0'),time,mask,width,
+ videoSecond:videoAtGameTime(time),referenceVideoSecond,
+ source:'optical-gap-observation',estimated:true
+})));
 const PHASE=[1825];
 for(let i=0;i<CAMERA.length;i+=2)PHASE.push(PHASE.at(-1)+decode(CAMERA.slice(i,i+2))-100);
 const CAM_PERIOD=25/24/12,ZOOM_PERIOD=.5;
@@ -61,7 +82,7 @@ function hueAt(t){
 if(EVENTS.length!==63||PHASE.length!==326||
  EVENTS.some((e,i)=>e.time>=88.04||(i>0&&e.time<=EVENTS[i-1].time)))
  throw Error('Malformed HYPER HEXAGONER source timing');
-const API=Object.freeze({EVENTS,PHASE,HUES,ZOOM,cameraPost,zoomPost,hueAt,
+const API=Object.freeze({EVENTS,GAP_OBSERVATIONS,PHASE,HUES,ZOOM,cameraPost,zoomPost,hueAt,
  VIDEO_START:403.47,VIDEO_END:488.1,GAME_RATE:25/24,REFERENCE_GAME_END:88.04,
  HUD_KNOTS,gameTimeAtVideo,videoAtGameTime,CAMERA_START:60.59,VIDEO_CUES,
  SOURCE:'1557(10).mp4',IS_APPROXIMATE:true});
