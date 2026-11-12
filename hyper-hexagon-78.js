@@ -80,36 +80,43 @@ const POST_PARTS=Object.freeze(derivePostParts());
 const ALL_PARTS=Object.freeze([...PRE_PARTS,BRIDGE,...POST_PARTS]);
 const SOURCE_WALLS=ALL_PARTS.reduce((n,p)=>n+p.events.length,0);
 if(SOURCE_WALLS!==112)throw Error('Source inventory changed: expected 71+41 video wall candidates');
-function shuffleGroup(group,rand,keepIntro=false){
- // Only whole clips of the same polygon-side family are permuted, never
- // reoriented, reflected, split, or exchanged across the 60s boundary.
- const locked=keepIntro?group.slice(0,1):[];
- const pool=keepIntro?group.slice(1):group.slice();
- for(let i=pool.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
- return [...locked,...pool];
-}
-function scheduleEra(parts,random,original,keepIntro){
- const planned=[];
- for(let i=0;i<parts.length;){
-  const key=p=>p.anchored?'anchor:'+p.id:'shape:'+p.sides;
-  const k=key(parts[i]);let end=i+1;
-  while(end<parts.length&&key(parts[end])===k)end++;
-  const slots=parts.slice(i,end),selected=original||parts[i].anchored?slots:shuffleGroup(slots,random,keepIntro&&i===0);
-  // Use the recorded gaps assigned to the original temporal slots.
-  // Total phrase duration in a side-family is invariant under permutation.
-  let at=slots[0].sourceStart;
-  for(let j=0;j<slots.length;j++){
-   planned.push({part:selected[j],at});
-   const gap=j+1<slots.length?Math.max(0,slots[j+1].sourceStart-slots[j].sourceEnd):0;
-   at+=selected[j].sourceEnd-selected[j].sourceStart+gap;
+// Keep the original 30 filmed dodge phrases intact. Previously the
+// 'random' selector only permuted ADJACENT same-shape phrases, leaving most
+// runs nearly fixed. Pick from the whole same-era, same-shape phrase bank
+// instead. Each VIDEO impact slot remains anchored in time, so every chosen
+// phrase has to fit between adjacent slots and end before the 60s bridge.
+// This preserves the transition schedule, never rotates/mirrors a part,
+// and leaves the original-order video comparison mode untouched.
+const phraseLength=p=>p.sourceEnd-p.sourceStart;
+function scheduleEra(parts,random,original,eraEnd){
+ const planned=[],uses=new Map();let previous=null;
+ for(let i=0;i<parts.length;i++){
+  const slot=parts[i],at=slot.sourceStart,next=i+1<parts.length?parts[i+1].sourceStart:eraEnd;
+  let chosen=slot;
+  if(!original&&!slot.anchored){
+   const slotDuration=phraseLength(slot);
+   const maxLength=Math.max(0,next-at-.28);
+   const minLength=slotDuration>.01?Math.max(.12,slotDuration*.58):0;
+   let bank=parts.filter(p=>!p.anchored&&p.sides===slot.sides&&
+     phraseLength(p)<=maxLength+EPS&&phraseLength(p)+EPS>=minLength&&
+     (slotDuration>.01||phraseLength(p)<=.60));
+   if(!bank.length)bank=[slot];
+   // A shuffle bag across compatible phrases encourages coverage before
+   // repetition; no phrase receives a direction flip or new wall mask.
+   const minUses=Math.min(...bank.map(p=>uses.get(p.id)||0));
+   bank=bank.filter(p=>(uses.get(p.id)||0)===minUses);
+   if(bank.length>1&&previous){const distinct=bank.filter(p=>p.id!==previous);if(distinct.length)bank=distinct;}
+   chosen=bank[Math.floor(random()*bank.length)]||slot;
   }
-  i=end;
+  uses.set(chosen.id,(uses.get(chosen.id)||0)+1);previous=chosen.id;
+  planned.push({part:chosen,at});
  }
  return planned;
 }
 function arrange(seed,original){const random=randomFrom(seed);
- return [...scheduleEra(PRE_PARTS,random,original,true),{part:BRIDGE,at:BRIDGE.sourceStart},
-  ...scheduleEra(POST_PARTS,random,original,false)];
+ return [...scheduleEra(PRE_PARTS,random,original,BRIDGE.sourceStart),
+  {part:BRIDGE,at:BRIDGE.sourceStart},
+  ...scheduleEra(POST_PARTS,random,original,REF_END+.75)];
 }
 function wallFor(e,at,id,group,part){
  const impact=at+e.offset,n=e.sides;
