@@ -450,22 +450,33 @@ function drawHexagonestWalls(walls,color){
 
 function drawWallField(walls,color,game){
  if(game.hyperHexagonSource78||game.hyperHexagonerSource910){
-  // Draw one filled polygon for connected same-band panels.
-  // Actor polygons are also the hitbox; other stages use their existing renderer.
+  // Same cached quads for physics and visuals, joined into contiguous
+  // filled contours including the sector 5->0 wrap.
   ctx.fillStyle=color;
   for(let i=0;i<walls.length;){
    let end=i+1;
    while(end<walls.length&&walls[end].waveId===walls[i].waveId)end++;
-   const actors=walls.slice(i,end);
-   for(let j=0;j<actors.length;){
-    let k=j+1;
-    while(k<actors.length&&actors[k].sector===actors[k-1].sector+1&&
-     actors[k].r===actors[k-1].r&&actors[k].thickness===actors[k-1].thickness)k++;
-    ctx.beginPath();ctx.moveTo(...actors[j].points[0]);
-    for(let a=j;a<k;a++)ctx.lineTo(...actors[a].points[1]);
-    ctx.lineTo(...actors[k-1].points[2]);
-    for(let a=k-1;a>=j;a--)ctx.lineTo(...actors[a].points[3]);
-    ctx.closePath();ctx.fill();j=k;
+   const wave=walls.slice(i,end),byBand=new Map();
+   for(const actor of wave){const band=actor.band??0;
+    if(!byBand.has(band))byBand.set(band,[]);
+    byBand.get(band).push(actor);
+   }
+   for(let arr of byBand.values()){
+    arr.sort((a,b)=>a.sector-b.sector);
+    if(arr.length>1&&arr[0].sector===0&&arr.at(-1).sector===arr[0].sides-1){
+     const cut=arr.findIndex((actor,k)=>k>0&&actor.sector!==arr[k-1].sector+1);
+     if(cut>0)arr=[...arr.slice(cut),...arr.slice(0,cut)];
+    }
+    for(let j=0;j<arr.length;){
+     let k=j+1;
+     while(k<arr.length&&arr[k].sector===(arr[k-1].sector+1)%arr[k-1].sides&&
+      Math.abs(arr[k].r-arr[k-1].r)<1e-6&&Math.abs(arr[k].thickness-arr[k-1].thickness)<1e-6)k++;
+     ctx.beginPath();ctx.moveTo(...arr[j].points[0]);
+     for(let a=j;a<k;a++)ctx.lineTo(...arr[a].points[1]);
+     ctx.lineTo(...arr[k-1].points[2]);
+     for(let a=k-1;a>=j;a--)ctx.lineTo(...arr[a].points[3]);
+     ctx.closePath();ctx.fill();j=k;
+    }
    }
    i=end;
   }
