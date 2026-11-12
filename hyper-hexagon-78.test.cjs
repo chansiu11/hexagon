@@ -15,6 +15,18 @@ class Game{
  selectSector(k){this.angle=(k+.5)*2*Math.PI/this.sides;return true;}
 }
 const E={Game,ORIGINAL_ARROW_DEGREES_PER_TICK:[7,7,9,7,7,9],
+ shapeStateAt(t,s,duration=.18){let k=0;for(let i=1;i<s.length&&s[i][0]<=t;i++)k=i;
+  return {from:k?s[k-1][1]:s[0][1],to:s[k][1],progress:k?Math.max(0,Math.min(1,(t-s[k][0])/duration)):1};},
+ wallTimelineTime(t,s){
+  let lag=0;
+  for(let i=1;i<s.length;i++){
+   const [a]=s[i],elapsed=t-a;if(elapsed<=0)continue;
+   if(elapsed<=.28)lag=elapsed;
+   else if(elapsed<.63)lag=.28*(1-(elapsed-.28)/.35);
+   else lag=0;
+  }
+  return Math.max(0,t-lag);
+ },
  wrap:x=>((x%(2*Math.PI))+2*Math.PI)%(2*Math.PI),
  playerHitPoint:a=>[66*Math.cos(a),66*Math.sin(a)],
  playerPoly:a=>[[66*Math.cos(a),66*Math.sin(a)],[64*Math.cos(a+.1),64*Math.sin(a+.1)],[64*Math.cos(a-.1),64*Math.sin(a-.1)]],
@@ -99,7 +111,35 @@ assert.equal(H.deathScale(0),1);assert(H.deathScale(1.15)>4);
  assert.deepEqual(g.deathCamera.affine,source,'capture the impact physics frame, not a stale rendered frame');
  g.time=20.2;g.sampleWalls();assert.deepEqual(g.deathCamera.affine,source);
 }
+assert.equal(H.MORPH_SECONDS,.18,'HARD task1/2 short morph duration');
+assert.equal(H.shapeAt(8.2-.01).to,6);
+assert.equal(H.shapeAt(8.2+.09).from,6);
+assert.equal(H.shapeAt(8.2+.09).to,5);
+assert(Math.abs(H.shapeAt(8.2+.09).progress-.5)<1e-8);
+for(const [time] of H.SHAPES.slice(1)){
+ const a=H.wallClock(time),b=H.wallClock(time+.18),c=H.wallClock(time+.28);
+ assert(Math.abs(a-b)<1e-7&&Math.abs(a-c)<1e-7,'hold wall motion over shape transition');
+ assert(Math.abs(H.wallClock(time+.64)-(time+.64))<1e-7,
+ 'resume original source wall clock without accumulated delay');
+}
+for(const [t,from,to,progress] of [[8.29,6,5,.5],[13.023,5,4,.5],[19.223,4,5,.5],[63.54,5,6,.5],[75.41,5,4,.5]]){
+ const g=new H.HyperGame(H.create(null,88,115,{order:'video'}));
+ g.time=t;g.sampleWalls();
+ assert.equal(g.fromSides,from);assert.equal(g.sides,to);
+ assert(Math.abs(g.morph-progress)<1e-5,'shape matches timed video state');
+ assert(g.walls.every(w=>Number.isFinite(w.mixedStart)&&Number.isFinite(w.mixedEnd)&&
+   w.points.length===4&&w.points.every(p=>p.every(Number.isFinite))),
+  'source masks retain permanent six-track collision quads');
+}
+for(const [at] of H.SHAPES.slice(1)){
+ const g=new H.HyperGame(H.create(null,88,115,{order:'video'}));
+ g.time=at-.001;g.sampleWalls();
+ const prior=g.angle;
+ g.time=at+.001;g.sampleWalls();
+ const delta=Math.atan2(Math.sin(g.angle-prior),Math.cos(g.angle-prior));
+ assert(Math.abs(delta)<.15,'player stays on surviving lane, never teleports');
+}
 assert.deepEqual(H.shakeAt(2,1,false),[0,0]);
 fs.writeFileSync(__dirname+'/parts-derived.json',JSON.stringify(H.ALL_PARTS.map(p=>({id:p.id,era:p.era,anchored:!!p.anchored,sourceStart:p.sourceStart,sourceEnd:p.sourceEnd,sourceVideoStart:p.sourceVideoStart,sourceVideoEnd:p.sourceVideoEnd,sides:p.sides,count:p.events.length})),null,2));
 console.log('RANDOM distinct:',new Set(variants).size,'fallbacks:',fallback.filter(Boolean).length,'of',fallback.length);
-console.log('PASS hyper task7/8: VIDEO order 112 source cues, 18+bridge+11 source parts, 60s bridge fixed, 540deg/s, 10 well-shuffled phrase bags; random event count varies by part choice');
+console.log('PASS hyper task7/8: VIDEO order 112 source cues, 18+bridge+11 source parts, 60s bridge fixed, 540deg/s, 10 well-shuffled phrase bags; HARD-inspired six-track morph, wall hold and recovery');
