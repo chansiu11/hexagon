@@ -95,6 +95,21 @@ for(let t=4;t<86.5;t+=.05){
 }
 assert(empty/total<.16,'video source must not drop most of its on-screen walls');
 assert(maxBlank<1,'the formerly 2-second video gap must be filled');
+// The one-use shuffle used to place a 0-second singleton into a 3s
+// source slot. Test the actual radial envelope; a merely reachable route
+// can still look like a completely empty screen.
+for(let seed of [1,2,3,5,17,42,101,2026,86753,91337]){
+ const d=M.create(null,seed,100,{order:'random'});
+ let maxBlank=0,empty=0;
+ for(let t=4;t<90;t+=.1){
+  const shown=d.waves.some(w=>{
+   const r=w.r-w.speed*(t-w.start);
+   return t>=w.start&&t<w.end&&r<=520&&r+w.thickness>=55;
+  });
+  empty=shown?0:empty+.1;maxBlank=Math.max(maxBlank,empty);
+ }
+ assert(maxBlank<=1.01,'random source parts must not leave >1s empty field');
+}
 console.log('PASS tasks 9/10',JSON.stringify(parts),
  '76 source-informed cues, 36 phrases, colorful walls, visible video coverage',
  (100*(1-empty/total)).toFixed(1)+'%', '10 safe seeded shuffles');
