@@ -483,36 +483,30 @@ function drawHexagonestWalls(walls,color){
 
 function drawWallField(walls,color,game){
  if(game.hyperHexagonSource78||game.hyperHexagonerSource910){
-  // Same cached quads for physics and visuals, joined into contiguous
-  // filled contours including the sector 5->0 wrap.
+  // Each actor is an exact collision quad. Joining actors by their SOURCE
+  // sector index is unsafe while the arena morphs (e.g. incoming 4-side
+  // walls during the on-screen 5-side phase at HYPER 12.45s): remapped
+  // sectors can skip or collapse a lane, and the joined contour paints a
+  // giant fan across what should be open space.
+  //
+  // Submit all quads as separate subpaths of ONE fill operation. Canvas'
+  // nonzero fill computes their union, with no per-quad antialias seams
+  // and no synthetic connecting edge. Never change actor geometry,
+  // source masks, collision, timing or angular speed here.
   ctx.fillStyle=color;
-  for(let i=0;i<walls.length;){
-   let end=i+1;
-   while(end<walls.length&&walls[end].waveId===walls[i].waveId)end++;
-   const wave=walls.slice(i,end),byBand=new Map();
-   for(const actor of wave){const band=actor.band??0;
-    if(!byBand.has(band))byBand.set(band,[]);
-    byBand.get(band).push(actor);
-   }
-   for(let arr of byBand.values()){
-    arr.sort((a,b)=>a.sector-b.sector);
-    if(arr.length>1&&arr[0].sector===0&&arr.at(-1).sector===arr[0].sides-1){
-     const cut=arr.findIndex((actor,k)=>k>0&&actor.sector!==arr[k-1].sector+1);
-     if(cut>0)arr=[...arr.slice(cut),...arr.slice(0,cut)];
-    }
-    for(let j=0;j<arr.length;){
-     let k=j+1;
-     while(k<arr.length&&arr[k].sector===(arr[k-1].sector+1)%arr[k-1].sides&&
-      Math.abs(arr[k].r-arr[k-1].r)<1e-6&&Math.abs(arr[k].thickness-arr[k-1].thickness)<1e-6)k++;
-     ctx.beginPath();ctx.moveTo(...arr[j].points[0]);
-     for(let a=j;a<k;a++)ctx.lineTo(...arr[a].points[1]);
-     ctx.lineTo(...arr[k-1].points[2]);
-     for(let a=k-1;a>=j;a--)ctx.lineTo(...arr[a].points[3]);
-     ctx.closePath();ctx.fill();j=k;
-    }
-   }
-   i=end;
+  ctx.beginPath();
+  let count=0;
+  for(const wall of walls){
+   const p=wall.points;
+   if(!p||p.length!==4||!p.every(pt=>Number.isFinite(pt[0])&&Number.isFinite(pt[1])))continue;
+   ctx.moveTo(p[0][0],p[0][1]);
+   ctx.lineTo(p[1][0],p[1][1]);
+   ctx.lineTo(p[2][0],p[2][1]);
+   ctx.lineTo(p[3][0],p[3][1]);
+   ctx.closePath();
+   count++;
   }
+  if(count)ctx.fill();
   return;
  }
 
