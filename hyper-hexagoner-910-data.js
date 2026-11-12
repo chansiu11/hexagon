@@ -43,14 +43,27 @@ const linear=(arr,x)=>{const k=Math.max(0,Math.min(arr.length-1,x)),j=Math.floor
  return arr[j]*(1-u)+arr[Math.min(arr.length-1,j+1)]*u;};
 function cameraPost(t){return linear(PHASE,Math.max(0,t-60)/CAM_PERIOD)/100;}
 function zoomPost(t){return linear(ZOOM,Math.max(0,t-60)/ZOOM_PERIOD)/100;}
-function hueAt(t){let index=0;for(let i=1;i<HUES.length;i++)if(HUES[i][0]<=t)index=i;
- return HUES[index][1];}
+function videoAtGameTime(t){
+ const time=Math.max(0,t);
+ for(let i=1;i<HUD_KNOTS.length;i++){
+  const a=HUD_KNOTS[i-1],b=HUD_KNOTS[i];
+  if(time<=b[1])return a[0]+(time-a[1])/(b[1]-a[1])*(b[0]-a[0]);
+ }
+ return HUD_KNOTS.at(-1)[0];
+}
+function hueAt(t){
+ // The hue observations were indexed by the previous optical-game clock.
+ // Convert corrected HUD time back to the exact filmed frame first.
+ const optical=Math.max(0,(videoAtGameTime(t)-404.4)*25/24);
+ let index=0;for(let i=1;i<HUES.length;i++)if(HUES[i][0]<=optical)index=i;
+ return HUES[index][1];
+}
 if(EVENTS.length!==63||PHASE.length!==326||
  EVENTS.some((e,i)=>e.time>=88.04||(i>0&&e.time<=EVENTS[i-1].time)))
  throw Error('Malformed HYPER HEXAGONER source timing');
 const API=Object.freeze({EVENTS,PHASE,HUES,ZOOM,cameraPost,zoomPost,hueAt,
  VIDEO_START:403.47,VIDEO_END:488.1,GAME_RATE:25/24,REFERENCE_GAME_END:88.04,
- HUD_KNOTS,gameTimeAtVideo,CAMERA_START:60.59,VIDEO_CUES,
+ HUD_KNOTS,gameTimeAtVideo,videoAtGameTime,CAMERA_START:60.59,VIDEO_CUES,
  SOURCE:'1557(10).mp4',IS_APPROXIMATE:true});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper910Data=API;
