@@ -12,7 +12,8 @@ const D=typeof module!=='undefined'?require('./hyper-hexagoner-910-data'):root.H
 if(!E?.Game||!D?.EVENTS)throw Error('HYPER HEXAGONER dependencies missing');
 const LEVEL=4,TAU=2*Math.PI,SIDES=6,ORBIT=66,SPEED=382,MAX_RADIUS=1290,
  REF_END=D.REFERENCE_GAME_END,SEC=TAU/6;
-const PLAYER_SPEED=E.PLAYER_SPEED_BY_LEVEL?.[LEVEL]||7*TAU/360*60; // stage 1/5 7° per 60Hz tick
+const PLAYER_DEGREES_PER_TICK=7; // source-informed HYPER HEXAGONER mode 1: 7° at 60Hz
+const PLAYER_SPEED=PLAYER_DEGREES_PER_TICK*TAU/360*60;
 const mod=(a,n)=>(a%n+n)%n,clamp=(a,b,c)=>Math.max(b,Math.min(c,a));
 function rng(seed){let x=(seed^0x7af927d3)>>>0;return ()=>{x=(x+0x6d2b79f5)>>>0;
  let y=Math.imul(x^(x>>>15),1|x);y^=y+Math.imul(y^(y>>>7),61|y);
@@ -138,19 +139,57 @@ function create(sourceTimeline=null,seed=seedNow(),duration=3600,options={}){
  }
  return d;
 }
-function beforeCamera(t){const p=P[LEVEL].camera;
- const ix=clamp(Math.floor((Math.max(0,t)-p.start)*p.sampleRate+1e-8),0,p.frames.length-1);
- return p.frames[ix].slice();
+function smoothSlope(before,value,after){
+ const a=value-before,b=after-value;
+ return a*b<=0?0:Math.sign(b)*Math.min(Math.abs((a+b)/2),3*Math.min(Math.abs(a),Math.abs(b)));
 }
-function cameraAt(t,pulse=0){const time=Math.max(0,t),beat=clamp(pulse,0,1);
+function smoothTrack(array,x){
+ const p=clamp(x,0,array.length-1),i=Math.floor(p),u=p-i;
+ const y0=array[i],y1=array[Math.min(i+1,array.length-1)];
+ if(i>=array.length-1||y0===y1)return y0;
+ const v0=smoothSlope(array[Math.max(0,i-1)],y0,y1);
+ const v1=smoothSlope(y0,y1,array[Math.min(i+2,array.length-1)]);
+ const u2=u*u,u3=u2*u;
+ return (2*u3-3*u2+1)*y0+(u3-2*u2+u)*v0+
+  (-2*u3+3*u2)*y1+(u3-u2)*v1;
+}
+const PHASE_INTERVAL=D.GAME_RATE/12;
+function sourcePhase(time){
+ // The 12fps optical camera samples remain the source knots, but their
+ // angular velocity becomes continuous between knots at display FPS.
+ return smoothTrack(D.PHASE,Math.max(0,time-60)/PHASE_INTERVAL)/100;
+}
+function sourceZoom(time){
+ return smoothTrack(D.ZOOM,Math.max(0,time-60)*2)/100;
+}
+function beforeCamera(t){
+ const p=P[LEVEL].camera,phase=(Math.max(0,t)-p.start)*p.sampleRate;
+ const frame=clamp(phase,0,p.frames.length-1),i=Math.floor(frame),u=frame-i;
+ const f=p.frames[i],g=p.frames[Math.min(i+1,p.frames.length-1)];
+ // The old Math.floor() froze both walls and backdrop for four 60fps
+ // draws, then jumped the entire world in one draw.
+ return f.map((v,k)=>v+(g[k]-v)*u);
+}
+const angleDelta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+function joinCamera(previous,angle,zoom,progress){
+ const u=clamp(progress,0,1),v=u*u*(3-2*u);
+ const a=Math.atan2(previous[1],previous[0]),radius=Math.hypot(previous[0],previous[1])||1;
+ const rot=a+angleDelta(a,angle)*v,mag=radius+(zoom-radius)*v;
+ const c=Math.cos(rot),sn=Math.sin(rot),base=[Math.cos(a)*radius,Math.sin(a)*radius,
+  -Math.sin(a)*radius,Math.cos(a)*radius,0,0];
+ const result=[c*mag,sn*mag,-sn*mag,c*mag,0,0];
+ return result.map((x,i)=>x+(previous[i]-base[i])*(1-v));
+}
+function cameraAt(t,pulse=0){
+ const time=Math.max(0,t),beat=clamp(pulse,0,1);
  if(time<60)return beforeCamera(time);
- const before=beforeCamera(59.93),a=Math.atan2(before[1],before[0]),
-  offset=a-D.cameraPost(60),end=Math.min(time,REF_END),
-  tailRate=clamp((D.cameraPost(REF_END)-D.cameraPost(REF_END-.25))/.25,-4.5,4.5),
-  angle=D.cameraPost(end)+offset+(time>REF_END?(time-REF_END)*tailRate:0);
- const z=D.zoomPost(end)*(1+.036*beat),c=Math.cos(angle),s=Math.sin(angle),
-  m=[c*z,s*z,-s*z,c*z,0,0];
- if(time<60.25){const f=(time-60)/.25;return before.map((x,i)=>x*(1-f)+m[i]*f)}
+ const before=beforeCamera(60),a=Math.atan2(before[1],before[0]);
+ const end=Math.min(time,REF_END),offset=a-sourcePhase(60);
+ const tailRate=clamp((sourcePhase(REF_END)-sourcePhase(REF_END-.25))/.25,-4.5,4.5);
+ const angle=sourcePhase(end)+offset+(time>REF_END?(time-REF_END)*tailRate:0);
+ const z=sourceZoom(end)*(1+.036*beat),c=Math.cos(angle),sn=Math.sin(angle);
+ const m=[c*z,sn*z,-sn*z,c*z,0,0];
+ if(time<60.25)return joinCamera(before,angle,z,(time-60)/.25);
  return m;
 }
 function palette(t){const hue=D.hueAt(Math.max(0,Math.min(REF_END,t)));
@@ -158,7 +197,8 @@ function palette(t){const hue=D.hueAt(Math.max(0,Math.min(REF_END,t)));
 }
 function shakeAt(audioTime,pulse,enabled){if(!enabled||!Number.isFinite(audioTime))return [0,0];
  const strength=clamp(pulse,0,1);if(strength<.02)return [0,0];
- const cycle=Math.floor(audioTime*160/60);return [((cycle&1)?1:-1)*3.1*strength,((cycle%3)?1:-1)*2.1*strength];
+ const phase=((audioTime*160/60)%1+1)%1,env=strength*Math.sin(Math.PI*phase)**2;
+ return [3.1*env*Math.sin(TAU*phase),2.1*env*Math.sin(2*TAU*phase)];
 }
 function deathScale(age){if(age<.933333)return 1;if(age<1.1)return 1+4.1*(age-.933333)/(.166667);
  return 5.1-.2*clamp((age-1.1)/.1,0,1);}
@@ -223,7 +263,7 @@ class HyperHexagonerGame extends E.Game{
  }
 }
 const API=Object.freeze({HyperHexagonerGame,create,PRE_PARTS,BRIDGE,POST_PARTS,ALL_PARTS,
- SOURCE_EVENTS,PLAYER_SPEED,SPEED,REF_END,SPECIAL,cameraAt,palette,shakeAt,deathScale,
+ SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,cameraAt,palette,shakeAt,deathScale,
  hasCoarseRoute});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper910=API;
