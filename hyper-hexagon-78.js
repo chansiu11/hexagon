@@ -13,8 +13,10 @@ const OLD=typeof module!=='undefined'?require('./hyper-hexagon-stage7'):root.Hex
 const D=typeof module!=='undefined'?require('./hyper-hexagon-78-data'):root.HexHyper78Data;
 if(!OLD||!D)throw Error('HYPER HEXAGON task7/8 source modules are missing');
 const TAU=Math.PI*2,LEVEL=3,SECTOR_RADIUS=66,MAX_R=1400,
- SPEED=OLD.SPEED,PLAYER_DEGREES_PER_TICK=7,
- PLAYER_SPEED=PLAYER_DEGREES_PER_TICK*TAU/360*60;
+ SPEED=OLD.SPEED,
+ // Match the real-world input speed of HexagonestGame: its 9°/60Hz
+ // internal rate is multiplied by 25/24 then advanced by dt/(25/24).
+ PLAYER_DEGREES_PER_TICK=9,PLAYER_SPEED=PLAYER_DEGREES_PER_TICK*TAU/360*60;
 const EPS=1e-7,REF_END=D.videoResultGameSeconds;
 const wrap=(x,n)=>(x%n+n)%n;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -255,10 +257,14 @@ function shakeAt(audioSeconds,pulse,enabled){
  const envelope=clamp(pulse,0,1)*Math.sin(Math.PI*phase)**2;
  return [2.8*envelope*Math.sin(TAU*phase),1.8*envelope*Math.sin(2*TAU*phase)];
 }
+// Video 1557(10).mp4 ~398.600–399.800: a one-frame white flash,
+// frozen 99.20 timer, delayed core expansion and the score panel at +1.20s.
+const DEATH_TIMING=Object.freeze({flashEnd:.075,zoomStart:.83,zoomEnd:1.105,resultStart:1.20,peakScale:5.1});
 function deathScale(age){
- const t=Math.max(0,age);if(t<=.933333)return 1;
- if(t<1.10)return 1+4.1*(t-.933333)/(1.10-.933333);
- return 5.1-.2*clamp((t-1.10)/.1,0,1);
+ const t=Math.max(0,age),d=DEATH_TIMING;
+ if(t<=d.zoomStart)return 1;
+ if(t<d.zoomEnd)return 1+(d.peakScale-1)*(t-d.zoomStart)/(d.zoomEnd-d.zoomStart);
+ return d.peakScale-.2*clamp((t-d.zoomEnd)/(d.resultStart-d.zoomEnd),0,1);
 }
 class HyperGame extends E.Game{
  constructor(data=create()){
@@ -278,8 +284,15 @@ class HyperGame extends E.Game{
   return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(p,w.points));
  }
  freezeDeathCamera(){if(this.deathCamera)return;
-  this.deathCamera={rotation:this.rotation,zoom:this.zoom,tilt:this.tilt,
-   time:this.time,affine:this.lastDrawCamera?.slice()||this.recordedCamera?.slice()||null};
+  // Use the freshly sampled camera, NOT the prior rendered frame. The
+  // impact's source orientation must not jump one frame after death.
+  const camera=this.recordedCamera?.slice()||this.lastDrawCamera?.slice()||cameraAt(this.time);
+  const struck=this.hit(),contact=E.playerHitPoint(this.angle);
+  if(!this.death)this.death={time:this.time,angle:this.angle,sides:this.sides,
+   wallId:struck?.id||null,player:E.playerPoly(this.angle).map(p=>p.slice()),
+   wall:struck?.points?.map(p=>p.slice())||[],holes:[],contact:contact.slice()};
+  this.deathCamera={rotation:Math.atan2(camera[1],camera[0]),zoom:this.zoom,tilt:this.tilt,
+   time:this.time,sides:this.sides,angle:this.angle,affine:camera};
   this.rotationSpeed=0;
  }
  sampleWalls(){
@@ -343,7 +356,7 @@ class HyperGame extends E.Game{
  }
 }
 const API={HyperGame,create,PRE_PARTS,POST_PARTS,BRIDGE,ALL_PARTS,SHAPES,
- SOURCE_WALLS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,cameraAt,palette,shakeAt,deathScale,
+ SOURCE_WALLS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,cameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
  hasCoarseRoute,sidesAt};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper78=API;
