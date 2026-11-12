@@ -6,17 +6,22 @@ const H=require('./hyper-hexagoner-910.js');
 const D=require('./hyper-hexagoner-910-data.js');
 const TAU=Math.PI*2;
 assert.equal(H.SOURCE_EVENTS.length,63);
-assert.equal(H.PRE_PARTS.length,15);
-assert.equal(H.POST_PARTS.length,7);
-assert.equal(H.ALL_PARTS.length,23);
+assert.equal(H.PRE_PARTS.length,26);
+assert.equal(H.POST_PARTS.length,9);
+assert.equal(H.ALL_PARTS.length,36);
+assert.equal(D.GAP_OBSERVATIONS.length,13);
 assert.equal(H.BRIDGE.events.length,5);
 assert(H.BRIDGE.sourceStart<60&&H.BRIDGE.sourceEnd>60);
 assert.equal(D.gameTimeAtVideo(488.31),88.04);
 assert(Math.abs(D.gameTimeAtVideo(462)-60.59)<1e-8);
 const video=H.create(null,123,90,{order:'video'});
-assert.equal(video.waves.length,63);
+assert.equal(video.waves.length,76);
+const recorded=video.waves.filter(w=>Number.isInteger(w.sourceEventId))
+ .sort((a,b)=>a.sourceEventId-b.sourceEventId);
+assert.equal(recorded.length,63);
+assert.equal(video.waves.filter(w=>w.opticalGap).length,13);
 for(let i=0;i<63;i++){
- const w=video.waves[i],e=D.EVENTS[i];
+ const w=recorded[i],e=D.EVENTS[i];
  assert.equal(w.sourceEventId,e.id);
  assert.equal(w.sourceGameSecond,e.time);
  assert.equal(w.sourceMask,e.mask);
@@ -26,19 +31,18 @@ for(let i=0;i<63;i++){
  assert.equal(w.mirrored,false);
 }
 assert(video.waves.every(w=>w.sourceVideoSecond<488.1));
-assert.deepEqual(H.ALL_PARTS.flatMap(p=>p.events.map(e=>e.id)),
- Array.from({length:63},(_,i)=>i));
+assert.equal(new Set(H.ALL_PARTS.flatMap(p=>p.events.map(e=>e.id))).size,76);
 const preOrders=new Set(),postOrders=new Set();
 for(let seed=1;seed<=35;seed++){
  const d=H.create(null,seed,90);
  const first=d.partOrder.filter(p=>!p.repeatedAfterReference);
- assert.equal(d.waves.filter(w=>!w.repeatedAfterReference).length,63);
- assert.equal(first.length,23);
- assert.equal(first[15].id,H.BRIDGE.id);
- assert.equal(first[15].at,H.BRIDGE.sourceStart);
- assert.equal(new Set(first.slice(0,15).map(p=>p.id)).size,15);
- assert.equal(new Set(first.slice(16).map(p=>p.id)).size,7);
- for(let i=0;i<22;i++)assert(first[i].at+first[i].sourceEnd-first[i].sourceStart
+ assert.equal(d.waves.filter(w=>!w.repeatedAfterReference).length,76);
+ assert.equal(first.length,36);
+ assert.equal(first[26].id,H.BRIDGE.id);
+ assert.equal(first[26].at,H.BRIDGE.sourceStart);
+ assert.equal(new Set(first.slice(0,26).map(p=>p.id)).size,26);
+ assert.equal(new Set(first.slice(27).map(p=>p.id)).size,9);
+ for(let i=0;i<35;i++ )assert(first[i].at+first[i].sourceEnd-first[i].sourceStart
   <=first[i+1].at-.26,'no part overlap');
  assert(d.waves.every(w=>w.partRotation===0&&!w.mirrored&&w.special===null));
  preOrders.add(first.slice(0,15).map(p=>p.id).join('|'));
@@ -76,4 +80,4 @@ lateral.update(1/60,-1);
 assert.equal(lateral.dead,false);
 assert(lateral.angle>=TAU/6-0.0002);
 assert.equal(lateral.hit(),null);
-console.log('PASS source 63, 23 video-part shuffles, modes 1/2/3 point hits, lateral contact and frozen death');
+console.log('PASS source 76 (63 orbit + 13 frame-inferred), 36 video-part shuffles, modes 1/2/3 point hits, lateral contact and frozen death');
