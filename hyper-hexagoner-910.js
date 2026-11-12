@@ -1,6 +1,6 @@
 /* HYPER HEXAGONER — task 9 (<60 HUD seconds) and task 10 (>=60).
  * Source 1557(10).mp4 video 06:44.40–08:09.0, observed result ~88.04.
- * 64 optical orbit-crossing cues; grouped into intact dodge phrases.
+ * 63 pre-death optical crossing cues, HUD-time calibrated, then grouped into intact dodge phrases.
  * Only phrase ORDER can shuffle; never rotate, mirror, change event mask,
  * reorder events within a phrase, or split the 60s boundary phrase.
  * This module is independent of tasks 1–8, 11–12 and RANDOM.
@@ -31,7 +31,7 @@ const SOURCE_EVENTS=Object.freeze(D.EVENTS.map(e=>Object.freeze({...e,
 const PRE_RANGES=[[0,0],[1,3],[4,6],[7,7],[8,10],[11,14],[15,16],
  [17,18],[19,21],[22,22],[23,26],[27,30],[31,31],[32,35],[36,38]];
 const BRIDGE_RANGE=[39,43];
-const POST_RANGES=[[44,47],[48,51],[52,52],[53,56],[57,57],[58,60],[61,63]];
+const POST_RANGES=[[44,47],[48,51],[52,52],[53,56],[57,57],[58,60],[61,62]];
 function partsFromRanges(ranges,era,prefix){
  return Object.freeze(ranges.map(([a,b],i)=>{
   const events=SOURCE_EVENTS.slice(a,b+1);
@@ -57,7 +57,7 @@ const BRIDGE=Object.freeze({
 });
 const ALL_PARTS=Object.freeze([...PRE_PARTS,BRIDGE,...POST_PARTS]);
 const SOURCE_COUNT=ALL_PARTS.reduce((total,p)=>total+p.events.length,0);
-if(SOURCE_COUNT!==64||BRIDGE.events.length!==5||
+if(SOURCE_COUNT!==63||BRIDGE.events.length!==5||
  ALL_PARTS.flatMap(p=>p.events).some((e,i)=>e.id!==i))
  throw Error('Task 9/10 recorded source must contain each cue once in order');
 function shuffle(parts,random){
@@ -122,7 +122,11 @@ function assemble(entries,seed,video,duration,extended=false){const waves=[],par
    sourceVideoStart:part.sourceVideoStart,sourceVideoEnd:part.sourceVideoEnd,
    count,rotation:0,mirrored:false,anchored:!!part.anchored});
  }
- if(extended&&!video){let at=POST_PARTS.at(-1).sourceEnd+1.4,random=rng(seed^0x124ef8),loops=0;
+ if(extended&&!video){
+  // Repeat only measured late phrases AFTER the actual source footage
+  // ends. A repeated outer wall must not become visible in the video
+  // reference window before its terminal 88.04s HUD freeze.
+  let at=REF_END+(MAX_RADIUS-ORBIT)/SPEED+.12,random=rng(seed^0x124ef8),loops=0;
   while(at<duration&&loops++<48&&POST_PARTS.length){
    for(const part of shuffle(POST_PARTS,random)){if(at>=duration)break;
     const group=partOrder.length;let count=0;
@@ -188,12 +192,16 @@ function smoothTrack(array,x){
 }
 const PHASE_INTERVAL=D.GAME_RATE/12;
 function sourcePhase(time){
- // The 12fps optical camera samples remain the source knots, but their
- // angular velocity becomes continuous between knots at display FPS.
- return smoothTrack(D.PHASE,Math.max(0,time-60)/PHASE_INTERVAL)/100;
+ // Video phase tracking starts at footage ~462s (HUD 60.59), NOT
+ // the former 60.00 used by the uncalibrated source events.
+ const x=(time-D.CAMERA_START)/PHASE_INTERVAL;
+ if(x<0)return (D.PHASE[0]+(D.PHASE[1]-D.PHASE[0])*x)/100;
+ return smoothTrack(D.PHASE,x)/100;
 }
 function sourceZoom(time){
- return smoothTrack(D.ZOOM,Math.max(0,time-60)*2)/100;
+ const x=(time-D.CAMERA_START)*2;
+ if(x<0)return (D.ZOOM[0]+(D.ZOOM[1]-D.ZOOM[0])*x)/100;
+ return smoothTrack(D.ZOOM,x)/100;
 }
 function beforeCamera(t){
  const p=P[LEVEL].camera,phase=(Math.max(0,t)-p.start)*p.sampleRate;
