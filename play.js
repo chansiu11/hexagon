@@ -550,8 +550,24 @@ function drawHexagonestWalls(walls,color){
 }
 
 function drawWallField(walls,color,game){
- // HYPER 9/10 original-order mode uses exact filmed contour polygons,
- // inverse-transformed into gameplay space; random mode retains quads.
+ // HYPER 9/10 film mode: every source contour is a separate paint operation.
+ // Combining opposite-winding contours into a single nonzero fill can erase
+ // an overlap from the display while hit() still treats it as solid.
+ // Render each contour independently; do not alter the polygon hit geometry.
+ if(game.hyperHexagonerSource910&&game.atlasActive){
+  ctx.fillStyle=game.atlasColor||color;
+  for(const wall of walls){
+   const p=wall.points;
+   if(!p||p.length<3||!p.every(pt=>Number.isFinite(pt[0])&&Number.isFinite(pt[1])))continue;
+   ctx.beginPath();
+   ctx.moveTo(p[0][0],p[0][1]);
+   for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);
+   ctx.closePath();
+   ctx.fill();
+  }
+  return;
+ }
+ // Random 9/10 and HYPER 7/8 retain their existing batched actor quads.
  if(game.hyperHexagonSource78||game.hyperHexagonerSource910){
   // Each actor is an exact collision quad. Joining actors by their SOURCE
   // sector index is unsafe while the arena morphs (e.g. incoming 4-side
