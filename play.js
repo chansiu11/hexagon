@@ -247,8 +247,52 @@ function drawHexagonestHUD(){
  HexHardDigits.draw(ctx,whole,887,8,44);
  HexHardDigits.draw(ctx,':'+part,944,30,22);
 }
+// The task 9/10 reference ends on a wide screen-filling hexagon, with
+// three angled result tabs entering from the left, right and bottom.
+function drawHyper910ResultOverlay(){
+ const rank=game.time<10?1:game.time<20?2:game.time<30?3:game.time<45?4:game.time<60?5:6;
+ const names=['','POINT','LINE','TRIANGLE','SQUARE','PENTAGON','HEXAGON'];
+ const move=ease((uiAge-HexHyper910.DEATH_TIMING.resultStart)/.20);
+ const off=560*(1-move);
+ // The translucent header is absent during the first split second
+ // of the film's zoom-out/result transition.
+ ctx.save();ctx.globalAlpha*=move;
+ polygon([[0,0],[405,0],[376,40],[0,40]],'#ffffff60');
+ text('TAB - HIGH SCORES',22,7,24,'#fff','left',355);
+ polygon([[540,0],[960,0],[960,40],[563,40]],'#ffffff60');
+ text('ESC - STAGE SELECT',938,7,24,'#fff','right',360);
+ ctx.restore();
+ ctx.save();ctx.translate(-off,0);
+ polygon([[0,193],[429,193],[514,377],[0,377]],'#000');
+ text('LEVEL '+rank,16,206,49,'#fff','left',325);
+ const icon=Array.from({length:6},(_,i)=>{
+  const a=i*Math.PI/3+.04;
+  return [384+32*Math.cos(a),243+32*Math.sin(a)];
+ });
+ polygon(icon,null,'#ffe4f5',3.2);
+ text(names[rank],180,264,23,'#fff','center',240);
+ text(game.time>=60?'STAGE COMPLETE':names[rank],174,323,23,'#fff','center',325);
+ ctx.restore();
+ ctx.save();ctx.translate(off,0);
+ polygon([[515,193],[960,193],[960,257],[543,257]],'#000');
+ text('LAST',533,205,29,'#fff','left',145);
+ const hundredths=hyper910Time(game.time).split(':');
+ HexHardDigits.draw(ctx,hundredths[0],856,206,48);
+ HexHardDigits.draw(ctx,':'+hundredths[1],949,230,24);
+ polygon([[558,306],[960,306],[960,355],[580,355]],'#000');
+ const newRecord=game.time>=bestTime(game.level)-.00001;
+ text(newRecord?'NEW RECORD':'BEST: '+hyper910Time(bestTime(game.level)),
+  938,316,25,'#fff','right',335);
+ ctx.restore();
+ ctx.save();ctx.translate(0,off*.58);
+ polygon([[243,555],[715,555],[740,600],[220,600]],'#000');
+ text('PRESS SPACE TO RETRY',480,567,24,'#fff','center',430);
+ ctx.restore();
+}
 function drawHardResult(dark,light,accent){
- ctx.fillStyle=dark;ctx.fillRect(0,0,960,600);ctx.save();ctx.translate(480,300);
+ ctx.fillStyle=dark;ctx.fillRect(0,0,960,600);ctx.save();
+ ctx.translate(game.hyperHexagonerSource910?508:480,
+  game.hyperHexagonerSource910?322:300);
  if(game.hyperHexagonSource78||game.hyperHexagonerSource910){
   // Reference video 1557(10): result backdrop keeps the polygon shape and
   // the frozen impact camera. Stage 7 can end as a pentagon; stage 9 as a
@@ -257,14 +301,14 @@ function drawHardResult(dark,light,accent){
   const n=Math.max(4,Math.min(6,game.death?.sides||game.deathCamera?.sides||game.sides||6));
   ctx.rotate(Math.atan2(camera[1],camera[0]));
   drawBackdrop({sides:n,fromSides:n,morph:1},dark,light,true);
-  const r=196,step=Math.PI*2/n;
-  polygon(Array.from({length:n},(_,i)=>[Math.cos(i*step)*r,Math.sin(i*step)*r]),dark,accent,2.2);
+  const r=game.hyperHexagonerSource910?291:196,step=Math.PI*2/n;
+  polygon(Array.from({length:n},(_,i)=>[Math.cos(i*step)*r,Math.sin(i*step)*r]),dark,game.hyperHexagonerSource910?'#ffe4f5':accent,2.2);
   const a=game.death?.angle??game.angle,cos=Math.cos(a),sin=Math.sin(a);
   // The source holds a tiny player marker at the enlarged core edge.
   const p=r+8,tangent=[-sin,cos];
   polygon([[cos*(p+12),sin*(p+12)],
    [cos*(p-3)+tangent[0]*6,sin*(p-3)+tangent[1]*6],
-   [cos*(p-3)-tangent[0]*6,sin*(p-3)-tangent[1]*6]],null,accent,2);
+   [cos*(p-3)-tangent[0]*6,sin*(p-3)-tangent[1]*6]],null,game.hyperHexagonerSource910?'#ffe4f5':accent,2);
  }else{
   ctx.rotate(game.level===0||game.hexagonestMode||game.hexagonerMode?
    (game.deathCamera?.rotation??game.rotation):
@@ -273,6 +317,7 @@ function drawHardResult(dark,light,accent){
   polygon([[161,0],[176,-7],[176,7]],accent);
  }
  ctx.restore();
+ if(game.hyperHexagonerSource910){drawHyper910ResultOverlay();return;}
  header('TAB - HIGH SCORES','ESC - STAGE SELECT');
  ctx.fillStyle='#000';ctx.fillRect(0,200,960,125);
  const rank=game.hexagonestMode?6:game.time<10?1:game.time<20?2:game.time<30?3:game.time<45?4:game.time<60?5:6;
