@@ -500,9 +500,8 @@ function drawHexagonestWalls(walls,color){
 }
 
 function drawWallField(walls,color,game){
- // HYPER 9/10: the filmed contour mask can contain the center core and
- // recorded player's trail. That was visibly jittering and did NOT match
- // the live wall collision. Below, both draw and hit use wall.points quads.
+ // HYPER 9/10 original-order mode uses exact filmed contour polygons,
+ // inverse-transformed into gameplay space; random mode retains quads.
  if(game.hyperHexagonSource78||game.hyperHexagonerSource910){
   // Each actor is an exact collision quad. Joining actors by their SOURCE
   // sector index is unsafe while the arena morphs (e.g. incoming 4-side
@@ -514,16 +513,14 @@ function drawWallField(walls,color,game){
   // nonzero fill computes their union, with no per-quad antialias seams
   // and no synthetic connecting edge. Never change actor geometry,
   // source masks, collision, timing or angular speed here.
-  ctx.fillStyle=color;
+  ctx.fillStyle=game.atlasActive&&game.atlasColor?game.atlasColor:color;
   ctx.beginPath();
   let count=0;
   for(const wall of walls){
    const p=wall.points;
-   if(!p||p.length!==4||!p.every(pt=>Number.isFinite(pt[0])&&Number.isFinite(pt[1])))continue;
+   if(!p||p.length<3||!p.every(pt=>Number.isFinite(pt[0])&&Number.isFinite(pt[1])))continue;
    ctx.moveTo(p[0][0],p[0][1]);
-   ctx.lineTo(p[1][0],p[1][1]);
-   ctx.lineTo(p[2][0],p[2][1]);
-   ctx.lineTo(p[3][0],p[3][1]);
+   for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);
    ctx.closePath();
    count++;
   }
