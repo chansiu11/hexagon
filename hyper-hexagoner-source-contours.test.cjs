@@ -31,9 +31,10 @@ const from=play.indexOf('if(game.hyperHexagonSource78||game.hyperHexagonerSource
 const to=play.indexOf('if(game.hexagonerSource8){',from);
 assert(from>anchor&&to>from,'source rendering branch remains reachable');
 const draw=new Function('ctx','walls','color','game',play.slice(from,to));
-function ctxMock(){return {fillStyle:null,paths:[],fills:0,
+function ctxMock(){return {fillStyle:null,paths:[],fills:0,drawn:[],
  beginPath(){this.paths=[]},moveTo(x,y){this.paths.push([[x,y]])},
- lineTo(x,y){this.paths.at(-1).push([x,y])},closePath(){},fill(){this.fills++}}}
+ lineTo(x,y){this.paths.at(-1).push([x,y])},closePath(){},
+ fill(){this.fills++;this.drawn.push(...this.paths.map(p=>p.map(x=>x.slice())))}}}
 for(const t of [0,2.3,8.5,19,42,59.5,60.5,68,77.2,87.4]){
  game.time=t;game.angle=Math.PI/6;game.sampleWalls();
  assert(game.atlasActive,'video mode uses film wall geometry');
@@ -55,9 +56,18 @@ for(const t of [0,2.3,8.5,19,42,59.5,60.5,68,77.2,87.4]){
  const ctx=ctxMock();draw(ctx,game.walls,'#ffffff',game);
  assert.equal(ctx.fillStyle,game.atlasColor);
  assert.equal(ctx.fills,1);
- assert.deepEqual(ctx.paths,[game.walls[0].points],
+ assert.deepEqual(ctx.drawn,[game.walls[0].points],
   'the draw path and collision path are point-for-point identical');
 }
+// Overlap two polygons with reversed winding. Their areas must BOTH paint,
+// otherwise a single canvas nonzero fill may cancel visible wall pixels.
+const first=game.walls[0].points.map(p=>p.slice());
+game.walls.push({id:'opposite-winding',points:first.slice().reverse(),collapsed:false});
+const overlapping=ctxMock();
+draw(overlapping,game.walls,'#ff00ff',game);
+assert.equal(overlapping.fills,2,'overlapping filmed shapes are painted separately');
+assert.deepEqual(overlapping.drawn,[first,first.slice().reverse()]);
+game.walls.pop();
 const before=calls;
 const random=new H.HyperHexagonerGame(H.create(null,7,90,{order:'random'}));
 random.time=8;random.sampleWalls();
