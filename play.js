@@ -326,7 +326,7 @@ function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#191919';ctx.fillRe
 }const camera=playing&&settings.motion?game.hyperHexagonSource78&&!launch?
  (game.dead?(game.deathCamera?.affine||game.recordedCamera):HexHyper78.cameraAt(game.time,music.pulse)):
  game.hyperHexagonerSource910&&!launch?
- (game.dead?(game.deathCamera?.affine||game.recordedCamera):HexHyper910.cameraAt(game.time,game.atlasActive?0:music.pulse)):
+ (game.dead?(game.deathCamera?.affine||game.recordedCamera):HexHyper910.cameraAt(game.time,music.pulse)):
  game.hexagonerSource8&&!launch?(game.dead?(game.deathCamera?.affine||game.recordedCamera):HexHexagonerVideo8.cameraAt(game.time,settings.sound&&music.active&&music.source&&music.context?.state==='running'?music.context.currentTime-music.lastHit:Infinity)):game.hexagonestMode&&game._post60Active&&!launch?HexHexagonestPost60.cameraAt(game):game.hardMode?(game._post60Active?HexHardPost60.cameraAt(game,rotation,game.zoom):HexHardMotion.cameraAt(game.time+(game.dead&&game.level!==0?uiAge*HexHardMotion.CLOCK_RATE:0),rotation,game.zoom,game.timeline.groups)):!launch?game.referenceCamera:null:null;if(camera){if(game.level===0||game.hexagonestMode||game.hexagonerMode||game.hyperHexagonSource78||game.hyperHexagonerSource910){ctx.transform(...camera);game.lastDrawCamera=camera;game.cameraWasActive=true}else{if(!game.cameraWasActive){game.cameraBlendFrom=game.lastDrawCamera||camera;game.cameraBlendStart=game.time}const u=Math.min(1,(game.time-game.cameraBlendStart)/.15),m=camera.map((v,i)=>game.cameraBlendFrom[i]*(1-u)+v*u);ctx.transform(...m);game.lastDrawCamera=m;game.cameraWasActive=true}}else{if(playing&&settings.motion){ctx.rotate(game.tilt*.55);ctx.transform(1,0,Math.sin(game.tilt)*.3,Math.cos(game.tilt*1.65),0,0);ctx.scale(game.zoom,game.zoom)}ctx.rotate(rotation);if(playing){const angle=game.tilt*.55,c=Math.cos(angle),s=Math.sin(angle),shear=Math.sin(game.tilt)*.3,compress=Math.cos(game.tilt*1.65),z=game.zoom,cr=Math.cos(rotation),sr=Math.sin(rotation);const a=c*z,b=s*z,d=(s*shear+c*compress)*z,k=(c*shear-s*compress)*z;game.lastDrawCamera=[a*cr+k*sr,b*cr+d*sr,-a*sr+k*cr,-b*sr+d*cr,0,0];game.cameraWasActive=false}}drawBackdrop(game,dark,light,playing);if(playing){drawWallField(game.walls,accent,game);ctx.save();drawCore(game,launch?referenceStartRadius(launch.age):camera||game.hardMode||game.hexagonestMode?50:45.8807,dark,accent);ctx.restore();if(!game.dead){drawTeleportEffect(game,accent);drawSectorStepEffect(game,accent);}const playerScale=1,orbit=launch?referenceStartRadius(launch.age)+16:66,ux=Math.cos(game.angle),uy=Math.sin(game.angle);polygon(playerPoly(game.angle,game.controlMode===1?(game.visualTurn||0):game.playerLean).map(([x,y])=>[(x-66*ux)*playerScale+orbit*ux,(y-66*uy)*playerScale+orbit*uy]),game.dead&&(game.hardMode||game.hexagonestMode||game.hexagonerMode||game.hyperHexagonSource78||game.hyperHexagonerSource910)?null:game.dead?'#fff':accent,game.dead&&(game.hardMode||game.hexagonestMode||game.hexagonerMode||game.hyperHexagonSource78||game.hyperHexagonerSource910)?accent:null,1.2);if(game.dead)drawDeathImpact(game);else if(settings.controlMode===3)drawDirectLabels(game)}else if(screen==='select'){hex(100,dark,accent);polygon([[-6,-122],[6,-122],[0,-132]],accent)}ctx.restore();
 if(screen==='title'){header('','ESC - QUIT');drawLogo('SUPER',220,160,520,100);drawLogo('HEXAGON',305,268,490,65);arrows();ctx.save();ctx.translate(selectionSlide*slideDirection*35,0);panel(['START GAME','OPTIONS','CREDITS'][menuItem]);ctx.restore();text('PRESS SPACE TO SELECT',480,565,23,'#fff')}
 if(screen==='select'){header('TAB - HIGH SCORES','MODE '+settings.controlMode+'  |  ESC - RETURN');ctx.fillStyle='#000';ctx.fillRect(0,95,960,155);text(levels[selected][0],480+selectionSlide*slideDirection*45,115,49,accent);text('DIFFICULTY: '+levels[selected][1],480,177,23,'#ddd');text('BEST TIME: '+format(bestTime(selected)),480,211,23,'#ddd');if(selected>=3&&selected<6)text('HYPER MODE',885,68,16,accent,'right');if(selected===6)text('MIXED PATTERNS / RANDOM MUSIC',900,68,16,accent,'right');panel(unlocked(selected)?'PRESS SPACE TO START':'LOCKED',270,470);if(!unlocked(selected))text('SURVIVE 60S IN '+levels[selected-3][0],480,345,17,'#ddd');arrows()}
@@ -498,23 +498,9 @@ function drawHexagonestWalls(walls,color){
 }
 
 function drawWallField(walls,color,game){
- if(game.hyperHexagonerSource910&&game.atlasActive){
-  // In source-order mode draw the actual filmed wall silhouettes from the
-  // user's 60fps video. The engine has already inverse-transformed each
-  // contour through the active camera, so screen outlines align with the
-  // film, while collision still uses the same vertex polygons.
-  ctx.fillStyle=game.atlasColor||color;
-  ctx.beginPath();
-  let count=0;
-  for(const wall of walls){
-   const p=wall.points;if(!p||p.length<3)continue;
-   ctx.moveTo(p[0][0],p[0][1]);
-   for(let j=1;j<p.length;j++)ctx.lineTo(p[j][0],p[j][1]);
-   ctx.closePath();count++;
-  }
-  if(count)ctx.fill('evenodd');
-  return;
- }
+ // HYPER 9/10: the filmed contour mask can contain the center core and
+ // recorded player's trail. That was visibly jittering and did NOT match
+ // the live wall collision. Below, both draw and hit use wall.points quads.
  if(game.hyperHexagonSource78||game.hyperHexagonerSource910){
   // Each actor is an exact collision quad. Joining actors by their SOURCE
   // sector index is unsafe while the arena morphs (e.g. incoming 4-side
