@@ -114,6 +114,7 @@ function updatePalette(dt){
 function palette(){
  const fallback=displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)');
  if(game?.hyperHexagonerSource910&&game.timeline?.orderMode==='video'&&
+  ['play','over','complete','paused'].includes(screen)&&
   typeof HexHyper910FilmedPalette!=='undefined'&&
   typeof HexHyper910Data!=='undefined'){
   const [bright,dark]=HexHyper910FilmedPalette.at(HexHyper910Data.videoAtGameTime(game.time));
