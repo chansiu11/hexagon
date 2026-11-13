@@ -17,6 +17,21 @@ async function run(){
   assert.equal(atlas.FPS,60);
   assert.equal(atlas.loadedFrameCount,5079);
   assert.equal(atlas.getFrame(atlas.START).index,0);
+  // A large center-hex outline from the first animation must not
+  // reappear as a moving wall ring. The same geometry later in the
+  // run must NOT be suppressed as an actual approaching wall.
+  const centerHex=Array.from({length:6},(_,i)=>{
+   const a=i*Math.PI/3;
+   return [Math.round(288+155*Math.cos(a)),Math.round(180+155*Math.sin(a))];
+  }).flat();
+  assert.equal(atlas.isCoreOutline(centerHex,atlas.START+.1),true,
+   'large intro core outline accidentally drawn as a wall');
+  assert.equal(atlas.isCoreOutline(centerHex,atlas.START+1),false,
+   'normal gameplay ring should not be filtered by intro-only rule');
+  const wedge=[288+85,180-30,288+210,180-35,288+210,180+35,288+85,180+30,
+   288+85,180-30,288+210,180-35];
+  assert.equal(atlas.isCoreOutline(wedge,atlas.START+.1),false,
+   'a partial exterior wedge is a wall, not a full center ring');
   const samples=[403.47,407.4,419,432,449,467,474,484,488.1];
   for(const t of samples){
    const fr=atlas.getFrame(t);
