@@ -111,7 +111,16 @@ function updatePalette(dt){
   const [h,s,l]=HexHyper910.palette(game.time);
   displayedHue=h;displayedSat=s;displayedLight=l;return;
  }if(game?.hexagonerSource8&&['play','over','complete','paused'].includes(screen)){const [h,sa,lights]=HexHexagonerVideo8.palette(game.time);displayedHue=h;displayedSat=sa;displayedLight=lights;return}if(game?.hexagonerMode&&game.time>=60&&['play','over','complete','paused'].includes(screen)){const [h,s,l]=HexHexagonerPost60.palette(game.time);displayedHue=h;displayedSat=s;displayedLight=l;return}if(game?.hexagonerMode&&game.time<60&&['play','over','complete','paused'].includes(screen)){const [h,s,l]=HexHexagonerReference.palette(game.time);displayedHue=h;displayedSat=s;displayedLight=l;return}if(game?.hexagonestMode&&game._post60Active&&['play','over','complete','paused'].includes(screen)){const [h,s,l]=HexHexagonestPost60.palette(game.time);displayedHue=h;displayedSat=s;displayedLight=l;return}if(game?.hexagonestMode&&['play','over','complete','paused'].includes(screen)){const [h,s,l]=HexHexagonest.palette(game.time+(game.sourceAligned?HexHexagonest.SOURCE_OFFSET:0));displayedHue=h;displayedSat=s;displayedLight=l;return}if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const [h,s,l]=HexHardMode.palette(game.time);displayedHue=h;displayedSat=s;displayedLight=l;return}const neutral=['title','options','credits','quit','scores'].includes(screen),mono=selected===5;let hue=levels[selected][2];if(game&&['play','over','paused','complete'].includes(screen)){const section=game.time/10,index=Math.floor(section);hue+=index*24+24*ease((section-index-.7)/.3)}const blend=1-Math.exp(-dt*5);const delta=((hue-displayedHue+540)%360)-180;displayedHue+=delta*blend;const sat=neutral||mono?0:89;displayedSat+=(sat-displayedSat)*blend;const lights=neutral?[14,19,93]:mono?[21,45,100]:game?.hexagonerMode&&game.time>=60?[93,85,45]:[12,19,59];displayedLight=displayedLight.map((v,i)=>v+(lights[i]-v)*blend)}
-function palette(){return displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)')}
+function palette(){
+ const fallback=displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)');
+ if(game?.hyperHexagonerSource910&&game.timeline?.orderMode==='video'&&
+  typeof HexHyper910FilmedPalette!=='undefined'&&
+  typeof HexHyper910Data!=='undefined'){
+  const [bright,dark]=HexHyper910FilmedPalette.at(HexHyper910Data.videoAtGameTime(game.time));
+  return [bright,dark,game.atlasActive&&game.atlasColor?game.atlasColor:fallback[2]];
+ }
+ return fallback;
+}
 
 function drawBackdrop(game,dark,light,playing){
  if(playing&&(game.level===6||game.hardMode||game.hyperHexagonSource78)&&game.morph<1&&game.fromSides!==game.sides){
