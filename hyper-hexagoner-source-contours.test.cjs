@@ -27,7 +27,7 @@ const H=mod.exports;
 const game=new H.HyperHexagonerGame(H.create(null,7,88,{order:'video'}));
 const play=fs.readFileSync(__dirname+'/play.js','utf8');
 const anchor=play.indexOf('function drawWallField(');
-const from=play.indexOf('if(game.hyperHexagonSource78||game.hyperHexagonerSource910){',anchor);
+const from=play.indexOf('if(game.hyperHexagonerSource910&&game.atlasActive){',anchor);
 const to=play.indexOf('if(game.hexagonerSource8){',from);
 assert(from>anchor&&to>from,'source rendering branch remains reachable');
 const draw=new Function('ctx','walls','color','game',play.slice(from,to));
