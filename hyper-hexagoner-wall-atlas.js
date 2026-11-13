@@ -8,7 +8,31 @@
 (function(root){'use strict';
 const START=403.466667,FPS=60,WIDTH=576,HEIGHT=360,EXPECTED=5079;
 const FILE='hyper-hexagoner-filmed-walls-60fps.b64?v=source-wall-silhouettes-20261113-v1';
-let frames=null,pending=null,loadError=null;
+let frames=null,pending=null,loadError=null,frameCache=null,removedCore=0;
+const PI2=Math.PI*2;
+// The optical segmentation sometimes mistakes the center hexagon outline
+// for a moving wall. It then renders an extra wriggling ring beside the
+// live core. A real wall covers only one/few sectors, while the duplicated
+// core wraps most of the central 360 degrees and is a narrow annulus.
+// Reject ONLY isolated near-center full-ring contours; retain every
+// outward wall wedge, including walls that reach the player's orbit.
+function isCoreOutline(flat){
+ if(!flat||flat.length<12||flat.length%2)return false;
+ let min=Infinity,max=0,xx=0,yy=0;
+ const angles=[];
+ for(let i=0;i<flat.length;i+=2){
+  const x=flat[i]-WIDTH/2,y=flat[i+1]-HEIGHT/2;
+  const r=Math.hypot(x,y);min=Math.min(min,r);max=Math.max(max,r);
+  xx+=x;yy+=y;
+  angles.push((Math.atan2(y,x)+PI2)%PI2);
+ }
+ const n=angles.length;
+ if(min<18||max>68||max-min>28||Math.hypot(xx/n,yy/n)>26)return false;
+ angles.sort((a,b)=>a-b);
+ let gap=angles[0]+PI2-angles[n-1];
+ for(let i=1;i<n;i++)gap=Math.max(gap,angles[i]-angles[i-1]);
+ return (PI2-gap)/PI2>.62;
+}
 async function load(){
  if(frames)return true;
  if(pending)return pending;
@@ -26,6 +50,8 @@ async function load(){
    json.width!==WIDTH||json.height!==HEIGHT)
    throw Error('Reference wall frames are incomplete');
   frames=json.frames;
+  frameCache=new Array(EXPECTED);
+  removedCore=0;
   return true;
  })().catch(error=>{loadError=error;pending=null;
   console.warn('HYPER HEXAGONER video wall atlas unavailable:',error);
@@ -35,10 +61,18 @@ async function load(){
 function getFrame(videoSecond){
  if(!frames)return null;
  const frame=Math.min(frames.length-1,Math.max(0,Math.round((videoSecond-START)*FPS)));
- const [rgb,paths]=frames[frame];
- return {index:frame,rgb,paths};
+ if(frameCache&&frameCache[frame])return frameCache[frame];
+ const [rgb,allPaths]=frames[frame];
+ const paths=allPaths.filter(poly=>{
+  if(isCoreOutline(poly)){removedCore++;return false}
+  return true;
+ });
+ const clean={index:frame,rgb,paths};
+ if(frameCache)frameCache[frame]=clean;
+ return clean;
 }
-const API={load,getFrame,START,FPS,WIDTH,HEIGHT,EXPECTED,
+const API={load,getFrame,isCoreOutline,START,FPS,WIDTH,HEIGHT,EXPECTED,
+ get removedCoreContours(){return removedCore},
  get ready(){return !!frames},get error(){return loadError},
  get loadedFrameCount(){return frames?.length||0}};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
