@@ -10,6 +10,7 @@ const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const P=typeof module!=='undefined'?require('./stage-profiles'):root.StageProfiles;
 const D=typeof module!=='undefined'?require('./hyper-hexagoner-910-data'):root.HexHyper910Data;
 const ATLAS=typeof module!=='undefined'?require('./hyper-hexagoner-wall-atlas'):root.HexHyper910Atlas;
+const FILMCAM=typeof module!=='undefined'?require('./hyper-hexagoner-filmed-camera-15fps'):root.HexHyper910FilmedCamera;
 if(!E?.Game||!D?.EVENTS)throw Error('HYPER HEXAGONER dependencies missing');
 const LEVEL=4,TAU=2*Math.PI,SIDES=6,ORBIT=66,SPEED=382,MAX_RADIUS=1290,
  REF_END=D.REFERENCE_GAME_END,SEC=TAU/6;
@@ -277,6 +278,13 @@ function cameraAt(t,pulse=0){
  if(time<60.25)return joinCamera(before,angle,z,(time-60)/.25);
  return m;
 }
+// For video-order playback the background spokes and generated wall quads
+// need the camera ACTUALLY measured from the filmed six-sided core.
+// Keep random mode's independent camera and input physics unchanged.
+function filmedCameraAt(t){
+ const second=D.videoAtGameTime(Math.max(0,Math.min(REF_END,t)));
+ return FILMCAM?.cameraAt?FILMCAM.cameraAt(second):cameraAt(t,0);
+}
 function palette(t){const hue=D.hueAt(Math.max(0,Math.min(REF_END,t)));
  // Reference video uses a WHITE and pastel stage with strongly saturated
  // blue / magenta / purple walls. The previous [15,29,98] rendered the
@@ -330,7 +338,9 @@ class HyperHexagonerGame extends E.Game{
  _samplePhysicalWalls(t){
   if(t<this._last){this._active=[];this._cursor=0}
   this._last=t;this.wallFrame=Math.floor(t*60);
-  this.recordedCamera=cameraAt(t);this.referenceCamera=this.recordedCamera;
+  this.recordedCamera=this.timeline.orderMode==='video'?
+   filmedCameraAt(t):cameraAt(t);
+  this.referenceCamera=this.recordedCamera;
   while(this._cursor<this._spawns.length&&this._spawns[this._cursor].start<=t)
    this._active.push(this._spawns[this._cursor++]);
   for(let i=this._active.length-1;i>=0;i--)if(t>=this._active[i].end)this._active.splice(i,1);
@@ -436,7 +446,7 @@ class HyperHexagonerGame extends E.Game{
  }
 }
 const API=Object.freeze({HyperHexagonerGame,create,PRE_PARTS,BRIDGE,POST_PARTS,ALL_PARTS,
- SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,ATLAS,cameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
+ SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,ATLAS,FILMCAM,cameraAt,filmedCameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
  hasCoarseRoute});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper910=API;
