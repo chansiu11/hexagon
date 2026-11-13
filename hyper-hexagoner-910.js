@@ -9,6 +9,7 @@
 const E=typeof module!=='undefined'?require('./engine'):root.HexEngine;
 const P=typeof module!=='undefined'?require('./stage-profiles'):root.StageProfiles;
 const D=typeof module!=='undefined'?require('./hyper-hexagoner-910-data'):root.HexHyper910Data;
+const ATLAS=typeof module!=='undefined'?require('./hyper-hexagoner-wall-atlas'):root.HexHyper910Atlas;
 if(!E?.Game||!D?.EVENTS)throw Error('HYPER HEXAGONER dependencies missing');
 const LEVEL=4,TAU=2*Math.PI,SIDES=6,ORBIT=66,SPEED=382,MAX_RADIUS=1290,
  REF_END=D.REFERENCE_GAME_END,SEC=TAU/6;
@@ -199,7 +200,14 @@ function hasCoarseRoute(waves){const n=144,dt=.05,step=Math.max(1,Math.floor(PLA
  return true;
 }
 function create(sourceTimeline=null,seed=seedNow(),duration=3600,options={}){
- const video=options.order==='video'||/(?:^|[?&])hyperHexagonerOrder=video(?:&|$)/.test(root.location?.search||'');
+ // Video-reproduction is the normal browser default while matching the
+ // supplied footage. The earlier phrase-random mode remains available with
+ // ?hyperHexagonerOrder=random. Node/tests keep deterministic random default.
+ const browser=typeof window!=='undefined'&&!!root.document;
+ const search=root.location?.search||'';
+ const randomRequested=options.order==='random'||/(?:^|[?&])hyperHexagonerOrder=random(?:&|$)/.test(search);
+ const video=options.order==='video'||!randomRequested&&
+  (/(?:^|[?&])hyperHexagonerOrder=video(?:&|$)/.test(search)||browser);
  let d=assemble(arrangement(seed,video),seed,video,duration,!video);
  if(!video&&!hasCoarseRoute(d.waves)){
   let found=false;
@@ -298,11 +306,47 @@ class HyperHexagonerGame extends E.Game{
   }))})).sort((a,b)=>a.start-b.start);
   this._active=[];this._cursor=0;this._last=-Infinity;
   this.sides=SIDES;this.fromSides=SIDES;this.morph=1;
-  this.recordedCamera=null;this.referenceCamera=null;this.sampleWalls();
+  this.recordedCamera=null;this.referenceCamera=null;
+  this.atlasActive=false;this.atlasColor=null;this._atlasFrameIndex=-1;
+  this.sampleWalls();
  }
  get targetSides(){return SIDES}
  get playerSpeed(){return PLAYER_SPEED}
  sampleWalls(){if(!this._spawns)return;const t=this.time;
+  // VIDEO source: use the real 60fps wall silhouettes instead of guessed
+  // radial rings. Contours were segmented from the uploaded gameplay, not
+  // hand-invented. Convert the filmed SCREEN points to world space using
+  // the inverse of the camera applied during draw().
+  if(this.timeline.orderMode==='video'&&ATLAS?.ready){
+   const frame=ATLAS.getFrame(D.videoAtGameTime(Math.min(t,REF_END)));
+   if(frame){
+    this.recordedCamera=cameraAt(t);
+    this.referenceCamera=this.recordedCamera;
+    this.wallFrame=frame.index;
+    this.atlasColor='rgb('+frame.rgb.join(',')+')';
+    this.atlasActive=true;
+    if(frame.index!==this._atlasFrameIndex){
+     this._atlasFrameIndex=frame.index;
+     const [a,b,c,d]=this.recordedCamera,det=a*d-b*c;
+     if(Math.abs(det)>1e-5){
+      const pxToLogical=960/ATLAS.WIDTH;
+      this._atlasWalls=frame.paths.map((flat,i)=>{
+       const points=[];
+       for(let j=0;j<flat.length;j+=2){
+        const x=(flat[j]-ATLAS.WIDTH/2)*pxToLogical;
+        const y=(flat[j+1]-ATLAS.HEIGHT/2)*pxToLogical;
+        points.push([(d*x-c*y)/det,(-b*x+a*y)/det]);
+       }
+       return {id:'film-'+frame.index+'-'+i,waveId:'film-'+frame.index,
+        points,atlasContour:true,collapsed:false};
+      });
+     }
+    }
+    this.walls=this._atlasWalls||[];
+    return;
+   }
+  }
+  this.atlasActive=false;
   if(t<this._last){this._active=[];this._cursor=0}
   this._last=t;this.wallFrame=Math.floor(t*60);
   this.recordedCamera=cameraAt(t);this.referenceCamera=this.recordedCamera;
@@ -326,6 +370,16 @@ class HyperHexagonerGame extends E.Game{
   // Identical visible quadrilaterals and physical collision shapes:
   // point in polygon at the small central avatar hitbox, not its outline.
   const center=E.playerHitPoint(angle);
+  if(this.atlasActive){
+   // The filmed wall image contains nested contours for ring openings.
+   // Canvas draws them with even-odd fill, and the exact same parity
+   // controls the central hit point; a transparent hole is never lethal.
+   let hit=null,count=0;
+   for(const wall of this.walls)if(E.pointInPolygon(center,wall.points)){
+    count++;if(!hit)hit=wall;
+   }
+   return count%2?hit:null;
+  }
   return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(center,w.points))||null;
  }
  die(w){
@@ -410,7 +464,7 @@ class HyperHexagonerGame extends E.Game{
  }
 }
 const API=Object.freeze({HyperHexagonerGame,create,PRE_PARTS,BRIDGE,POST_PARTS,ALL_PARTS,
- SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,cameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
+ SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,ATLAS,cameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
  hasCoarseRoute});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper910=API;
