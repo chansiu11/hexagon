@@ -16,7 +16,7 @@ const PI2=Math.PI*2;
 // core wraps most of the central 360 degrees and is a narrow annulus.
 // Reject ONLY isolated near-center full-ring contours; retain every
 // outward wall wedge, including walls that reach the player's orbit.
-function isCoreOutline(flat){
+function isCoreOutline(flat,videoSecond=Infinity){
  if(!flat||flat.length<12||flat.length%2)return false;
  let min=Infinity,max=0,xx=0,yy=0;
  const angles=[];
@@ -27,7 +27,13 @@ function isCoreOutline(flat){
   angles.push((Math.atan2(y,x)+PI2)%PI2);
  }
  const n=angles.length;
- if(min<18||max>68||max-min>28||Math.hypot(xx/n,yy/n)>26)return false;
+ // In the opening 0.55s the source's shrinking hexagon can exceed
+ // a 68px radius. Its narrow full-ring outline is NOT an incoming wall.
+ // Only expand this range during that known intro, never during play:
+ // later full-ring wall bands must remain hittable and visible.
+ const early=videoSecond>=START&&videoSecond<START+.55;
+ const maxRing=early?245:68;
+ if(min<18||max>maxRing||max-min>28||Math.hypot(xx/n,yy/n)>26)return false;
  angles.sort((a,b)=>a-b);
  let gap=angles[0]+PI2-angles[n-1];
  for(let i=1;i<n;i++)gap=Math.max(gap,angles[i]-angles[i-1]);
@@ -64,7 +70,7 @@ function getFrame(videoSecond){
  if(frameCache&&frameCache[frame])return frameCache[frame];
  const [rgb,allPaths]=frames[frame];
  const paths=allPaths.filter(poly=>{
-  if(isCoreOutline(poly)){removedCore++;return false}
+  if(isCoreOutline(poly,START+frame/FPS)){removedCore++;return false}
   return true;
  });
  const clean={index:frame,rgb,paths};
