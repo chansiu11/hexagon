@@ -327,14 +327,17 @@ class HyperHexagonerGame extends E.Game{
     this.atlasActive=true;
     if(frame.index!==this._atlasFrameIndex){
      this._atlasFrameIndex=frame.index;
-     const [a,b,c,d]=this.recordedCamera,det=a*d-b*c;
+     const [a,b,c,d,tx=0,ty=0]=this.recordedCamera,det=a*d-b*c;
      if(Math.abs(det)>1e-5){
       const pxToLogical=960/ATLAS.WIDTH;
       this._atlasWalls=frame.paths.map((flat,i)=>{
        const points=[];
        for(let j=0;j<flat.length;j+=2){
-        const x=(flat[j]-ATLAS.WIDTH/2)*pxToLogical;
-        const y=(flat[j+1]-ATLAS.HEIGHT/2)*pxToLogical;
+        // Camera source shake/tilt also has a translation component.
+        // Cancel it here so the final canvas transform restores the
+        // exact filmed 576x360 pixel positions.
+        const x=(flat[j]-ATLAS.WIDTH/2)*pxToLogical-tx;
+        const y=(flat[j+1]-ATLAS.HEIGHT/2)*pxToLogical-ty;
         points.push([(d*x-c*y)/det,(-b*x+a*y)/det]);
        }
        return {id:'film-'+frame.index+'-'+i,waveId:'film-'+frame.index,
