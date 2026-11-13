@@ -1,6 +1,6 @@
 /* HYPER HEXAGONER — task 9 (<60 HUD seconds) and task 10 (>=60).
  * Source 1557(10).mp4 video ~06:43.47–08:08.10; recorded game-over timer 88.04.
- * 63 pre-death orbit crossings + additional photographed colored wall bands, HUD-timed and grouped into intact dodge phrases.
+ * 63 pre-death orbit crossings + frame-observed gap bands, grouped into intact gameplay phrases.\n * The 60fps film is retained for offline visual comparison, not active hit geometry.
  * Only phrase ORDER can shuffle; never rotate, mirror, change event mask,
  * reorder events within a phrase, or split the 60s boundary phrase.
  * This module is independent of tasks 1–8, 11–12 and RANDOM.
@@ -306,61 +306,25 @@ class HyperHexagonerGame extends E.Game{
    points:[[0,0],[0,0],[0,0],[0,0]]
   }))})).sort((a,b)=>a.start-b.start);
   this._active=[];this._cursor=0;this._last=-Infinity;
-  // The film was recorded with a different player path. Its color contours
-  // must NOT be the sole authority for killing a live player.
+  // Single source of truth for visual polygons and gameplay collision.
   this._collisionWalls=[];
   this.sides=SIDES;this.fromSides=SIDES;this.morph=1;
   this.recordedCamera=null;this.referenceCamera=null;
-  this.atlasActive=false;this.atlasColor=null;this._atlasFrameIndex=-1;
+  this.atlasActive=false;this.atlasColor=null;
   this.sampleWalls();
  }
  get targetSides(){return SIDES}
  get playerSpeed(){return PLAYER_SPEED}
  sampleWalls(){
   if(!this._spawns)return;
-  const t=this.time;
-  // Advance actual radial-wall physics even when the visual 60fps atlas
-  // is active. This also prevents atlas-load transitions from briefly
-  // replacing a safe physics frame with arbitrary filled film pixels.
-  this._samplePhysicalWalls(t);
-  // VIDEO source: use the real 60fps wall silhouettes instead of guessed
-  // radial rings. Contours were segmented from the uploaded gameplay, not
-  // hand-invented. Convert the filmed SCREEN points to world space using
-  // the inverse of the camera applied during draw().
-  if(this.timeline.orderMode==='video'&&ATLAS?.ready){
-   const frame=ATLAS.getFrame(D.videoAtGameTime(Math.min(t,REF_END)));
-   if(frame){
-    this.recordedCamera=cameraAt(t);
-    this.referenceCamera=this.recordedCamera;
-    this.wallFrame=frame.index;
-    this.atlasColor='rgb('+frame.rgb.join(',')+')';
-    this.atlasActive=true;
-    if(frame.index!==this._atlasFrameIndex){
-     this._atlasFrameIndex=frame.index;
-     const [a,b,c,d,tx=0,ty=0]=this.recordedCamera,det=a*d-b*c;
-     if(Math.abs(det)>1e-5){
-      const pxToLogical=960/ATLAS.WIDTH;
-      this._atlasWalls=frame.paths.map((flat,i)=>{
-       const points=[];
-       for(let j=0;j<flat.length;j+=2){
-        // Camera source shake/tilt also has a translation component.
-        // Cancel it here so the final canvas transform restores the
-        // exact filmed 576x360 pixel positions.
-        const x=(flat[j]-ATLAS.WIDTH/2)*pxToLogical-tx;
-        const y=(flat[j+1]-ATLAS.HEIGHT/2)*pxToLogical-ty;
-        points.push([(d*x-c*y)/det,(-b*x+a*y)/det]);
-       }
-       return {id:'film-'+frame.index+'-'+i,waveId:'film-'+frame.index,
-        points,atlasContour:true,collapsed:false};
-      });
-     }
-    }
-    this.walls=this._atlasWalls||[];
-    return;
-   }
-  }
-
+  // TASK 1 collision rule: draw and hit-test the SAME moving wall panels.
+  // The 60fps reference movie shows another player's trajectory and has
+  // spurious center/core contours; inverse-transforming its pixels into
+  // this run's game world creates wiggly lines and pass-through collisions.
+  // Keep the source film as offline reference data, NOT active geometry.
+  this._samplePhysicalWalls(this.time);
   this.atlasActive=false;
+  this.atlasColor=null;
   this.walls=this._collisionWalls;
  }
  _samplePhysicalWalls(t){
@@ -384,29 +348,11 @@ class HyperHexagonerGame extends E.Game{
   }
  }
   hit(angle=this.angle){
-  // Identical visible quadrilaterals and physical collision shapes:
-  // point in polygon at the small central avatar hitbox, not its outline.
+  // The small avatar center point is tested against exactly the quads
+  // submitted to the HYPER 9/10 renderer. No second, disagreeing film
+  // mask is allowed to veto a visible wall impact.
   const center=E.playerHitPoint(angle);
-  // Only genuine inbound walls can cause an impact; a frame in the filmed
-  // atlas may cover the avatar point because the FILMED player stood in
-  // another lane, or because the mask includes the background/core.
-  // In ordinary mode use the public actor list (also supports the task-1
-  // collision helper and manual sector-step callers). Only a film-backed
-  // scene needs the separate underlying physical actors.
-  const actors=this.atlasActive?this._collisionWalls:this.walls;
-  const physical=actors.find(w=>
-   !w.collapsed&&E.pointInPolygon(center,w.points))||null;
-  if(!physical)return null;
-  if(this.atlasActive){
-   // Also require a visible filled silhouette (even-odd, respecting
-   // holes). This prevents invisible deaths when optical contours differ.
-   let film=null,count=0;
-   for(const wall of this.walls)if(E.pointInPolygon(center,wall.points)){
-    count++;if(!film)film=wall;
-   }
-   return count%2?film:null;
-  }
-  return physical;
+  return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(center,w.points))||null;
  }
  die(w){
   if(!w||this.dead)return false;
