@@ -13,6 +13,18 @@ for(const ch of PACKED){
  if(bits>=8){bits-=8;data[bytes++]=(value>>>bits)&255;}
 }
 if(bytes!==COUNT*6)throw Error('Incomplete filmed palette track');
+// The six-sector phase tracker is rotationally symmetric modulo 60deg.
+ // Compare source-image sector centers to the two sampled colors to recover
+ // WHICH parity of wedges is bright at each recorded clip time.
+const PARITY='M5nNZDaT2UxmN5nNZDaT2UxmzWYym0ls3kwG';
+const parity=new Uint8Array(Math.ceil(COUNT/8));
+bits=0;value=0;bytes=0;
+for(const ch of PARITY){
+ const n=ABC.indexOf(ch);if(n<0)continue;
+ value=(value<<6)|n;bits+=6;
+ if(bits>=8){bits-=8;parity[bytes++]=(value>>>bits)&255;}
+}
+if(bytes!==parity.length)throw Error('Filmed wedge parity missing');
 const clip=(x,a,b)=>Math.max(a,Math.min(b,x));
 function frame(i,k){const o=i*6+k*3;return [data[o],data[o+1],data[o+2]];}
 function at(videoSecond){
@@ -22,8 +34,13 @@ function at(videoSecond){
  const min=post?split:0,max=post?COUNT-1:split-1;
  const a=clip(Math.floor(pos),min,max),b=clip(a+1,min,max),u=clip(pos-a,0,1);
  const color=k=>frame(a,k).map((x,i)=>Math.round(x+(frame(b,k)[i]-x)*u));
- const light=color(0),dark=color(1);
- return ['rgb('+light.join(',')+')','rgb('+dark.join(',')+')'];
+ const bright=color(0),dark=color(1);
+ // drawBackdrop paints odd and even sectors in alternating palette slots.
+ // Sector 0 takes slot 1: flip the slots when the filmed wedge was bright.
+ const nearest=clip(Math.round(pos),0,COUNT-1);
+ const sector0Bright=!!(parity[nearest>>3]&(1<<(nearest&7)));
+ const first=sector0Bright?dark:bright,second=sector0Bright?bright:dark;
+ return ['rgb('+first.join(',')+')','rgb('+second.join(',')+')'];
 }
 const API=Object.freeze({START,FPS,COUNT,POST_START,at});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
