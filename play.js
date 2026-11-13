@@ -210,7 +210,10 @@ function drawHyperHUD(){
  if(game.hyperHexagonerSource910){
   const h=hyper910HudGeometry(game.time);
   polygon([[0,0],[272,0],[244,40],[0,40]],'#000');
-  text('BEST: '+hyper910Time(bestTime(game.level)),16,7,25,'#fff','left',210);
+  const storedBest=bestTime(game.level);
+  const newRecord=game.time>storedBest+1e-5&&game.time>0;
+  text(newRecord?'NEW RECORD':'BEST: '+hyper910Time(storedBest),
+   16,7,25,'#fff','left',newRecord?170:210);
   polygon([[h.x,0],[960,0],[960,66],[h.footer,66],
    [h.notch,40],[h.head,40]],'#000');
   text('HYPER MODE',h.x+28,7,24,'#fff','left',218);
