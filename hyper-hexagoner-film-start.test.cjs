@@ -7,7 +7,7 @@ const fs=require('node:fs'),E=require('./engine.js');
 const P=require('./stage-profiles.js'),D=require('./hyper-hexagoner-910-data.js');
 const TAU=2*Math.PI;
 let filmLoads=0;
-const film={ready:true,WIDTH:576,HEIGHT:360,
+const film={ready:false,WIDTH:576,HEIGHT:360,
  getFrame(){filmLoads++;return {index:0,rgb:[255,30,130],
   paths:[[0,0,576,0,576,360,0,360]]};}};
 const code=fs.readFileSync(__dirname+'/hyper-hexagoner-910.js','utf8');
@@ -40,7 +40,7 @@ assert(Math.abs(same.r-oldRadius+.01*H.SPEED)<.02,
 film.ready=false;g.sampleWalls();
 assert.equal(g.walls,g._collisionWalls);
 assert(g.hit(occupied),'no collision changes when atlas becomes unavailable');
-film.ready=true;g.sampleWalls();
-assert.equal(filmLoads,0,'film is never automatically sampled');
-assert(g.hit(occupied),'no collision changes when atlas becomes available');
+film.ready=false;g.sampleWalls();
+assert.equal(filmLoads,0,'failed film loading uses source-phrase geometry');
+assert(g.hit(occupied),'no collision changes when atlas is unavailable');
 console.log('PASS HYPER 9/10: shared visible/hit polygons, center clear, correct wall speed, safe film loading and source-lane collisions');
