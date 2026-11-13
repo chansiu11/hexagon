@@ -180,7 +180,8 @@ function assemble(entries,seed,video,duration,extended=false){const waves=[],par
  waves.sort((a,b)=>a.start-b.start);
  return {kind:'hyper-hexagoner-910',mode:'hyper-hexagoner-910',source:D.SOURCE,
   sourceRange:[D.VIDEO_START,D.VIDEO_END],videoEnd:REF_END,seed:seed>>>0,
-  orderMode:video?'video':'random',duration,waves,partOrder,sourcePartCount:ALL_PARTS.length,
+  orderMode:video?'video':'random',duration:video?Math.min(duration,REF_END):duration,
+  waves,partOrder,sourcePartCount:ALL_PARTS.length,
   sourceEventCount:SOURCE_COUNT,level:LEVEL,shapeSchedule:[[0,SIDES]]};
 }
 function hasCoarseRoute(waves){const n=144,dt=.05,step=Math.max(1,Math.floor(PLAYER_SPEED*dt/TAU*n));
