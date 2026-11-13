@@ -101,7 +101,14 @@ function buildControls(){hovered=null;controls.replaceChildren();if(['title','se
 function panel(label,y=435,width=380){const over=hovered&&hovered.y<=y+28&&hovered.y+hovered.h>=y+28&&hovered.x<480&&hovered.x+hovered.w>480;const down=pressed&&pressed.y<=y+28&&pressed.y+pressed.h>=y+28&&pressAge<.25;const squash=down?Math.sin(Math.min(1,pressAge/.25)*Math.PI)*.045:0;ctx.save();ctx.translate(480,y+27);ctx.scale(1+(over?hoverAmount*.018:0)-squash,1-squash);ctx.translate(-480,-y-27);polygon([[480-width/2-20,y],[480+width/2+20,y],[480+width/2-8,y+55],[480-width/2+8,y+55]],'#ffffff20','#ffffff50',4);text(label,480,y+16,24,over?'#fff':'#ddd','center',width-20);ctx.restore()}
 function arrows(){for(const [x,flip]of[[145,-1],[815,1]]){ctx.save();const over=hovered&&hovered.x<x&&hovered.x+hovered.w>x;const down=pressed&&pressed.x<x&&pressed.x+pressed.w>x&&pressAge<.25;ctx.translate(x+(over?flip*hoverAmount*5:0),472+(down?Math.sin(pressAge/.25*Math.PI)*4:0));ctx.scale(flip*(down?.96:1),down?.96:1);polygon([[-90,-42],[75,-42],[100,50],[-65,50]],'#000');polygon([[-85,-50],[80,-50],[105,42],[-60,42]],'#ffffff28','#ffffff45',5);polygon([[-53,-13],[12,-13],[12,-30],[58,0],[12,30],[12,13],[-53,13]],'#080808');ctx.restore()}}
 function header(left,right){if(left){polygon([[0,0],[400,0],[380,42],[0,42]],'#0008','#ffffff25',3);text(left,18,10,20,'#ddd','left',360)}if(right){polygon([[560,0],[960,0],[960,42],[580,42]],'#0008','#ffffff25',3);text(right,940,10,20,'#ddd','right',360)}}
-function format(n){if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const ticks=Math.floor(n*60+1e-7);return String(Math.floor(ticks/60))+':'+String(ticks%60).padStart(2,'0')}return n.toFixed(2).padStart(5,'0')}
+function hyper910Time(n){
+ const c=Math.floor(Math.max(0,Number(n)||0)*100+1e-7);
+ return String(Math.floor(c/100))+':'+String(c%100).padStart(2,'0');
+}
+function format(n){
+ if(game?.hyperHexagonerSource910&&['play','over','complete','paused'].includes(screen))
+  return hyper910Time(n);
+ if(game?.hardMode&&['play','over','complete','paused'].includes(screen)){const ticks=Math.floor(n*60+1e-7);return String(Math.floor(ticks/60))+':'+String(ticks%60).padStart(2,'0')}return n.toFixed(2).padStart(5,'0')}
 function updatePalette(dt){
  if(game?.hyperHexagonSource78&&['play','over','complete','paused'].includes(screen)){
   const [h,s,l]=HexHyper78.palette(game.time);
@@ -191,7 +198,27 @@ function drawHardHUD(){
  const ticks=Math.floor(game.time*60+1e-7),whole=String(Math.floor(ticks/60)),part=String(ticks%60).padStart(2,'0');
  HexHardDigits.draw(ctx,whole,887,8,44);HexHardDigits.draw(ctx,':'+part,944,30,22);
 }
+// Reference HYPER HEXAGONER stopwatch uses decimal hundredths,
+// and its black right-side HUD grows leftward on the 10-second boundary.
+function hyper910HudGeometry(seconds){
+ const centis=Math.floor(Math.max(0,seconds)*100+1e-7);
+ const digits=String(Math.floor(centis/100)).length,x=544-43.5*(digits-1);
+ return {x,head:x+29,notch:815-43.5*(digits-1),
+  footer:832-43.5*(digits-1),centis,digits};
+}
 function drawHyperHUD(){
+ if(game.hyperHexagonerSource910){
+  const h=hyper910HudGeometry(game.time);
+  polygon([[0,0],[272,0],[244,40],[0,40]],'#000');
+  text('BEST: '+hyper910Time(bestTime(game.level)),16,7,25,'#fff','left',210);
+  polygon([[h.x,0],[960,0],[960,66],[h.footer,66],
+   [h.notch,40],[h.head,40]],'#000');
+  text('HYPER MODE',h.x+28,7,24,'#fff','left',218);
+  HexHardDigits.draw(ctx,String(Math.floor(h.centis/100)),893,8,44);
+  HexHardDigits.draw(ctx,':'+String(h.centis%100).padStart(2,'0'),944,30,22);
+  return;
+ }
+ // No layout changes for HYPER HEXAGON (7/8).
  polygon([[0,0],[284,0],[265,39],[0,39]],'#000');
  text('BEST: '+format(bestTime(game.level)),16,7,25,'#fff','left',245);
  polygon([[615,0],[960,0],[960,66],[798,66],[778,40],[635,40]],'#000');
