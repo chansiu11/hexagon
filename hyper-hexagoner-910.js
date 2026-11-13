@@ -306,6 +306,9 @@ class HyperHexagonerGame extends E.Game{
    points:[[0,0],[0,0],[0,0],[0,0]]
   }))})).sort((a,b)=>a.start-b.start);
   this._active=[];this._cursor=0;this._last=-Infinity;
+  // The film was recorded with a different player path. Its color contours
+  // must NOT be the sole authority for killing a live player.
+  this._collisionWalls=[];
   this.sides=SIDES;this.fromSides=SIDES;this.morph=1;
   this.recordedCamera=null;this.referenceCamera=null;
   this.atlasActive=false;this.atlasColor=null;this._atlasFrameIndex=-1;
@@ -313,7 +316,13 @@ class HyperHexagonerGame extends E.Game{
  }
  get targetSides(){return SIDES}
  get playerSpeed(){return PLAYER_SPEED}
- sampleWalls(){if(!this._spawns)return;const t=this.time;
+ sampleWalls(){
+  if(!this._spawns)return;
+  const t=this.time;
+  // Advance actual radial-wall physics even when the visual 60fps atlas
+  // is active. This also prevents atlas-load transitions from briefly
+  // replacing a safe physics frame with arbitrary filled film pixels.
+  this._samplePhysicalWalls(t);
   // VIDEO source: use the real 60fps wall silhouettes instead of guessed
   // radial rings. Contours were segmented from the uploaded gameplay, not
   // hand-invented. Convert the filmed SCREEN points to world space using
@@ -350,14 +359,18 @@ class HyperHexagonerGame extends E.Game{
     return;
    }
   }
+
   this.atlasActive=false;
+  this.walls=this._collisionWalls;
+ }
+ _samplePhysicalWalls(t){
   if(t<this._last){this._active=[];this._cursor=0}
   this._last=t;this.wallFrame=Math.floor(t*60);
   this.recordedCamera=cameraAt(t);this.referenceCamera=this.recordedCamera;
   while(this._cursor<this._spawns.length&&this._spawns[this._cursor].start<=t)
    this._active.push(this._spawns[this._cursor++]);
   for(let i=this._active.length-1;i>=0;i--)if(t>=this._active[i].end)this._active.splice(i,1);
-  this.walls.length=0;
+  this._collisionWalls.length=0;
   for(const w of this._active){const rad=w.r-w.speed*(t-w.start);
    for(const a of w.actors){a.r=rad+a.offset;
     const poly=E.wallVisualPoly(a);
@@ -366,25 +379,30 @@ class HyperHexagonerGame extends E.Game{
     a.collapsed=Math.abs((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-
       (p[1][1]-p[0][1])*(p[2][0]-p[0][0]))<1e-8;
     // As in task 1, a vanished or zero-area panel never blocks the orbit.
-    if(!a.collapsed)this.walls.push(a);
+    if(!a.collapsed)this._collisionWalls.push(a);
    }
   }
  }
- hit(angle=this.angle){
+  hit(angle=this.angle){
   // Identical visible quadrilaterals and physical collision shapes:
   // point in polygon at the small central avatar hitbox, not its outline.
   const center=E.playerHitPoint(angle);
+  // Only genuine inbound walls can cause an impact; a frame in the filmed
+  // atlas may cover the avatar point because the FILMED player stood in
+  // another lane, or because the mask includes the background/core.
+  const physical=this._collisionWalls.find(w=>
+   !w.collapsed&&E.pointInPolygon(center,w.points))||null;
+  if(!physical)return null;
   if(this.atlasActive){
-   // The filmed wall image contains nested contours for ring openings.
-   // Canvas draws them with even-odd fill, and the exact same parity
-   // controls the central hit point; a transparent hole is never lethal.
-   let hit=null,count=0;
+   // Also require a visible filled silhouette (even-odd, respecting
+   // holes). This prevents invisible deaths when optical contours differ.
+   let film=null,count=0;
    for(const wall of this.walls)if(E.pointInPolygon(center,wall.points)){
-    count++;if(!hit)hit=wall;
+    count++;if(!film)film=wall;
    }
-   return count%2?hit:null;
+   return count%2?film:null;
   }
-  return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(center,w.points))||null;
+  return physical;
  }
  die(w){
   if(!w||this.dead)return false;
