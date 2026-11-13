@@ -390,7 +390,11 @@ class HyperHexagonerGame extends E.Game{
   // Only genuine inbound walls can cause an impact; a frame in the filmed
   // atlas may cover the avatar point because the FILMED player stood in
   // another lane, or because the mask includes the background/core.
-  const physical=this._collisionWalls.find(w=>
+  // In ordinary mode use the public actor list (also supports the task-1
+  // collision helper and manual sector-step callers). Only a film-backed
+  // scene needs the separate underlying physical actors.
+  const actors=this.atlasActive?this._collisionWalls:this.walls;
+  const physical=actors.find(w=>
    !w.collapsed&&E.pointInPolygon(center,w.points))||null;
   if(!physical)return null;
   if(this.atlasActive){
