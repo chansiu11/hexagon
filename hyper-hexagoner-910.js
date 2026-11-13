@@ -318,22 +318,55 @@ class HyperHexagonerGame extends E.Game{
   this._collisionWalls=[];
   this.sides=SIDES;this.fromSides=SIDES;this.morph=1;
   this.recordedCamera=null;this.referenceCamera=null;
-  this.atlasActive=false;this.atlasColor=null;
+  this.atlasActive=false;this.atlasColor=null;this.filmFrame=null;
+  this._filmWalls=[];
   this.sampleWalls();
  }
  get targetSides(){return SIDES}
  get playerSpeed(){return PLAYER_SPEED}
  sampleWalls(){
   if(!this._spawns)return;
-  // TASK 1 collision rule: draw and hit-test the SAME moving wall panels.
-  // The 60fps reference movie shows another player's trajectory and has
-  // spurious center/core contours; inverse-transforming its pixels into
-  // this run's game world creates wiggly lines and pass-through collisions.
-  // Keep the source film as offline reference data, NOT active geometry.
+  // The reference wall contours and the collision polygons are identical:
+  // inverse-transform source pixels through the SAME camera as the player.
+  // Random phrase mode and failed film loads preserve proven quad physics.
+  this.recordedCamera=this.timeline.orderMode==='video'?
+   filmedCameraAt(this.time):cameraAt(this.time);
+  this.referenceCamera=this.recordedCamera;
+  if(this._sampleFilmedWalls(this.time))return;
   this._samplePhysicalWalls(this.time);
-  this.atlasActive=false;
-  this.atlasColor=null;
+  this.atlasActive=false;this.atlasColor=null;this.filmFrame=null;
   this.walls=this._collisionWalls;
+ }
+ _sampleFilmedWalls(t){
+  if(this.timeline.orderMode!=='video'||!ATLAS?.ready||!ATLAS.getFrame)return false;
+  const frame=ATLAS.getFrame(D.videoAtGameTime(t));
+  if(!frame||!Array.isArray(frame.paths))return false;
+  const [a,b,c,d,tx,ty]=this.recordedCamera,det=a*d-b*c;
+  if(!Number.isFinite(det)||Math.abs(det)<1e-7)return false;
+  const width=ATLAS.WIDTH||576,height=ATLAS.HEIGHT||360;
+  const sx=960/width,sy=600/height,cx=width/2,cy=height/2;
+  this._filmWalls.length=0;
+  for(let i=0;i<frame.paths.length;i++){
+   const contour=frame.paths[i];
+   if(!contour||contour.length<6||contour.length%2)continue;
+   const points=[];
+   for(let j=0;j<contour.length;j+=2){
+    const x=(contour[j]-cx)*sx-tx,y=(contour[j+1]-cy)*sy-ty;
+    const wx=(d*x-c*y)/det,wy=(a*y-b*x)/det;
+    if(!Number.isFinite(wx)||!Number.isFinite(wy)){points.length=0;break}
+    points.push([wx,wy]);
+   }
+   if(points.length>=3)this._filmWalls.push({
+    id:'film:'+frame.index+':'+i,filmed:true,sourceFrame:frame.index,
+    points,collapsed:false});
+  }
+  this.walls=this._filmWalls;
+  this.filmFrame=frame.index;
+  const rgb=frame.rgb;
+  this.atlasColor=Array.isArray(rgb)&&rgb.length===3&&rgb.every(Number.isFinite)?
+   'rgb('+rgb.map(v=>clamp(Math.round(v),0,255)).join(',')+')':null;
+  this.atlasActive=true;
+  return true;
  }
  _samplePhysicalWalls(t){
   if(t<this._last){this._active=[];this._cursor=0}
@@ -358,9 +391,8 @@ class HyperHexagonerGame extends E.Game{
   }
  }
   hit(angle=this.angle){
-  // The small avatar center point is tested against exactly the quads
-  // submitted to the HYPER 9/10 renderer. No second, disagreeing film
-  // mask is allowed to veto a visible wall impact.
+  // Both the film and the fallback quad renderer consume wall.points.
+  // A player cannot pass through a visible film polygon.
   const center=E.playerHitPoint(angle);
   return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(center,w.points))||null;
  }
