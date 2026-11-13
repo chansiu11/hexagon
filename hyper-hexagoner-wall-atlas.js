@@ -42,5 +42,5 @@ const API={load,getFrame,START,FPS,WIDTH,HEIGHT,EXPECTED,
  get ready(){return !!frames},get error(){return loadError},
  get loadedFrameCount(){return frames?.length||0}};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
-else{root.HexHyper910Atlas=API;load();}
+else{root.HexHyper910Atlas=API;} // Reference atlas: load explicitly for offline comparison only.
 })(typeof window!=='undefined'?window:globalThis);
