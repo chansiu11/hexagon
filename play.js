@@ -77,7 +77,11 @@ async function start(){
  starting=true;const level=selected,origin=screen;status.textContent='게임 데이터를 불러오는 중입니다.';
  try{
  const audioReady=settings.sound?music.unlock():Promise.resolve();
- const [timeline]=await Promise.all([loadTimeline(level),audioReady]);
+ // A filmed HYPER HEXAGONER run must not start with procedural placeholder
+  // walls and suddenly switch meshes halfway through a dodge. The asset
+  // is fetched ahead of play, and a failed fetch uses the old engine safely.
+  const [timeline]=await Promise.all([loadTimeline(level),audioReady,
+   level===4&&typeof HexHyper910Atlas!=='undefined'?HexHyper910Atlas.load():Promise.resolve()]);
  if(level!==selected||screen!==origin)return;
  if(level===6)music.randomTrackIndex=timeline.musicTrack.index;
  if(settings.sound){
@@ -494,6 +498,23 @@ function drawHexagonestWalls(walls,color){
 }
 
 function drawWallField(walls,color,game){
+ if(game.hyperHexagonerSource910&&game.atlasActive){
+  // In source-order mode draw the actual filmed wall silhouettes from the
+  // user's 60fps video. The engine has already inverse-transformed each
+  // contour through the active camera, so screen outlines align with the
+  // film, while collision still uses the same vertex polygons.
+  ctx.fillStyle=game.atlasColor||color;
+  ctx.beginPath();
+  let count=0;
+  for(const wall of walls){
+   const p=wall.points;if(!p||p.length<3)continue;
+   ctx.moveTo(p[0][0],p[0][1]);
+   for(let j=1;j<p.length;j++)ctx.lineTo(p[j][0],p[j][1]);
+   ctx.closePath();count++;
+  }
+  if(count)ctx.fill('evenodd');
+  return;
+ }
  if(game.hyperHexagonSource78||game.hyperHexagonerSource910){
   // Each actor is an exact collision quad. Joining actors by their SOURCE
   // sector index is unsafe while the arena morphs (e.g. incoming 4-side
