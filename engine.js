@@ -229,7 +229,7 @@
         // during 0..0.55s: a video chronological run retains its first frame.
         // Its stage-specific source admission is responsible for excluding
         // non-wall core/ship contours before registration.
-        this.walls=this.level!==2&&this.time<.55?[]:frame.walls;
+        this.walls=![2,3].includes(this.level)&&this.time<.55?[]:frame.walls;
         this.applyShape(frame.sides);
         this.rotation=frame.angle;
         this.zoom=frame.zoom;
