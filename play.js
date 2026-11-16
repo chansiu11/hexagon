@@ -29,7 +29,18 @@ function drawArena(ctx,colors,opts){
  ctx.rotate(camera);
  if(opts.settings.motion){
   ctx.transform(1,0,Math.sin(game.tilt)*.2,1,0,0);
-  ctx.scale(game.zoom,game.zoom);
+  // In the HEXAGONER films the large opening core/ship shrinks rapidly into
+  // the normal arena. The 20fps wall contour bank stores a clamped camera
+  // zoom, so apply a separate visual launch scale instead of scaling the
+  // collision orbit or inventing extra wall polygons.
+  let introZoom=1;
+  if(game.level===1&&game.time<.85){
+   const source=game.replay?.kind==='parts'?game.replay.source:game.replay?.id;
+   const u=Math.max(0,Math.min(1,game.time/.85));
+   const hold=1-u*u*(3-2*u);
+   introZoom+=hold*(source==='1596'?2.3:1.3);
+  }
+  ctx.scale(game.zoom*introZoom,game.zoom*introZoom);
  }
  for(let i=0;i<game.sides;i++){
   const a=i*TAU/game.sides,b=(i+1)*TAU/game.sides;
