@@ -36,6 +36,26 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
  assert.equal(await page.evaluate(()=>screen),'select','Unimplemented map must not start');
  for(let i=0;i<5;i++){await page.getByRole('button',{name:'다음'}).click();await page.waitForFunction(expected=>selected===expected,(i+2)%6,{timeout:6000});}
  assert.equal(await page.evaluate(()=>selected),0,'Navigation must wrap after sixth map');
+ 
+ // A playable-but-patternless 1-1 shell must not fabricate 60-second records.
+ const prior=await page.evaluate(()=>records[0]);
+ await page.getByRole('button',{name:'게임 시작'}).click();
+ await page.waitForFunction(()=>document.querySelector('#game').dataset.screen==='play',null,{timeout:6000});
+ await page.evaluate(()=>{game.time=60.5});
+ await page.waitForTimeout(350);
+ assert.equal(await page.evaluate(()=>records[0]),prior,'Empty placeholder may not record a high score');
+ // Existing seven-slot saves migrate by keeping the six original slot values.
+ await page.evaluate(()=>localStorage.setItem('hexagon-web-v2',
+  JSON.stringify({records:[11,22,33,44,55,66,777],recordsMode2:[1,2,3,4,5,6,7],
+   recordsMode3:[8,9,10,11,12,13,14],settings:{sound:false,motion:false,controlMode:1,hyperUnlocked:false}})));
+ await page.reload();
+ await page.waitForFunction(()=>document.querySelector('#game').dataset.screen==='title',null,{timeout:6000});
+ assert.deepEqual(await page.evaluate(()=>records),[11,22,33,44,55,66]);
+ assert.deepEqual(await page.evaluate(()=>recordsMode2),[1,2,3,4,5,6]);
+ assert.deepEqual(await page.evaluate(()=>recordsMode3),[8,9,10,11,12,13]);
+ await page.evaluate(()=>save());
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('hexagon-web-v2')).records.length),6);
+ 
  assert.equal(errors.length,0,errors.join('\n'));
- await browser.close();console.log('PASS: menu, launch, input, collision, death, retry, pause, return, six-map wrapping');
+ await browser.close();console.log('PASS: menu, engine controls, collision, death, retry, return, 6-map routing and old-save migration');
 })().catch(e=>{console.error(e);process.exit(1)});
