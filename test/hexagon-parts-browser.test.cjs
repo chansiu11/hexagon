@@ -76,6 +76,24 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
  await page.keyboard.press('Escape');await page.keyboard.press('Escape');
  assert.equal(await page.evaluate(()=>HexMenu.screen),'select');
  assert.deepEqual(errors,[]);
+ // Regression: the 1596 menu/zoom-in source once produced an invisible
+ // collision at 0.13 seconds. Test the actual first 0.45s WITHOUT spectator.
+ const fresh=await browser.newPage({viewport:{width:960,height:600}});
+ const freshErrors=[];fresh.on('pageerror',e=>freshErrors.push(e.message));
+ await fresh.addInitScript(()=>localStorage.setItem('hexagon-web-v2',JSON.stringify({
+  records:[0,0,0,0,0,0],settings:{sound:false,motion:true,controlMode:1,hyperUnlocked:true}
+ })));
+ await fresh.goto('http://127.0.0.1:4173/?first=1596&seed=20261116');
+ await fresh.waitForFunction(()=>HexMenu.screen==='title');
+ await fresh.keyboard.press('Space');await fresh.keyboard.press('Space');
+ await fresh.waitForFunction(()=>HexMenu.screen==='play',{timeout:16000});
+ assert.equal(await fresh.evaluate(()=>HexPlay.game.spectating),false);
+ assert.equal(await fresh.evaluate(()=>HexPlay.game.replay.source),'1596');
+ await fresh.waitForTimeout(420);
+ assert.equal(await fresh.evaluate(()=>HexPlay.game.dead),false);
+ await fresh.screenshot({path:'test-artifacts/1596-real-play-opening.png'});
+ assert.deepEqual(freshErrors,[]);
+ await fresh.close();
  await browser.close();
  console.log('PASS: 53 filmed parts: random selection, long run, time boundary, death/retry, controller, pause/menu');
 })().catch(err=>{console.error(err);process.exit(1)});
