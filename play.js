@@ -134,7 +134,8 @@ function replayPalette(g){
  if(Math.max(...color.slice(6,9))<90){
   let replacement=null;
   if(original===g.replay&&g.time<1.2 || parts&&g.time<1.2){
-   replacement=source==='1595'?[206,54,35]:[200,121,26];
+   replacement=g.level===1?(source==='1595'?[140,172,60]:[228,36,116]):
+    (source==='1595'?[206,54,35]:[200,121,26]);
   }else{
    const n=Math.max(0,Math.min(pal.colors.length-1,i));
    for(let d=1;d<=5&&!replacement;d++){
