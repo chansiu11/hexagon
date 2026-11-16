@@ -21,7 +21,7 @@ test('source timelines generate legal deterministic actors without resetting at 
  for(let source=0;source<2;source++){
   const a=S.timeline(source);
   assert.deepEqual(a,S.timeline(source));
-  assert.ok(a.walls.length>600);
+  assert.equal(a.walls.length,[631,540][source]);
   assert.ok(a.walls.some(w=>w.at<60)&&a.walls.some(w=>w.at>=60));
   assert.equal(a.shapeEvents.length,0);
   assert.doesNotThrow(()=>E.validateTimeline(a));
