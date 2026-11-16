@@ -184,6 +184,11 @@
       this.time=Math.min(seconds,(this.replay.frames.length-1)/this.replay.fps*this.replay.gameRate);
       this.dead=false;this.timelineEnded=false;this.death=null;
       this.replayFrame=-1;this.sampleWalls();
+      // Jumping over multiple source events must not invent a new core morph
+      // at the seek destination. Real-time continuous playback still morphs.
+      this.shapeFrom=this.sides;
+      this.shapeTo=this.sides;
+      this.shapeChangedAt=-100;
       return true;
     }
     applyShape(sides){
