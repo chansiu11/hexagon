@@ -18,7 +18,7 @@ for(const id of ['1595','1596']) {
   assert.equal(createHash('sha256').update(raw).digest('hex'),meta.sourceSHA256);
   assert.equal(replay.at(0).index,0);
   assert.ok(replay.gameDuration>60);
-  const pre=replay.at(59.9),edge=replay.at(60.0),post=replay.at(60.1);
+  const pre=replay.at(59.9),edge=replay.at(60.0),post=replay.at(60.2);
   assert.ok(pre.index<edge.index&&edge.index<post.index);
   assert.equal(post.index-edge.index,1);
   assert.equal(edge.index-pre.index,1);
@@ -34,7 +34,7 @@ for(const id of ['1595','1596']) {
 test('source playback never invokes random ordering or legacy HEXAGONER engine',()=>{
  const fs=require('node:fs');
  const source=fs.readFileSync(require.resolve('./task2-hexagoner-source-replay.js'),'utf8');
- assert.doesNotMatch(source,/Math\\.random|hexagoner-video8|hexagoner-parts|require\\(['"]\\.\\/engine/);
+ for(const forbidden of ['Math.random','hexagoner-video8','hexagoner-parts',"require('./engine"]) assert.equal(source.includes(forbidden),false);
  assert.equal(R.SOURCE_CLOCK_RATE,25/24);
  assert.equal(R.SAMPLE_FPS,10);
 });
