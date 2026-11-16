@@ -170,7 +170,17 @@ async function start(index,controlMode=1,enabled=true){
  const requested=args.get('trace');
  const raw=['1595','1596'].includes(requested);
  let playback;
- if(raw){
+ if(index===1){
+  // Task 2-1: HEXAGONER is chronological video replay only. The independent
+  // connected-phrase random bank is deliberately reserved for task 2-2.
+  const sourceId=raw?requested:'1595';
+  const option=map.replays?.[sourceId];
+  if(!option)throw new Error('Unregistered HEXAGONER filmed run '+sourceId);
+  const [source,palette]=await Promise.all([
+    HexReplay.load(sourceId,option),HexReplay.loadPalette(sourceId,1)]);
+  source.palette=palette;
+  playback=source;
+ }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
   const [source,palette]=await Promise.all([
