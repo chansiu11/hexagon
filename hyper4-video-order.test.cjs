@@ -36,3 +36,22 @@ for(const [key,total,beforeCount,afterCount] of [['1595',98,62,36],['1596',107,6
  assert.equal(left.videoOrderSource,key);
 }
 console.log('hyper4 task4-1: validated two sequential optical timelines, era split, wall geometry and 60s continuity');
+
+for(const key of ['1595','1596']){
+ const timeline=H.create(key),first=timeline.events[0];
+ let free=0;while(H.panelMask(first.screenMask,free,6))free++;
+ let occupied=0;while(!H.panelMask(first.screenMask,occupied,6))occupied++;
+ assert.ok(free<6&&occupied<6,'first source mask must have occupied and open lanes');
+ const simulate=sector=>{
+  const clip={...timeline,events:[first],duration:first.impact+.5};
+  const g=new H.HyperGame(clip);g.angle=(sector+.5)*Math.PI/3;
+  for(let tick=0;tick<2000&&!(g.dead||g.timelineEnded);tick++)g.update(1/240,0);
+  return g;
+ };
+ const passing=simulate(free),hit=simulate(occupied);
+ assert.equal(passing.dead,false,'visible open lane must pass first wall '+key);
+ assert.equal(hit.dead,true,'visible blocked lane must collide at 240Hz '+key);
+ assert.ok(hit.time>1,'must not die at startup '+key);
+ assert.ok(hit.death?.wallId!==undefined,'collision must record actual wall contact '+key);
+}
+console.log('hyper4 task4-1: two optical opening and collision paths pass at 240 Hz');
