@@ -229,7 +229,9 @@
         // during 0..0.55s: a video chronological run retains its first frame.
         // Its stage-specific source admission is responsible for excluding
         // non-wall core/ship contours before registration.
-        this.walls=![2,3].includes(this.level)&&this.time<.55?[]:frame.walls;
+        // Source-measured stages 3, 4 and 5 must not silently drop real
+        // early wall polygons: their own tracers must exclude fake intro art.
+        this.walls=![2,3,4].includes(this.level)&&this.time<.55?[]:frame.walls;
         this.applyShape(frame.sides);
         this.rotation=frame.angle;
         this.zoom=frame.zoom;
