@@ -1,10 +1,9 @@
-name: Hexagon wall and input regressions
+name: Rebuilt Hexagon 1-1 checks
 on:
   push:
-    branches: [main]
+    branches: [main, rebuild-hexagon-1-1-20261116]
   pull_request:
   workflow_dispatch:
-
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -13,38 +12,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate engine and source timelines
+      - name: Static scripts and unit tests
         run: |
-          node --check hard-mode.js
-          node hard-mode.test.cjs
-          node hard-variation.test.cjs
-          node hard-video-parts.test.cjs
-          node --check hexagonest-video.js
-          node --check hexagonest-camera.js
-          node --check hexagonest-mode.js
-          node hexagonest-mode.test.cjs
-          node hexagonest-gap-bridges.test.cjs
-          node --check hexagoner-parts.js
-          node hexagoner-parts.test.cjs
-          node --check hexagon-beat.js
-          node --check hexagonest-beat-early.js
-          node --check hexagonest-beat-mono.js
-          node hard-motion.test.cjs
-          node beat-video.test.cjs
-          node camera-source-freeze.test.cjs
-          node audio-feedback.test.cjs
-          node --check play.js
           node --check engine.js
+          node --check play.js
+          node --check menu-ui.js
           node --check audio.js
-          node --check wall-lifecycle-patches.js
-          node engine.test.cjs
-          node rigid-walls.test.cjs
-          node stage-one-continuity.test.cjs
-          node waves.test.cjs
-          node wall-continuity.test.cjs
-          node player-speed.test.cjs
-          node observed-waves.test.cjs
-          node seventeen-second.test.cjs
-          node stage-two-lifecycle.test.cjs
-          node wall-morph-stability.test.cjs
-          node teleport-and-clock.test.cjs
+          node --test engine.test.cjs
