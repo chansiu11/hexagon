@@ -90,17 +90,11 @@ function unlockHyper(){
  if(!settings.hyperUnlocked){settings.hyperUnlocked=true;save();root.HexPlay?.selectSound()}
  toast('하이퍼 모드 전체 해금');buildControls();
 }
-async function setMode(mode){
+function setMode(mode){
  if(![1,2,3].includes(mode))return;
  settings.controlMode=mode;save();
- if(screen==='play'||screen==='paused'){
-  root.HexPlay?.pause();
-  const level=selected;
-  try{
-   const started=await root.HexPlay?.start(level,mode,settings.sound);
-   if(started&&selected===level)switchScreen('play');
-  }catch(error){console.error(error);switchScreen('select');toast('조작 모드 전환 실패');}
- }
+ // Mode changes must not rewind 60 seconds or pick another random part.
+ if(['play','paused'].includes(screen))root.HexPlay?.setMode(mode);
  buildControls();setStatus('조작 모드 '+mode);
 }
 async function start(){
