@@ -7,6 +7,11 @@ const make=(walls,shapes=[{at:0,sides:6}])=>engine.registerMap(0,{sourceStatus:'
 const wall=(patch={})=>({id:'w1',spawnAt:0,radius:150,speed:120,thickness:32,sides:6,blocked:[0],...patch});
 test('six stage numbers survive; seventh map and random route are rejected',()=>{
  assert.equal(engine.LEVELS.length,6);assert.equal(engine.hasMap(6),false);
+ assert.deepEqual(engine.LEVELS.map(l=>l.slice(0,3)),[
+  ['HEXAGON','HARD',32],['HEXAGONER','HARDER',120],
+  ['HEXAGONEST','HARDEST',285],['HEXAGON','HARDESTER',190],
+  ['HEXAGONER','HARDESTEST',225],['HEXAGONEST','HARDESTESTEST',0]
+ ]);
  assert.throws(()=>new engine.ArenaGame(6),/removed/);
  assert.throws(()=>engine.registerMap(6,{walls:[],shapes:[{at:0,sides:6}]}),/0 through 5/);
  assert.equal(engine.hasMap(0),true);
