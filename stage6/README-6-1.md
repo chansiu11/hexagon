@@ -55,3 +55,9 @@ only the isolated stage6 files onto the verified common-engine branch,
 manually validate/fix the full source wall geometry and speed, and
 integrate it there. 6-2 handles playable stage, random parts, and 60s
 seam checks; 6-3 handles the six-map end-to-end review.
+
+## Additional video-pixel spot check
+
+At game times 3, 7, 12, 18, 25, 32, 40, 48 and 55 seconds, automated 320x180 grayscale-bright region comparison gave source-mask mean pixel precision of approximately 0.749 for 1595 and only 0.521 for 1596. This is a limited foreground proxy, not true polygon/collision accuracy. Both are below original-fidelity requirements; source 1596 has particularly serious false classifications. Pixel-accurate wall order recreation is therefore NOT completed. The local Node tape-data tests passed; a headless Chromium visual run could not be confirmed in this environment.
+
+During the 6-1 preparation a task5-1-hyper-hexagoner-rebuild-20261116 branch appeared, but no verified finished task-5 source branch/commit was available for integration.
