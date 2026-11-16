@@ -25,7 +25,10 @@ jobs:
           node --check menu.js
           node --check stages/hexagon.js
           node --check stages/hexagoner.js
+          node --check hexagoner-parts.js
           node --check test/hexagoner-source.test.cjs
+          node --check test/hexagoner-parts.test.cjs
+          node --check test/hexagoner-parts-browser.test.cjs
           node --check test/hexagoner-browser.test.cjs
           node --check test/rebuilt-engine.test.cjs
           node --check test/rebuilt-browser.test.cjs
@@ -34,7 +37,7 @@ jobs:
           node --check test/hexagon-parts.test.cjs
           node --check test/hexagon-parts-browser.test.cjs
       - name: New engine and map continuity tests
-        run: node --test test/rebuilt-engine.test.cjs test/video-replay.test.cjs test/hexagon-parts.test.cjs test/hexagoner-source.test.cjs
+        run: node --test test/rebuilt-engine.test.cjs test/video-replay.test.cjs test/hexagon-parts.test.cjs test/hexagoner-source.test.cjs test/hexagoner-parts.test.cjs
       - name: Install Chromium browser test tools
         run: |
           npm install --no-save --no-package-lock playwright
@@ -53,6 +56,7 @@ jobs:
           node test/video-browser.test.cjs
           node test/hexagon-parts-browser.test.cjs
           node test/hexagoner-browser.test.cjs
+          node test/hexagoner-parts-browser.test.cjs
       - name: Save browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
