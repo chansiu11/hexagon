@@ -74,6 +74,8 @@ async function loadTimeline(level){
 }
 async function start(){
  if(starting)return;if(!unlocked(selected)){beep(110,.2);return}
+ // Stage 5 has its OWN rebuilt-engine player; never fall back to old Hyper910.
+ if(selected===4){window.location.assign('task5/preview.html');return;}
  starting=true;const level=selected,origin=screen;status.textContent='게임 데이터를 불러오는 중입니다.';
  try{
  const audioReady=settings.sound?music.unlock():Promise.resolve();
