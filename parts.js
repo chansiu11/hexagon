@@ -182,7 +182,7 @@
   }
   choose(time,oldCamera,oldPlayer){
    const sides=this.current.sideOut;
-   const candidates=(time>=60?this.post:this.pre).filter(p=>p.sideIn===sides);
+   const candidates=(time>=60?this.post:this.pre).filter(p=>p.sideIn===sides&&p.from>0);
    if(!candidates.length)throw new Error('No compatible filmed part after time '+time+' sides '+sides);
    const ranked=[];
    const outMask=this.current.exitSignature;
@@ -255,11 +255,26 @@
     // Full-strength wall corridors are never overlapped. At seam frames,
     // both outgoing and incoming fields are visible, but transient fade
     // fragments cannot trigger invisible-wall death.
-    walls=[...tail.frame.walls.map(w=>({...w,id:bridge.part.id+':'+w.id,
-      opacity:1-opacity})),...walls.map(w=>({...w,id:this.current.id+':'+w.id,opacity}))];
+    // The new camera phase can differ by whole sector rotations. Apply the
+    // counter-rotation to the previous wall silhouettes, keeping them in
+    // exactly the same screen-space position during the bridge.
+    const oldCamera=tail.frame.angle+bridge.offset;
+    const delta=oldCamera-camera,c=Math.cos(delta),s=Math.sin(delta);
+    const rotate=p=>[c*p[0]-s*p[1],s*p[0]+c*p[1]];
+    const oldWalls=tail.frame.walls.map(w=>({...w,id:bridge.part.id+':'+w.id,
+      points:w.points.map(rotate),holes:w.holes.map(ring=>ring.map(rotate)),
+      opacity:1-opacity}));
+    walls=[...oldWalls,...walls.map(w=>({...w,id:this.current.id+':'+w.id,opacity}))];
    }else if(bridge)this.bridge=null;
    this.sourceFrame=info.index;
    this.colors=paletteAt(this.recordings[this.current.source],info.index);
+   if(bridge&&seconds<bridge.until&&this.colors){
+    const prior=paletteAt(this.recordings[bridge.part.source],bridge.part.to);
+    if(prior&&prior.length===this.colors.length){
+     const t=clamp((seconds-bridge.start)/MAX_BRIDGE,0,1);
+     this.colors=this.colors.map((v,i)=>Math.round(lerp(prior[i],v,t)));
+    }
+   }
    this.sourceTime=info.sourceTime;
    this.activePart=this.current.id;
    this.epoch=seconds<60?0:1;
