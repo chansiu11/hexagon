@@ -34,6 +34,19 @@ const fs=require('node:fs');
      const observedShape=trace==='1595'?4:6;
      assert.equal(obs.shape,observedShape,'match the filmed core at the 60s boundary');
    }
+   if(time===.3){
+    // The original introductory film has a vivid ship against a dark
+    // alternating background. Never render the ship in near-black when a
+    // video palette extraction misses the red/gold core outline.
+    const ship=await page.evaluate(()=>{
+      const g=HexPlay.game,th=g.angle+g.rotation,r=66*g.zoom;
+      const x=Math.round(480+Math.cos(th)*r),y=Math.round(300+Math.sin(th)*r);
+      const cv=document.querySelector('#game'),ctx=cv.getContext('2d');
+      return Array.from(ctx.getImageData(x-1,y-1,3,3).data);
+    });
+    const reds=ship.filter((_,i)=>i%4===0);
+    assert.ok(Math.max(...reds)>130,trace+' source ship is invisible on intro');
+   }
    if([.3,59.95,60.05,101].includes(time))
     await page.screenshot({path:'test-artifacts/'+trace+'-at-'+time+'.png'});
   }
