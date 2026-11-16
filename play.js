@@ -7,6 +7,7 @@ const music=new HexAudio();
 const inputs=new Set(),touches=new Map();
 const directCodes=['KeyQ','KeyW','KeyE','KeyA','KeyS','KeyD','KeyZ','KeyX','KeyC','Digit0','Digit9','Digit8'];
 let game=null,mode=1,sound=true,deathPlayed=false,startTicket=0,deathShownAt=0;
+let announcedRank=0;
 const point=(r,a)=>[Math.cos(a)*r,Math.sin(a)*r];
 const textColor='#fff';
 function polygon(ctx,points,color,stroke=null,width=2){
@@ -79,11 +80,20 @@ function drawArena(ctx,colors,opts){
  ctx.restore();
  // Gameplay HUD is intentionally a new implementation. Video-specific
  // proportions, dynamic camera and timed voice cues belong to step 1-3.
- const levelBanner=game.time>=59.25&&game.time<61.85;
+ const rankNames=['POINT','LINE','TRIANGLE','SQUARE','SQUARE','PENTAGON'];
+ const recordReached=game.level===1&&game.time>=60&&game.time>(opts.best||0);
+ const rankTime=Math.min(5,Math.floor(game.time/10));
+ const showRank=game.level===1&&!(opts.best>0&&game.time<opts.best)&&game.time<60;
+ const levelBanner=game.level===1?(showRank||recordReached):game.time>=59.25&&game.time<61.85;
  if(levelBanner){
-  polygon(ctx,[[0,0],[370,0],[352,73],[0,73]],'#000');
-  opts.text('LEVEL UP',14,3,21,'#fff','left',300);
-  opts.text('HEXAGON',14,25,42,'#fff','left',330);
+  if(game.level===1){
+   polygon(ctx,[[0,0],[400,0],[380,41],[0,41]],'#000');
+   opts.text(recordReached?'NEW RECORD':rankNames[rankTime],14,7,26,'#fff','left',380);
+  }else{
+   polygon(ctx,[[0,0],[370,0],[352,73],[0,73]],'#000');
+   opts.text('LEVEL UP',14,3,21,'#fff','left',300);
+   opts.text('HEXAGON',14,25,42,'#fff','left',330);
+  }
  }else{
   polygon(ctx,[[0,0],[276,0],[250,40],[0,40]],'#000');
   opts.text('BEST: '+opts.format(opts.best),18,7,26,'#fff','left',230);
@@ -92,7 +102,7 @@ function drawArena(ctx,colors,opts){
  opts.text('TIME',654,8,27,'#fff','left',112);
  const centis=Math.floor(game.time*100+1e-7),seconds=Math.floor(centis/100);
  opts.text(String(seconds)+'.'+String(centis%100).padStart(2,'0'),935,7,37,'#fff','right',185);
- if(!levelBanner)opts.text('MODE '+mode,78,54,17,'#ddd','left');
+ if(!levelBanner&&game.level!==1)opts.text('MODE '+mode,78,54,17,'#ddd','left');
  if(game.replay?.kind==='parts'){
   if(new URLSearchParams(location.search).get('debug')==='1')
    opts.text('FILMED PART '+game.replay.activePart+' / '+game.replay.source+' / '+
@@ -171,15 +181,24 @@ async function start(index,controlMode=1,enabled=true){
  const raw=['1595','1596'].includes(requested);
  let playback;
  if(index===1){
-  // Task 2-1: HEXAGONER is chronological video replay only. The independent
-  // connected-phrase random bank is deliberately reserved for task 2-2.
-  const sourceId=raw?requested:'1595';
-  const option=map.replays?.[sourceId];
-  if(!option)throw new Error('Unregistered HEXAGONER filmed run '+sourceId);
-  const [source,palette]=await Promise.all([
-    HexReplay.load(sourceId,option),HexReplay.loadPalette(sourceId,1)]);
-  source.palette=palette;
-  playback=source;
+  // Task 2-2: normal HEXAGONER gameplay uses both distinct films' dodge
+  // phrases; ?trace=1595 or ?trace=1596 retains chronological source replay.
+  if(raw){
+   const [source,palette]=await Promise.all([
+    HexReplay.load(requested,map.replays[requested]),HexReplay.loadPalette(requested,1)]);
+   source.palette=palette;playback=source;
+  }else{
+   const [first,second,paletteA,paletteB]=await Promise.all([
+    HexReplay.load('1595',map.replays['1595']),HexReplay.load('1596',map.replays['1596']),
+    HexReplay.loadPalette('1595',1),HexReplay.loadPalette('1596',1)]);
+   first.palette=paletteA;second.palette=paletteB;
+   const value=args.get('seed');
+   const seed=value===null?(Date.now()^Math.floor(performance.now()*1000)):
+    Number.isFinite(Number(value))?Number(value):Date.now();
+   playback=HexagonerParts.create({'1595':first,'1596':second},{seed,
+    firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
+    playerSpeed:map.playerSpeed});
+  }
  }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
@@ -212,7 +231,7 @@ async function start(index,controlMode=1,enabled=true){
  const sourceScreenAngle=initialSource==='1595'?-1.15:-1.18;
  game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
  game.setControlMode(mode);game.sampleWalls();
- music.setEnabled(sound);deathPlayed=false;deathShownAt=0;
+ music.setEnabled(sound);deathPlayed=false;deathShownAt=0;announcedRank=0;
  if(sound)music.unlock().then(()=>{
   if(ticket===startTicket&&game&&!game.dead&&!game.paused){
    music.play(index,game.time);music.voice('begin');
@@ -235,8 +254,16 @@ function tick(dt){
  if(!game||game.dead||game.paused||game.timelineEnded)return;
  const left=inputs.has('ArrowLeft')||inputs.has('KeyA')||[...touches.values()].includes(-1);
  const right=inputs.has('ArrowRight')||inputs.has('KeyD')||[...touches.values()].includes(1);
- const priorSides=game.sides;
+ const priorSides=game.sides,priorTime=game.time;
  game.update(dt,mode===1?Number(right)-Number(left):0);
+ if(game.level===1&&sound&&!game.dead){
+  const stages=[10,20,30,50,60],voiceNames=['line','triangle','square','pentagon','hexagon'];
+  for(let i=announcedRank;i<stages.length;i++){
+   if(priorTime<stages[i]&&game.time>=stages[i]){
+    music.voice(voiceNames[i]);announcedRank=i+1;
+   }
+  }
+ }
  if(priorSides!==game.sides){
   const name={3:'triangle',4:'square',5:'pentagon',6:'hexagon'}[game.sides];
   if(name&&sound)music.voice(name);
