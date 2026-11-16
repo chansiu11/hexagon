@@ -18,3 +18,26 @@ jobs:
           node --check task5/hyper-hexagoner-order.js
           node --check task5/preview.js
           node --test task5/replay.test.cjs
+      - name: Regression checks for unchanged maps 1-4
+        run: |
+          node engine.test.cjs
+          node hard-mode.test.cjs
+          node hexagoner-video8.test.cjs
+          node hexagonest-mode.test.cjs
+          node hyper-hexagon-78.test.cjs
+      - name: Run real headless browser on both source timelines
+        run: |
+          BROWSER=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+          if [ -z "$BROWSER" ]; then echo 'Chrome not installed' >&2; exit 1; fi
+          timeout 35s "$BROWSER" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=750 --dump-dom "file://$PWD/task5/preview.html?source=1" > /tmp/task5-source1.html
+          grep -q 'task5-1:optical-20fps:A:' /tmp/task5-source1.html
+          timeout 35s "$BROWSER" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=750 --dump-dom "file://$PWD/task5/preview.html?source=2" > /tmp/task5-source2.html
+          grep -q 'task5-1:optical-20fps:B:' /tmp/task5-source2.html
+          timeout 35s "$BROWSER" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=750 --screenshot="$PWD/task5-source2.png" --window-size=1100,760 "file://$PWD/task5/preview.html?source=2"
+      - name: Upload preview screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task5-browser-preview
+          path: task5-source2.png
+          if-no-files-found: ignore
