@@ -94,6 +94,19 @@
     return out;
    }
    const walls=[];
+   function sourceHudFragment(points){
+    // The original film also contains BEST/TIME and LEVEL UP banners.
+    // Small wide contours along the recorded top HUD are NOT travelling
+    // walls. Keep the visible wave contours that extend into the arena.
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(const [x,y] of points){
+     const sx=(c*x-s*y)*zoom/2+w/2,sy=(s*x+c*y)*zoom/2+h/2;
+     minX=Math.min(minX,sx);maxX=Math.max(maxX,sx);
+     minY=Math.min(minY,sy);maxY=Math.max(maxY,sy);
+    }
+    return minY>=19&&maxY<=76&&maxX-minX>=70&&
+      (minX<220||maxX>350);
+   }
    function sourcePlayerFragment(points){
     // Source frames also contain the filmed player's small bright triangle
     // and tiny center-core fragments. Neither is a descending wall.
@@ -114,7 +127,7 @@
     const points=verts(),holes=[];
     const holeCount=u8();
     for(let j=0;j<holeCount;j++)holes.push(verts());
-    if(sourcePlayerFragment(points))continue;
+    if(sourcePlayerFragment(points)||sourceHudFragment(points))continue;
     walls.push({id:'trace-'+f+'-'+i,sourceFrame:f,points,holes});
    }
    frames.push({angle,sides,zoom,walls});
