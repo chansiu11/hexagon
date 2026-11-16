@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "stage": "HEXAGONEST",
-  "method": "first-pass 30fps original-video pixel-color contour transcription; not original engine parameters",
+  "method": "first-pass 60fps video-frame contour transcription: measured pixels, not exact original engine wall commands",
   "sourceVideos": [
     "1595(2).mp4",
     "1596(2).mp4"
@@ -11,19 +11,24 @@
       "sourceFile": "1595(2).mp4",
       "path": "data/hexagonest-1595.b64",
       "videoStart": 277,
-      "videoEnd": 371.3666666666667,
+      "videoEnd": 371.3833333333333,
       "gameRate": 1.0416666666666667,
-      "sampleFps": 30,
+      "sampleFps": 60,
       "gameStartOffset": 0.1
     },
     "1596": {
       "sourceFile": "1596(2).mp4",
       "path": "data/hexagonest-1596.b64",
       "videoStart": 227.5166666667,
-      "videoEnd": 296.1166666667,
+      "videoEnd": 296.13333333336664,
       "gameRate": 1.0416666666666667,
-      "sampleFps": 30,
+      "sampleFps": 60,
       "gameStartOffset": 0
     }
-  }
+  },
+  "knownLimitations": [
+    "Geometry is derived from source-image accent-color contours, and some palette transitions may still merge or split polygons.",
+    "Camera/zoom and center shape observations require independent calibration; no original engine parameters are claimed.",
+    "Random phrase joining, HUD, death, voice and sound timing are reserved for task 3-2."
+  ]
 }
