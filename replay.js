@@ -8,7 +8,7 @@
 })(typeof window!=='undefined'?window:globalThis,function(){
  'use strict';
  const cache=new Map();
- let paletteCache=null;
+ const paletteCache=new Map();
  function fromBase64(text){
   const raw=String(text).trim();
   if(typeof atob==='function')return Uint8Array.from(atob(raw),ch=>ch.charCodeAt(0));
@@ -146,22 +146,25 @@
   const tag=String(id);
   if(!['1595','1596'].includes(tag)||!info||!info.path)
     throw new Error('Unknown reference video');
-  if(!cache.has(tag)){
+  // Same source IDs are present in both stages; paths must not alias.
+  const key=tag+'|'+info.path;
+  if(!cache.has(key)){
    const promise=fetch(info.path).then(r=>{if(!r.ok)throw new Error('Reference geometry '+r.status);return r.text()})
     .then(text=>decode(text,{...info,id:tag}));
-   cache.set(tag,promise);promise.catch(()=>cache.delete(tag));
+   cache.set(key,promise);promise.catch(()=>cache.delete(key));
   }
-  return cache.get(tag);
+  return cache.get(key);
  }
- async function loadPalette(id){
+ async function loadPalette(id,stage=0){
   if(!['1595','1596'].includes(String(id)))throw new Error('Unknown palette source');
-  if(!paletteCache){
-   paletteCache=fetch('data/hexagon-palettes.json')
-     .then(r=>{if(!r.ok)throw new Error('Palette '+r.status);return r.json();});
-   paletteCache.catch(()=>{paletteCache=null});
+  const isHexagoner=stage===1;
+  const path=isHexagoner?'data/hexagoner-'+String(id)+'-palette.json':'data/hexagon-palettes.json';
+  if(!paletteCache.has(path)){
+   const request=fetch(path).then(r=>{if(!r.ok)throw new Error('Palette '+r.status);return r.json();});
+   paletteCache.set(path,request);request.catch(()=>paletteCache.delete(path));
   }
-  const data=await paletteCache;
-  const entry=data[String(id)];
+  const data=await paletteCache.get(path);
+  const entry=isHexagoner?data:data[String(id)];
   if(!entry||!Array.isArray(entry.colors)||entry.colors.length<100)
     throw new Error('Incomplete palette transcript');
   return entry;
