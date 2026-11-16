@@ -30,6 +30,17 @@ test('unverified or missing 60+ video chronology cannot masquerade as verified o
  assert.throws(()=>Film.parse(fixture('1595'),'1595'),/not been verified/);
  assert.throws(()=>Film.parse({...fixture('1595'),id:'1596'},'1595'),/Incomplete/);
 });
+test('first genuine filmed wall contour is not silently removed at game launch',()=>{
+ const source=fixture('1595');
+ source.frames[0].walls=[{id:'first-real-approach',
+  points:[[100,-9],[125,-9],[125,9],[100,9]],holes:[]}];
+ const film=Film.parse(source,'1595',{allowFixture:true});
+ const game=new Engine.ArenaGame(4);
+ game.attachReplay(film,{spectating:true});
+ assert.equal(game.walls.length,1,'stage 5 discarded valid first wall');
+ assert.equal(game.walls[0].sourceFrame,0);
+ assert.equal(game.dead,false);
+});
 test('independently indexed 0–60 / 60+ frames retain source wall IDs and passable lanes',()=>{
  for(const id of ['1595','1596']){
   const film=Film.parse(fixture(id),id,{allowFixture:true}),metrics=Film.stats(film);
