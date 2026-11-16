@@ -33,8 +33,8 @@ test('both independent source recordings contain uninterrupted pre/post-60 chron
  for(const id of ['1595','1596']){
   const f=await source(id),meta=map.replays[id];
   assert.equal(f.fps,meta.sampleFps);
-  assert.equal(f.fps,20,'document that 60fps full precision is still unverified');
-  assert.ok(f.frames.length>1700);
+  assert.equal(f.fps,60,'full video frame cadence must be preserved');
+  assert.ok(f.frames.length>5000,'both films must contain actual 60fps pre/post-60 source frames');
   const boundary=Math.floor(60/f.gameRate*f.fps);
   assert.ok(boundary>0&&boundary<f.frames.length-1);
   assert.ok(f.frames.slice(0,boundary).some(fr=>fr.walls.length));
