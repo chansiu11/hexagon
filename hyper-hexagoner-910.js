@@ -17,6 +17,15 @@ const LEVEL=4,TAU=2*Math.PI,SIDES=6,ORBIT=66,SPEED=382,MAX_RADIUS=1290,
 // Equal to the user-visible 9-degree/60Hz input speed of HEXAGONEST.
 const PLAYER_DEGREES_PER_TICK=9;
 const PLAYER_SPEED=PLAYER_DEGREES_PER_TICK*TAU/360*60;
+// In the filmed opening, extracted silhouettes can include the expanding
+// center hexagon or the original video's player. Neither is an incoming
+// obstacle. The first verified source wall reaches the avatar orbit at
+// HUD 2.291s; ignore FILM collision before that point, while preserving
+// source-frame wall drawing, timing, camera and controls.
+const FIRST_FILMED_WALL_CONTACT=Math.min(
+ ...D.EVENTS.map(e=>e.time),
+ ...(D.GAP_OBSERVATIONS||[]).map(e=>e.time)
+);
 const mod=(a,n)=>(a%n+n)%n,clamp=(a,b,c)=>Math.max(b,Math.min(c,a));
 function rng(seed){let x=(seed^0x7af927d3)>>>0;return ()=>{x=(x+0x6d2b79f5)>>>0;
  let y=Math.imul(x^(x>>>15),1|x);y^=y+Math.imul(y^(y>>>7),61|y);
@@ -391,8 +400,14 @@ class HyperHexagonerGame extends E.Game{
   }
  }
   hit(angle=this.angle){
-  // Both the film and the fallback quad renderer consume wall.points.
-  // A player cannot pass through a visible film polygon.
+  // No verified original wall can reach the player before this timestamp.
+  // The film segmentation can mislabel the launch/core as a wall, causing
+  // immediate death before gameplay begins. Keep the visual film intact.
+  // This guard is exclusive to original-order footage and ends precisely
+  // at the first recorded wall contact (no blanket post-start immunity).
+  if(this.timeline.orderMode==='video'&&this.atlasActive&&
+   this.time<FIRST_FILMED_WALL_CONTACT-1e-8)return null;
+  // Both the film and the fallback renderer use the exact drawn points.
   const center=E.playerHitPoint(angle);
   return this.walls.find(w=>!w.collapsed&&E.pointInPolygon(center,w.points))||null;
  }
@@ -478,7 +493,7 @@ class HyperHexagonerGame extends E.Game{
  }
 }
 const API=Object.freeze({HyperHexagonerGame,create,PRE_PARTS,BRIDGE,POST_PARTS,ALL_PARTS,
- SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,ATLAS,FILMCAM,cameraAt,filmedCameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
+ SOURCE_EVENTS,PLAYER_SPEED,PLAYER_DEGREES_PER_TICK,SPEED,REF_END,SPECIAL,ATLAS,FILMCAM,FIRST_FILMED_WALL_CONTACT,cameraAt,filmedCameraAt,palette,shakeAt,deathScale,DEATH_TIMING,
  hasCoarseRoute});
 if(typeof module!=='undefined'&&module.exports)module.exports=API;
 else root.HexHyper910=API;
