@@ -25,12 +25,12 @@ const fs=require('node:fs');
  for(let i=1;i<=6;i++)await page.keyboard.press('ArrowRight');
  assert.equal(await page.evaluate(()=>HexMenu.selected),0,'six maps wrap to zero');
  // Stage 3 HEXAGONEST now has a verified replay; verify an *actually*
- // unavailable stage (index 4), while preserving six-map navigation.
+ // unavailable stage-5 SOURCE (index 4), while preserving six-map navigation.
  for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');
  assert.equal(await page.evaluate(()=>HexMenu.selected),4);
  await page.keyboard.press('Space');
  assert.equal(await page.evaluate(()=>HexMenu.screen),'select','missing map cannot play wrong map');
- assert.match(await page.locator('#status').textContent(),/PATTERN NOT READY/);
+ assert.match(await page.locator('#status').textContent(),/PATTERN NOT READY|재생 데이터를 불러오지 못했습니다/);
  for(let i=0;i<4;i++)await page.keyboard.press('ArrowLeft');
  await page.keyboard.press('Space');
  await page.waitForFunction(()=>HexMenu.screen==='play');
