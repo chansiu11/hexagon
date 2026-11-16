@@ -12,6 +12,24 @@ for(const id of ['1595','1596']){
   const playback=await HexReplay.decode(text,{...recorded[id],id});
   assert.equal(playback.frames.length,recorded[id].frames);
   assert.equal(playback.fps,20);
+  // The source recording includes its own player triangle. It must not
+  // become an incoming wall actor or cause a phantom collision.
+  let sourcePlayerFragments=0;
+  for(const frame of playback.frames){
+    for(const wall of frame.walls){
+      const pts=wall.points;
+      if(pts.length>10)continue;
+      const radius=Math.max(...pts.map(([x,y])=>Math.hypot(x,y)))*frame.zoom/2;
+      let twiceArea=0;
+      for(let j=0;j<pts.length;j++){
+        const a=pts[j],b=pts[(j+1)%pts.length];
+        twiceArea+=a[0]*b[1]-a[1]*b[0];
+      }
+      const area=Math.abs(twiceArea)*frame.zoom*frame.zoom/8;
+      if(radius<=52&&area<=65)sourcePlayerFragments++;
+    }
+  }
+  assert.equal(sourcePlayerFragments,0,'filmed player should not be a wall');
   const duration=playback.gameStartOffset+(playback.frames.length-1)/20*playback.gameRate;
   assert.ok(duration>110);
   const g=new HexEngine.ArenaGame(0);
