@@ -54,10 +54,11 @@
   function getMap(index) {return registry.get(index)||null;}
   function panelPolygon(radius, thickness, sides, sector) {
     const a=sector*TAU/sides, b=(sector+1)*TAU/sides;
-    const outer=radius+thickness;
+    // Never invert wall polygons after their inner edge moves behind the core.
+    const inner=Math.max(20,radius),outer=Math.max(inner,radius+thickness);
     return [
-      [radius*Math.cos(a),radius*Math.sin(a)],
-      [radius*Math.cos(b),radius*Math.sin(b)],
+      [inner*Math.cos(a),inner*Math.sin(a)],
+      [inner*Math.cos(b),inner*Math.sin(b)],
       [outer*Math.cos(b),outer*Math.sin(b)],
       [outer*Math.cos(a),outer*Math.sin(a)]
     ];
