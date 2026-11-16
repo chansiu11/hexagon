@@ -43,7 +43,9 @@ for(const t of [0,2.3,8.5,19,42,59.5,60.5,68,77.2,87.4]){
  assert.equal(game.walls.length,1);
  assert.equal(game.walls[0].points.length,5,'do not reduce source polygon to a 4-corner quad');
  assert.equal(game.atlasColor,'rgb(42,114,239)');
- assert(game.hit(game.angle),'a visible film contour blocks the avatar-center point');
+ if(t<H.FIRST_FILMED_WALL_CONTACT)
+  assert.equal(game.hit(game.angle),null,'filmed launch/core must not kill before first real wall');
+ else assert(game.hit(game.angle),'a source wall arriving at the orbit blocks the avatar');
  assert.equal(game.hit(game.angle+Math.PI),null,'a visibly empty orbit lane remains open');
  const camera=game.recordedCamera;
  const frame=atlas.getFrame(D.videoAtGameTime(t)),src=frame.paths[0],pts=game.walls[0].points;
@@ -68,6 +70,23 @@ draw(overlapping,game.walls,'#ff00ff',game);
 assert.equal(overlapping.fills,2,'overlapping filmed shapes are painted separately');
 assert.deepEqual(overlapping.drawn,[first,first.slice().reverse()]);
 game.walls.pop();
+// A bogus full-screen launch polygon must not cause a death as the game
+// time moves through the opening. At the first verified contact the normal
+// visible-polygon collision resumes immediately.
+const introAtlas=atlas.getFrame;
+atlas.getFrame=()=>({index:0,rgb:[255,0,255],
+ paths:[[0,0,576,0,576,360,0,360]]});
+const opening=new H.HyperHexagonerGame(H.create(null,24,5,{order:'video'}));
+opening.angle=Math.PI/6;
+for(let i=0;i<Math.floor((H.FIRST_FILMED_WALL_CONTACT-.01)*60);i++){
+ opening.update(1/60,0);
+ assert.equal(opening.dead,false,'false death during the video opening at '+opening.time);
+}
+assert(opening.time<H.FIRST_FILMED_WALL_CONTACT);
+opening.time=H.FIRST_FILMED_WALL_CONTACT;
+opening.sampleWalls();
+assert(opening.hit(opening.angle),'the guard must end when the first source wall arrives');
+atlas.getFrame=introAtlas;
 const before=calls;
 const random=new H.HyperHexagonerGame(H.create(null,7,90,{order:'random'}));
 random.time=8;random.sampleWalls();
@@ -77,4 +96,4 @@ assert.equal(calls,before,'random mode never samples film frames');
 atlas.ready=false;game.sampleWalls();
 assert.equal(game.atlasActive,false,'missing atlas returns to quad-based source events');
 assert.strictEqual(game.walls,game._collisionWalls);
-console.log('PASS film walls: 10 source moments, inverse camera, shared paint/hit, gap lane, random & fallback');
+console.log('PASS film walls: intro collision gate, first wall active, 10 source moments, inverse camera, shared paint/hit, gap lane, random & fallback');
