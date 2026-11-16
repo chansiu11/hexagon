@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const HexEngine=require('../engine.js'),HexReplay=require('../replay.js');
-global.HexEngine=HexEngine;require('../stages/hexagon.js');
+global.HexEngine=HexEngine;require('../stages/hexagon.js');require('../stages/hexagoner.js');
 const recorded={
  1595:{fps:20,frames:3533,gameStartOffset:.10,gameRate:1.0333,sourceStart:0,sourceEnd:176.60},
  1596:{fps:20,frames:2207,gameStartOffset:.05,gameRate:1.0383,sourceStart:3.55,sourceEnd:113.85}
@@ -61,5 +61,6 @@ test('original menu still has exactly six modes, no seventh playback route',()=>
  assert.equal(HexEngine.LEVELS.length,6);
  assert.equal(HexEngine.getMap(6),null);
  assert.equal(Object.keys(HexEngine.getMap(0).replays).join(','),'1595,1596');
- for(let i=1;i<6;i++)assert.equal(HexEngine.hasMap(i),false);
+ assert.equal(HexEngine.hasMap(1),true);
+ for(let i=2;i<6;i++)assert.equal(HexEngine.hasMap(i),false);
 });
