@@ -224,9 +224,12 @@
         if(index===this.replayFrame)return;
         this.replayFrame=index;
         const frame=this.replay.frames[index];
-        // Startup footage briefly contains the shrinking CENTRAL CORE, not
-        // incoming wall actors. Never treat that outline as a collision wall.
-        this.walls=this.time<.55?[]:frame.walls;
+        // The first two stages use a measured launch/core exclusion window.
+        // Stage 3 must not discard verified incoming HEXAGONEST wall contours
+        // during 0..0.55s: a video chronological run retains its first frame.
+        // Its stage-specific source admission is responsible for excluding
+        // non-wall core/ship contours before registration.
+        this.walls=this.level!==2&&this.time<.55?[]:frame.walls;
         this.applyShape(frame.sides);
         this.rotation=frame.angle;
         this.zoom=frame.zoom;
