@@ -4,6 +4,7 @@
    These are 60 fps observed video contour samples, NOT exact original wall commands. */
 HexEngine.registerMap(3,{
   sourceStatus:'hyper-hexagon-4-1-independent-source-chronology-60fps',
+  playerSpeed:8.5, // HYPER-specific calibrated estimate, not certified source engine value
   walls:[],
   shapes:[{at:0,sides:6}],
   replays:{

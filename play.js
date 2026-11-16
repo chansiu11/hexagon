@@ -43,16 +43,39 @@ function drawHexagonerHUD(ctx,opts,accent){
  opts.text(timeText,-22,4,digitHeight,'#fff','right',275);
  ctx.restore();
 }
+function drawHyperHUD(ctx,opts,accent){
+ // Original film 1594/1557: HUD is fixed in screen-space, unlike the arena.
+ const t=game.time,best=opts.best||0;
+ const rank=['POINT','LINE','TRIANGLE','SQUARE','PENTAGON','HEXAGON'][Math.min(5,Math.floor(t/10))];
+ const record=t>=60&&t>best;
+ const label=record?'NEW RECORD':best>0&&t<best?'BEST: '+opts.format(best):t>=60?'LEVEL UP':rank;
+ const width=Math.max(185,Math.min(325,label.length*19+35));
+ polygon(ctx,[[0,0],[width+16,0],[width-6,37],[0,37]],'#000');
+ opts.text(label,13,5,label.length>11?19:24,'#fff','left',width-12);
+ if(record){ctx.fillStyle=accent;ctx.fillRect(14,33,Math.min(width-20,235),2);}
+ polygon(ctx,[[610,0],[960,0],[960,62],[800,62],[788,36],[626,36]],'#000');
+ opts.text('HYPER MODE',636,7,20,'#fff','left',159);
+ const ticks=Math.floor(t*100+1e-7);
+ const stamp=String(Math.floor(ticks/100))+'.'+String(ticks%100).padStart(2,'0');
+ ctx.save();ctx.translate(960,0);ctx.scale(.8,1);
+ opts.text(stamp,-13,5,42,'#fff','right',193);
+ ctx.restore();
+}
 function drawArena(ctx,colors,opts){
  const [dark,light,accent]=colors;
  const camera=opts.settings.motion?game.rotation:0;
  ctx.save();
  if(game.dead&&deathShownAt){
   const age=Math.max(0,(performance.now()-deathShownAt)/1000);
-  const zoom=1+.14*(1-Math.exp(-age*14));
+  const zoom=1+(game.level===3?.23:.14)*(1-Math.exp(-age*14));
   ctx.translate(480,300);ctx.scale(zoom,zoom);ctx.translate(-480,-300);
  }
  ctx.translate(480,300);
+ // A small pixel-stepped shake moves ship, wall and core together.
+ if(game.level===3&&opts.settings.motion&&!game.dead){
+  const beat=Math.floor(game.time*60);
+  ctx.translate(((beat*17)%7-3)*.30,((beat*13)%9-4)*.25);
+ }
  ctx.rotate(camera);
  if(opts.settings.motion){
   ctx.transform(1,0,Math.sin(game.tilt)*.2,1,0,0);
@@ -118,7 +141,7 @@ function drawArena(ctx,colors,opts){
  ctx.restore();
  // HEXAGONER has its own source-measured HUD geometry, leaving HEXAGON
  // unchanged. Render after the arena transform so text stays screen-fixed.
- if(game.level===1){drawHexagonerHUD(ctx,opts,accent);}else{
+ if(game.level===3){drawHyperHUD(ctx,opts,accent);}else if(game.level===1){drawHexagonerHUD(ctx,opts,accent);}else{
  // Gameplay HUD is intentionally a new implementation. Video-specific
  // proportions, dynamic camera and timed voice cues belong to step 1-3.
  const rankNames=['POINT','LINE','TRIANGLE','SQUARE','SQUARE','PENTAGON'];
@@ -243,16 +266,34 @@ async function start(index,controlMode=1,enabled=true){
     firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
     playerSpeed:map.playerSpeed});
   }
- }else if(index===2||index===3){
-  // HEXAGONEST task 3-1 / HYPER HEXAGON task 4-1: source order ONLY. 3-2 will provide connected
-  // random dodge phrases after both complete source runs are measured.
-  // Never fall through to the unrelated HEXAGON stage-zero part sampler.
-  const id=raw?requested:'1595';
-  const option=map.replays?.[id];
-  if(!option)throw new Error('Filmed stage '+index+' source video missing: '+id);
-  const [film,palette]=await Promise.all([
-   HexReplay.load(id,option),HexReplay.loadPalette(id,index)]);
+ }else if(index===2){
+  // HEXAGONEST remains chronological until its own task 3-2.
+  const id=raw?requested:'1595',option=map.replays?.[id];
+  if(!option)throw new Error('HEXAGONEST source video missing: '+id);
+  const [film,palette]=await Promise.all([HexReplay.load(id,option),HexReplay.loadPalette(id,2)]);
   film.palette=palette;playback=film;
+ }else if(index===3){
+  // ?trace=1595/1596 preserves full original film order for precise audits.
+  // Default gameplay uses reachability-gated parts from both recordings.
+  if(raw){
+   const [film,palette]=await Promise.all([
+    HexReplay.load(requested,map.replays[requested]),HexReplay.loadPalette(requested,3)]);
+   film.palette=palette;playback=film;
+  }else{
+   const [a,b,pa,pb,response]=await Promise.all([
+    HexReplay.load('1595',map.replays['1595']),HexReplay.load('1596',map.replays['1596']),
+    HexReplay.loadPalette('1595',3),HexReplay.loadPalette('1596',3),
+    fetch('data/hyper-hexagon-4-2-bank.json')]);
+   if(!response.ok)throw Error('HYPER 4-2 measured dodge cuts unavailable: '+response.status);
+   const bank=await response.json();
+   a.palette=pa;b.palette=pb;
+   const seedArg=args.get('seed');
+   const seed=seedArg===null?(Date.now()^Math.floor(performance.now()*1000)):
+    Number.isFinite(Number(seedArg))?Number(seedArg):Date.now();
+   playback=HyperHexagonParts.create({'1595':a,'1596':b},bank,{
+    seed,firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
+    playerSpeed:map.playerSpeed});
+  }
  }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
@@ -287,7 +328,11 @@ async function start(index,controlMode=1,enabled=true){
  // HEXAGONEST filmed ship bearing is not yet measured. Keep the engine's
  // normal initial angle until video measurement, rather than borrowing the
  // ship bearing measured in the HEXAGON / HEXAGONER recordings.
- if(index!==2&&index!==3){
+ if(index===3){
+  // Source intro ship bearings estimated from the two filmed launches.
+  const screenAngle=initialSource==='1595'?-2.45:-.35;
+  game.angle=((screenAngle-game.rotation)%TAU+TAU)%TAU;
+ }else if(index!==2){
   const sourceScreenAngle=index===1?(initialSource==='1595'?-Math.PI/2:.26):
    (initialSource==='1595'?-1.15:-1.18);
   game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
