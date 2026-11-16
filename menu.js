@@ -100,10 +100,18 @@ function setMode(mode){
 async function start(){
  if(starting)return;
  if(!unlocked(selected)){toast('SURVIVE 60S TO UNLOCK');return}
- if(!HexEngine.hasMap(selected)){toast('PATTERN NOT READY: '+levels[selected][0]);return}
  const requested=selected,origin=screen;
  starting=true;setStatus('영상에서 추출한 벽을 불러오는 중입니다.');
  try{
+  // The 60fps HEXAGONEST sources are checked asynchronously on page load.
+  // Selecting stage three before that check finishes must not incorrectly
+  // label the map unavailable; wait only for this stage, not stages 1/2.
+  if(requested===2&&root.hexagonestSourceReady)
+   await root.hexagonestSourceReady;
+  if(requested!==selected||screen!==origin)return;
+  if(!HexEngine.hasMap(requested)){
+   toast('PATTERN NOT READY: '+levels[requested][0]);return;
+  }
   const started=await root.HexPlay?.start(requested,settings.controlMode,settings.sound);
   if(requested!==selected||screen!==origin){root.HexPlay?.stop();return}
   if(started)switchScreen('play');
