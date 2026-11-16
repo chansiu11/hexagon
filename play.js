@@ -30,7 +30,14 @@ function drawArena(ctx,colors,opts){
  }
  // Use the same world-space panel points as the engine's hit detection.
  // Submit disconnected panels as independent closed contours (no center seams).
- for(const wall of game.walls)polygon(ctx,wall.points,accent);
+ for(const wall of game.walls){
+  ctx.beginPath();
+  for(const ring of [wall.points,...(wall.holes||[])]){
+   ring.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+   ctx.closePath();
+  }
+  ctx.fillStyle=accent;ctx.fill('evenodd');
+ }
  const core=Array.from({length:game.sides},(_,i)=>point(50,i*TAU/game.sides));
  polygon(ctx,core,dark,accent,3);
  polygon(ctx,HexEngine.playerPolygon(game.angle),game.dead?'#fff':accent);
@@ -58,8 +65,8 @@ function drawArena(ctx,colors,opts){
  const centis=Math.floor(game.time*100+1e-7),seconds=Math.floor(centis/100);
  opts.text(String(seconds)+':'+String(centis%100).padStart(2,'0'),935,7,37,'#fff','right',185);
  opts.text('MODE '+mode,78,54,17,'#ddd','left');
- if(game.map.sourceStatus==='awaiting-video-transcription-1-2')
-  opts.text('WALL TRANSCRIPTION PENDING - STEP 1-2',480,570,15,'#fff','center',730);
+ if(game.replay)
+  opts.text('VIDEO '+game.replay.id+' / SOURCE ORDER / '+game.replay.fps+' FPS',480,570,14,'#fff','center',730);
  if(mode===2&&!game.dead){
   polygon(ctx,[[28,508],[164,508],[174,566],[18,566]],'#000a','#ffffff80',2);
   opts.text(game.doubleStepReady?'READY':'2 STEPS',96,517,21,'#fff');
@@ -73,6 +80,13 @@ function draw(ctx,opts){
   ctx.fillStyle='#0009';ctx.fillRect(0,130,960,260);
   opts.text('PAUSED',480,220,65);opts.panel('PRESS SPACE TO RESUME',435,500);
  }
+ if(opts.screen==='complete'){
+  ctx.fillStyle='#000c';ctx.fillRect(0,200,960,125);
+  opts.text('SOURCE RUN COMPLETE',480,212,35,'#fff');
+  opts.text('LAST: '+opts.format(game.time),480,262,28,'#fff');
+  opts.header('TAB - HIGH SCORES','ESC - STAGE SELECT');
+  opts.panel('PRESS SPACE TO RETRY',535,470);
+ }
  if(opts.screen==='over'){
   ctx.fillStyle='#000c';ctx.fillRect(0,200,960,125);
   opts.text('GAME OVER',480,207,43,'#fff');
@@ -81,14 +95,22 @@ function draw(ctx,opts){
   opts.panel('PRESS SPACE TO RETRY',535,470);
  }
 }
-function start(index,controlMode=1,enabled=true){
+async function start(index,controlMode=1,enabled=true){
  if(!HexEngine.hasMap(index))return false;
+ const map=HexEngine.getMap(index);
+ const args=new URLSearchParams(location.search);
+ const requested=args.get('trace');
+ // Source ordering is deterministic in 1-2. Random mixing belongs to 1-3.
+ const trace=['1595','1596'].includes(requested)?requested:'1595';
+ const option=map.replays?.[trace];
+ if(!option)throw new Error('Video source is not registered: '+trace);
+ const recording=await HexReplay.load(trace,option);
  clearInput();music.stop();
  game=new HexEngine.ArenaGame(index);mode=controlMode;sound=enabled;
+ game.attachReplay(recording,{spectating:args.get('spectate')==='1'});
  game.setControlMode(mode);game.sampleWalls();
- music.setEnabled(sound);
- deathPlayed=false;
- // Playback may be asynchronous; game simulation never waits for an MP3.
+ music.setEnabled(sound);deathPlayed=false;
+ // Do not block gameplay time on the MP3 decode/start.
  if(sound)music.unlock().then(()=>{if(game&&!game.dead&&!game.paused)music.play(index,game.time)}).catch(()=>{});
  return true;
 }
@@ -103,13 +125,15 @@ function onDeath(){
  deathPlayed=true;clearInput();music.death();
 }
 function tick(dt){
- if(!game||game.dead||game.paused)return;
+ if(!game||game.dead||game.paused||game.timelineEnded)return;
  const left=inputs.has('ArrowLeft')||inputs.has('KeyA')||[...touches.values()].includes(-1);
  const right=inputs.has('ArrowRight')||inputs.has('KeyD')||[...touches.values()].includes(1);
  game.update(dt,mode===1?Number(right)-Number(left):0);
  if(game.dead)onDeath();
  canvas.dataset.gameTime=String(game.time);
  canvas.dataset.wallCount=String(game.walls.length);
+ canvas.dataset.sourceTrace=game.replay?.id||'';
+ canvas.dataset.sourceFrame=String(game.replayFrame);
  canvas.dataset.gameState=game.dead?'dead':'running';
 }
 function keydown(e){
