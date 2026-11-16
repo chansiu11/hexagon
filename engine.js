@@ -7,12 +7,12 @@
   'use strict';
   const TAU = Math.PI * 2;
   const LEVELS = Object.freeze([
-    Object.freeze(['HEXAGON', 'HARD', 350]),
-    Object.freeze(['HEXAGONER', 'HARDER', 28]),
-    Object.freeze(['HEXAGONEST', 'HARDEST', 275]),
-    Object.freeze(['HYPER HEXAGON', 'HARDER', 185]),
-    Object.freeze(['HYPER HEXAGONER', 'HARDEST', 220]),
-    Object.freeze(['HYPER HEXAGONEST', 'HARDESTEST', 315])
+    Object.freeze(['HEXAGON', 'HARD', 32, 220]),
+    Object.freeze(['HEXAGONER', 'HARDER', 120, 250]),
+    Object.freeze(['HEXAGONEST', 'HARDEST', 285, 290]),
+    Object.freeze(['HEXAGON', 'HARDESTER', 190, 300]),
+    Object.freeze(['HEXAGONER', 'HARDESTEST', 225, 335]),
+    Object.freeze(['HEXAGONEST', 'HARDESTESTEST', 0, 370])
   ]);
   const registry = new Map();
   const ORBIT = 66;
