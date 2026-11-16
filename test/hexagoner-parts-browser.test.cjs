@@ -38,7 +38,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    assert.ok(Math.abs(obs.time-t)<.17);
    assert.ok(Number.isFinite(obs.zoom)&&Number.isFinite(obs.camera));
    assert.ok(obs.maxObservedGap<1,'wall field gap exceeded 1s in QA seed');
-   assert.equal(obs.epoch,t<60?0:1);
+   assert.equal(obs.epoch,obs.time<60?0:1,'epoch must follow the actual running clock');
    if(t>75)assert.ok(obs.transitions>=10);
    if([1.2,59.9,60.1,121.5].includes(t))
     await page.screenshot({path:'test-artifacts/hexagoner-random-'+first+'-'+t+'.png'});
