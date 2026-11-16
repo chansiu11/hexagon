@@ -261,7 +261,27 @@
     const neighbor=this.bank.all.find(p=>p.source===previous.source&&p.from===previous.to);
     if(neighbor&&neighbor.sideIn===previous.sideOut)
      return {part:neighbor,score:Infinity,fallback:true,sectorShift:0};
-    return null;
+    // A spectator can stand in an outgoing blocked lane that would have
+    // ended a real run. Avoid ending the film bank: choose the safest newly
+    // arriving lane among rotated, screen-aligned candidates. This route is
+    // explicitly flagged; it is NOT proof that a real player could survive.
+    const currentSlot=Math.floor(wrap(playerAngle)/TAU*SLOTS)%SLOTS;
+    let lastResort=null;
+    for(const part of pool){
+     if(part.from===0||part.sideIn!==previous.sideOut)continue;
+     for(let sectorShift=0;sectorShift<part.sideIn;sectorShift++){
+      const shiftSlots=Math.round(sectorShift*SLOTS/part.sideIn);
+      let risk=0;
+      for(let step=0;step<STEPS;step++){
+       const occupiedHere=part.entryMasks[step][(currentSlot+shiftSlots)%SLOTS];
+       risk+=occupiedHere*(STEPS-step);
+      }
+      risk+=signatureDistance(previous.exitSignature,part.entrySignature,shiftSlots)*4;
+      if(!lastResort||risk<lastResort.risk)
+       lastResort={part,sectorShift,risk,score:Infinity,fallback:true,unverified:true};
+     }
+    }
+    return lastResort;
    }
    candidate.sort((a,b)=>a.score-b.score);
    const top=candidate.slice(0,Math.min(5,candidate.length));
@@ -294,7 +314,7 @@
    this.source=this.current.source;this.activePart=this.current.id;
    this.transitions++;
    this.history.push({at:deadline,part:this.current.id,source:this.source,
-    epoch:deadline<60?0:1,fallback:!!selected.fallback,score:selected.score,sectorShift:selected.sectorShift||0});
+    epoch:deadline<60?0:1,fallback:!!selected.fallback,unverified:!!selected.unverified,score:selected.score,sectorShift:selected.sectorShift||0});
   }
   sample(seconds,playerAngle=TAU/12){
    if(!finite(seconds)||seconds<0)throw RangeError('Invalid HEXAGONER game time');
