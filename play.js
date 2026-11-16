@@ -79,12 +79,19 @@ function drawArena(ctx,colors,opts){
  ctx.restore();
  // Gameplay HUD is intentionally a new implementation. Video-specific
  // proportions, dynamic camera and timed voice cues belong to step 1-3.
- polygon(ctx,[[0,0],[276,0],[250,40],[0,40]],'#000');
- opts.text('BEST: '+opts.format(opts.best),18,7,26,'#fff','left',230);
+ const levelBanner=game.time>=59.25&&game.time<61.85;
+ if(levelBanner){
+  polygon(ctx,[[0,0],[370,0],[352,73],[0,73]],'#000');
+  opts.text('LEVEL UP',14,3,21,'#fff','left',300);
+  opts.text('HEXAGON',14,25,42,'#fff','left',330);
+ }else{
+  polygon(ctx,[[0,0],[276,0],[250,40],[0,40]],'#000');
+  opts.text('BEST: '+opts.format(opts.best),18,7,26,'#fff','left',230);
+ }
  polygon(ctx,[[622,0],[960,0],[960,65],[782,65],[768,40],[650,40]],'#000');
  opts.text('TIME',654,8,27,'#fff','left',112);
  const centis=Math.floor(game.time*100+1e-7),seconds=Math.floor(centis/100);
- opts.text(String(seconds)+':'+String(centis%100).padStart(2,'0'),935,7,37,'#fff','right',185);
+ opts.text(String(seconds)+'.'+String(centis%100).padStart(2,'0'),935,7,37,'#fff','right',185);
  opts.text('MODE '+mode,78,54,17,'#ddd','left');
  if(game.replay?.kind==='parts'){
   if(new URLSearchParams(location.search).get('debug')==='1')
