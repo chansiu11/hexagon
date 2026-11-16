@@ -1,5 +1,5 @@
 'use strict';
-/* 4-1: real uploaded 1595(3)/1596(3) source-data verification.
+/* 4-1: byte-identical 1594/1557 sources, uploaded as 1595(3)/1596(3).
    Pixel-contour transcription is not proof of engine-command equivalence. */
 const test=require('node:test');
 const assert=require('node:assert/strict');
@@ -26,8 +26,8 @@ test('HYPER HEXAGON is isolated from earlier maps and stage 7',()=>{
  assert.equal(map.walls.length,0);
  assert.ok(map.sourceStatus.includes('4-1'));
  assert.notEqual(map.replays['1595'].path,map.replays['1596'].path);
- assert.equal(map.replays['1595'].sourceFile,'1595(3).mp4');
- assert.equal(map.replays['1596'].sourceFile,'1596(3).mp4');
+ assert.equal(map.replays['1595'].sourceFile,'1594.mp4');
+ assert.equal(map.replays['1596'].sourceFile,'1557(20261116-003454).mp4');
 });
 test('both independent source recordings contain uninterrupted pre/post-60 chronology',async()=>{
  for(const id of ['1595','1596']){

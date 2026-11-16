@@ -6,32 +6,32 @@
   "sources": [
     {
       "id": "1595",
-      "sourceFile": "1595(3).mp4",
+      "sourceFile": "1594.mp4",
       "videoStart": 382.99,
       "videoEnd": 472.62333333333333,
       "gameEnd": 93.36805555555556,
       "frameCount": 5379,
       "geometry": "data/hyper-hexagon-1595.b64",
-      "palette": "data/hyper-hexagon-1595-palette.json"
+      "palette": "data/hyper-hexagon-1595-palette.json",
+      "analyzedUpload": "1595(3).mp4",
+      "sha256": "5786efff132daeb37fa66c28ebf47f18c5364facce0f3f60ae8eb7abc53eaa52"
     },
     {
       "id": "1596",
-      "sourceFile": "1596(3).mp4",
+      "sourceFile": "1557(20261116-003454).mp4",
       "videoStart": 303.32,
       "videoEnd": 398.60333333333335,
       "gameEnd": 99.25347222222223,
       "frameCount": 5718,
       "geometry": "data/hyper-hexagon-1596.b64",
-      "palette": "data/hyper-hexagon-1596-palette.json"
+      "palette": "data/hyper-hexagon-1596-palette.json",
+      "analyzedUpload": "1596(3).mp4",
+      "sha256": "fc74c211ec9346997f29a4de7a57d75c2fb619d81f8581ec865d0a566644fff8"
     }
   ],
   "frameRate": 60,
   "gameRate": 1.0416666666666667,
   "method": "Full-frame 60fps foreground-pixel mask and polygon-contour tracing from uploaded game footage, not original game engine wall spawn/physics commands.",
-  "unknownOriginalFiles": [
-    "1557(20261116-003454).mp4",
-    "1594.mp4"
-  ],
   "limitations": [
     "Color-based contours approximate video silhouettes, with simplification and mask errors during sudden colors/morphs.",
     "Original wall spawn times/speeds/thickness/actor identities have not been independently recovered from source game engine.",
@@ -42,5 +42,7 @@
   "notes": [
     "Geometry sampled at actual 60fps. Source 1595: 5379 frames (0..93.37 game s). Source 1596: 5718 frames (0..99.25 game s).",
     "Core contour transient 7/8-sided misclassification corrected to closest following valid 4-6 sides; not exact engine shape transition reconstruction."
-  ]
+  ],
+  "originalFilenameIdentityVerified": true,
+  "verificationMethod": "SHA-256 byte-for-byte match of original named Library videos with attached 1595(3).mp4 / 1596(3).mp4"
 }
