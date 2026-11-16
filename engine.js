@@ -204,7 +204,10 @@
         const frame=this.replay.sample(this.time,this.angle);
         if(frame.playerAngleDelta)this.angle=wrap(this.angle+frame.playerAngleDelta);
         this.replayFrame=frame.replayFrame;
-        this.walls=frame.walls;
+        // Both films begin with a shrinking core / player flash, NOT
+        // incoming lethal walls. Preserve the same launch grace used by the
+        // chronological source route; it applies only once per game run.
+        this.walls=this.time<.55?[]:frame.walls;
         this.applyShape(frame.sides);
         this.rotation=frame.angle;
         this.zoom=frame.zoom;
