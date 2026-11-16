@@ -8,9 +8,9 @@
       "id": "1595",
       "sourceFile": "1595(3).mp4",
       "videoStart": 382.99,
-      "videoEnd": 472.59,
-      "gameEnd": 93.3333333,
-      "frameCount": 1793,
+      "videoEnd": 472.62333333333333,
+      "gameEnd": 93.36805555555556,
+      "frameCount": 5379,
       "geometry": "data/hyper-hexagon-1595.b64",
       "palette": "data/hyper-hexagon-1595-palette.json"
     },
@@ -18,25 +18,29 @@
       "id": "1596",
       "sourceFile": "1596(3).mp4",
       "videoStart": 303.32,
-      "videoEnd": 398.57,
-      "gameEnd": 99.21875,
-      "frameCount": 1906,
+      "videoEnd": 398.60333333333335,
+      "gameEnd": 99.25347222222223,
+      "frameCount": 5718,
       "geometry": "data/hyper-hexagon-1596.b64",
       "palette": "data/hyper-hexagon-1596-palette.json"
     }
   ],
-  "frameRate": 20,
+  "frameRate": 60,
   "gameRate": 1.0416666666666667,
-  "method": "pixel-color mask and polygon contour tracing from exact uploaded footage; not original engine wall events",
+  "method": "Full-frame 60fps foreground-pixel mask and polygon-contour tracing from uploaded game footage, not original game engine wall spawn/physics commands.",
   "unknownOriginalFiles": [
     "1557(20261116-003454).mp4",
     "1594.mp4"
   ],
   "limitations": [
-    "Source frame quantization at 20fps; fast motion may differ between samples",
-    "Camera/core phase and player speed not yet validated",
-    "60-second source sequences are continuous but per-wall track identity may be lost at color/morph switches",
-    "No random source-part connections in 4-1",
-    "No browser end-to-end verified until workflow/play inspection"
+    "Color-based contours approximate video silhouettes, with simplification and mask errors during sudden colors/morphs.",
+    "Original wall spawn times/speeds/thickness/actor identities have not been independently recovered from source game engine.",
+    "Camera and center-ship speed/motion not fully source-measured; per-frame replay shows video silhouettes rather than independent wall events.",
+    "No measured per-part wall arrangement/random connections in 4-1. Those remain for 4-2.",
+    "Visual frame matching and long-duration survivability have not been exhaustively certified."
+  ],
+  "notes": [
+    "Geometry sampled at actual 60fps. Source 1595: 5379 frames (0..93.37 game s). Source 1596: 5718 frames (0..99.25 game s).",
+    "Core contour transient 7/8-sided misclassification corrected to closest following valid 4-6 sides; not exact engine shape transition reconstruction."
   ]
 }
