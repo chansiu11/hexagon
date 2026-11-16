@@ -43,6 +43,21 @@ function drawHexagonerHUD(ctx,opts,accent){
  opts.text(timeText,-22,4,digitHeight,'#fff','right',275);
  ctx.restore();
 }
+function drawHyperHUD(ctx,opts,accent){
+ const t=game.time;
+ const ranks=['POINT','LINE','TRIANGLE','SQUARE','PENTAGON','HEXAGON'];
+ const label=opts.best>0?'BEST: '+opts.format(opts.best):
+  (t<60?ranks[Math.min(5,Math.floor(t/10))]:'NEW RECORD');
+ polygon(ctx,[[0,0],[Math.min(325,110+label.length*18),0],
+  [Math.min(305,95+label.length*18),39],[0,39]],'#000');
+ opts.text(label,15,5,label.length>11?19:25,'#fff','left',320);
+ polygon(ctx,[[552,0],[799,0],[784,39],[562,39]],'#000');
+ opts.text('HYPER MODE',572,4,26,'#fff','left',207);
+ polygon(ctx,[[804,0],[960,0],[960,56],[832,56],[816,38]],'#000');
+ const ticks=Math.floor(t*100+1e-7);
+ const timer=String(Math.floor(ticks/100))+'.'+String(ticks%100).padStart(2,'0');
+ opts.text(timer,949,3,43,'#fff','right',143);
+}
 function drawArena(ctx,colors,opts){
  const [dark,light,accent]=colors;
  const camera=opts.settings.motion?game.rotation:0;
@@ -118,7 +133,7 @@ function drawArena(ctx,colors,opts){
  ctx.restore();
  // HEXAGONER has its own source-measured HUD geometry, leaving HEXAGON
  // unchanged. Render after the arena transform so text stays screen-fixed.
- if(game.level===1){drawHexagonerHUD(ctx,opts,accent);}else{
+ if(game.level===1){drawHexagonerHUD(ctx,opts,accent);}else if(game.level===3){drawHyperHUD(ctx,opts,accent);}else{
  // Gameplay HUD is intentionally a new implementation. Video-specific
  // proportions, dynamic camera and timed voice cues belong to step 1-3.
  const rankNames=['POINT','LINE','TRIANGLE','SQUARE','SQUARE','PENTAGON'];
@@ -149,7 +164,7 @@ function drawArena(ctx,colors,opts){
   if(new URLSearchParams(location.search).get('debug')==='1')
    opts.text('FILMED PART '+game.replay.activePart+' / '+game.replay.source+' / '+
     (game.time<60?'0–60':'60+')+' / '+game.replay.transitions+' SEAMS',480,570,14,'#fff','center',730);
- }else if(game.replay)
+ }else if(game.replay&&(game.level!==3||new URLSearchParams(location.search).get('debug')==='1'))
   opts.text('SOURCE '+game.replay.id+' / CHRONOLOGICAL REPLAY',480,570,14,'#fff','center',730);
  if(mode===2&&!game.dead){
   polygon(ctx,[[28,508],[164,508],[174,566],[18,566]],'#000a','#ffffff80',2);
@@ -243,9 +258,8 @@ async function start(index,controlMode=1,enabled=true){
     firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
     playerSpeed:map.playerSpeed});
   }
- }else if(index===2||index===3){
-  // HEXAGONEST task 3-1 / HYPER HEXAGON task 4-1: source order ONLY. 3-2 will provide connected
-  // random dodge phrases after both complete source runs are measured.
+ }else if(index===2){
+  // HEXAGONEST task 3-1 retains independent chronological source order.
   // Never fall through to the unrelated HEXAGON stage-zero part sampler.
   const id=raw?requested:'1595';
   const option=map.replays?.[id];
@@ -253,6 +267,29 @@ async function start(index,controlMode=1,enabled=true){
   const [film,palette]=await Promise.all([
    HexReplay.load(id,option),HexReplay.loadPalette(id,index)]);
   film.palette=palette;playback=film;
+ }else if(index===3){
+  // HYPER 4-2: use 48 real film cuts from two independently traced sources.
+  // ?trace=1595/1596 preserves exact previous chronological replay order.
+  if(raw){
+   const [film,palette]=await Promise.all([
+    HexReplay.load(requested,map.replays[requested]),HexReplay.loadPalette(requested,3)]);
+   film.palette=palette;playback=film;
+  }else{
+   const [first,second,paletteA,paletteB,bank]=await Promise.all([
+    HexReplay.load('1595',map.replays['1595']),HexReplay.load('1596',map.replays['1596']),
+    HexReplay.loadPalette('1595',3),HexReplay.loadPalette('1596',3),
+    fetch('data/hyper-hexagon-4-2-bank.json').then(r=>{
+     if(!r.ok)throw Error('HYPER 4-2 bank unavailable '+r.status);
+     return r.json();
+    })]);
+   first.palette=paletteA;second.palette=paletteB;
+   const value=args.get('seed');
+   const seed=value===null?(Date.now()^Math.floor(performance.now()*1000)):
+    Number.isFinite(Number(value))?Number(value):Date.now();
+   playback=HyperHexagonParts.create({'1595':first,'1596':second},bank,{
+    seed,firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
+    playerSpeed:map.playerSpeed});
+  }
  }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
@@ -287,7 +324,11 @@ async function start(index,controlMode=1,enabled=true){
  // HEXAGONEST filmed ship bearing is not yet measured. Keep the engine's
  // normal initial angle until video measurement, rather than borrowing the
  // ship bearing measured in the HEXAGON / HEXAGONER recordings.
- if(index!==2&&index!==3){
+ if(index===3){
+  // Distinct recorded opening ship bearings in the two HYPER films.
+  const opening=initialSource==='1595'?-2.48:-.15;
+  game.angle=((opening-game.rotation)%TAU+TAU)%TAU;
+ }else if(index!==2){
   const sourceScreenAngle=index===1?(initialSource==='1595'?-Math.PI/2:.26):
    (initialSource==='1595'?-1.15:-1.18);
   game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
@@ -318,7 +359,7 @@ function tick(dt){
  const right=inputs.has('ArrowRight')||inputs.has('KeyD')||[...touches.values()].includes(1);
  const priorSides=game.sides,priorTime=game.time;
  game.update(dt,mode===1?Number(right)-Number(left):0);
- if(game.level===1&&sound&&!game.dead){
+ if((game.level===1||game.level===3)&&sound&&!game.dead){
   const stages=[10,20,30,50,60],voiceNames=['line','triangle','square','pentagon','hexagon'];
   for(let i=announcedRank;i<stages.length;i++){
    if(priorTime<stages[i]&&game.time>=stages[i]){
