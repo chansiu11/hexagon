@@ -1,4 +1,4 @@
-name: HEXAGON rebuild — 1-3 filmed patterns and connectivity
+name: HEXAGON / HEXAGONER rebuilt source verification
 on:
   push:
     branches: [main, rebuild-step-*]
@@ -24,6 +24,9 @@ jobs:
           node --check play.js
           node --check menu.js
           node --check stages/hexagon.js
+          node --check stages/hexagoner.js
+          node --check test/hexagoner-source.test.cjs
+          node --check test/hexagoner-browser.test.cjs
           node --check test/rebuilt-engine.test.cjs
           node --check test/rebuilt-browser.test.cjs
           node --check test/video-replay.test.cjs
@@ -31,7 +34,7 @@ jobs:
           node --check test/hexagon-parts.test.cjs
           node --check test/hexagon-parts-browser.test.cjs
       - name: New engine and map continuity tests
-        run: node --test test/rebuilt-engine.test.cjs test/video-replay.test.cjs test/hexagon-parts.test.cjs
+        run: node --test test/rebuilt-engine.test.cjs test/video-replay.test.cjs test/hexagon-parts.test.cjs test/hexagoner-source.test.cjs
       - name: Install Chromium browser test tools
         run: |
           npm install --no-save --no-package-lock playwright
@@ -49,10 +52,11 @@ jobs:
           node test/rebuilt-browser.test.cjs
           node test/video-browser.test.cjs
           node test/hexagon-parts-browser.test.cjs
+          node test/hexagoner-browser.test.cjs
       - name: Save browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: filmed-hexagon-1-3-validation-screenshots
+          name: filmed-hexagon-hexagoner-source-validation-screenshots
           path: test-artifacts/
           if-no-files-found: ignore
