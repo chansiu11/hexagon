@@ -118,7 +118,7 @@ function drawArena(ctx,colors,opts){
  ctx.restore();
  // HEXAGONER has its own source-measured HUD geometry, leaving HEXAGON
  // unchanged. Render after the arena transform so text stays screen-fixed.
- if(game.level===1){drawHexagonerHUD(ctx,opts,accent);return;}
+ if(game.level===1){drawHexagonerHUD(ctx,opts,accent);}else{
  // Gameplay HUD is intentionally a new implementation. Video-specific
  // proportions, dynamic camera and timed voice cues belong to step 1-3.
  const rankNames=['POINT','LINE','TRIANGLE','SQUARE','SQUARE','PENTAGON'];
@@ -144,6 +144,7 @@ function drawArena(ctx,colors,opts){
  const centis=Math.floor(game.time*100+1e-7),seconds=Math.floor(centis/100);
  opts.text(String(seconds)+'.'+String(centis%100).padStart(2,'0'),935,7,37,'#fff','right',185);
  if(!levelBanner&&game.level!==1)opts.text('MODE '+mode,78,54,17,'#ddd','left');
+ }
  if(game.replay?.kind==='parts'){
   if(new URLSearchParams(location.search).get('debug')==='1')
    opts.text('FILMED PART '+game.replay.activePart+' / '+game.replay.source+' / '+
