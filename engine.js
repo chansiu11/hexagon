@@ -46,6 +46,7 @@
       throw new RangeError('Shape schedule must begin at 0 seconds');
     registry.set(index,Object.freeze({
       id:index, name:LEVELS[index][0], sourceStatus:String(definition.sourceStatus||'pending'),
+      playerSpeed:finite(definition.playerSpeed)&&definition.playerSpeed>0?definition.playerSpeed:PLAYER_SPEED,
       walls:Object.freeze(walls), shapes:Object.freeze(shapes.map(s=>Object.freeze(s))),
       camera:typeof definition.camera==='function'?definition.camera:null,
       replays:definition.replays||null
@@ -99,6 +100,7 @@
       const map=optionalDefinition||registry.get(index);
       if(!map) throw new Error('MAP_UNAVAILABLE: '+LEVELS[index][0]);
       this.map=map;
+      this.playerSpeed=finite(map.playerSpeed)&&map.playerSpeed>0?map.playerSpeed:PLAYER_SPEED;
       this.level=index;
       this.time=0;
       this.angle=TAU/12;
@@ -260,7 +262,7 @@
               (this.replay.frames.length-1)/this.replay.fps*this.replay.gameRate;
             if(this.time>=end){this.time=end;this.timelineEnded=true;}
           }
-          if(this.controlMode===1)this.angle=wrap(this.angle+Math.max(-1,Math.min(1,turn))*PLAYER_SPEED*h);
+          if(this.controlMode===1)this.angle=wrap(this.angle+Math.max(-1,Math.min(1,turn))*this.playerSpeed*h);
           this.sampleWalls();
           if(!this.timelineEnded)this.checkCollision();
           if(this.timelineEnded)break;
@@ -270,7 +272,7 @@
           this._shapeCursor++;
           this.sides=this.map.shapes[this._shapeCursor].sides;
         }
-        if(this.controlMode===1)this.angle=wrap(this.angle+Math.max(-1,Math.min(1,turn))*PLAYER_SPEED*h);
+        if(this.controlMode===1)this.angle=wrap(this.angle+Math.max(-1,Math.min(1,turn))*this.playerSpeed*h);
         if(this.map.camera){
           const cam=this.map.camera(this.time);
           if(cam){this.rotation=finite(cam.rotation)?cam.rotation:this.rotation;
