@@ -1,4 +1,4 @@
-/* Task 2-1: independently video-traced HEXAGONER wall-order replay.
+/* Task 2-1/2-2: independently video-traced HEXAGONER wall sources.
  * These records contain sampled 20fps vector silhouettes, NOT the old
  * procedural HEXAGONER generator or accurately timed original wall commands.
  * Source time maps 177.96..275.01 (1595) and 119.30..223.80 (1596).
@@ -6,7 +6,8 @@
  * 60 seconds is an ordinary point in each uninterrupted recorded timeline.
  */
 HexEngine.registerMap(1,{
- sourceStatus:'source-contour-replay-task2-1-no-random',
+ sourceStatus:'video-contour-37-dodge-phrases-task2-2',
+ playerSpeed:8.2,
  walls:[],
  shapes:[{at:0,sides:6}],
  replays:{
