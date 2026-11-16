@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const engine=require('../engine.js');
 global.HexEngine=engine;
-require('../stages/hexagon.js');
+require('../stages/hexagon.js');require('../stages/hexagoner.js');
 const make=(walls,shapes=[{at:0,sides:6}])=>engine.registerMap(0,{sourceStatus:'test-only',walls,shapes});
 const wall=(patch={})=>({id:'w1',spawnAt:0,radius:150,speed:120,thickness:32,sides:6,blocked:[0],...patch});
 test('six stage numbers survive; seventh map and random route are rejected',()=>{
@@ -15,8 +15,10 @@ test('six stage numbers survive; seventh map and random route are rejected',()=>
  assert.throws(()=>new engine.ArenaGame(6),/removed/);
  assert.throws(()=>engine.registerMap(6,{walls:[],shapes:[{at:0,sides:6}]}),/0 through 5/);
  assert.equal(engine.hasMap(0),true);
- assert.equal(engine.hasMap(1),false);
- assert.throws(()=>new engine.ArenaGame(1),/MAP_UNAVAILABLE/);
+ assert.equal(engine.hasMap(1),true);
+ assert.equal(new engine.ArenaGame(1).level,1);
+ assert.equal(engine.hasMap(2),false);
+ assert.throws(()=>new engine.ArenaGame(2),/MAP_UNAVAILABLE/);
  const index=fs.readFileSync('index.html','utf8');
  for(const legacy of ['random-waves.js','stage-profiles.js','pattern-bank.js','hard-mode.js'])
   assert.ok(!index.includes(legacy),'unreachable old play dependency '+legacy);
