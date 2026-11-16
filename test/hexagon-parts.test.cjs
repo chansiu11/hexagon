@@ -125,3 +125,16 @@ test('render/collision polygons treat transparent seam fragments as nonlethal',(
  assert.equal(game.checkCollision(),true);
  assert.equal(game.death.wallId,'fading');
 });
+test('both original source openings are safe for the first half-second in ordinary, collision-enabled play',async()=>{
+ for(const source of ['1595','1596']){
+  const g=new HexEngine.ArenaGame(0);
+  g.attachReplay(HexParts.create(await get(),{seed:20261116,firstSource:source}));
+  const referenceScreenAngle=source==='1595'?-1.15:-1.18;
+  g.angle=((referenceScreenAngle-g.rotation)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+  g.update(.45);
+  assert.equal(g.dead,false,source+' had an instant source-core collision');
+  assert.equal(g.walls.length,0,source+' mistook the launch flash for a wall');
+  g.update(.11);
+  assert.equal(g.dead,false,source+' died immediately after launch');
+ }
+});
