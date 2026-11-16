@@ -47,7 +47,8 @@
     registry.set(index,Object.freeze({
       id:index, name:LEVELS[index][0], sourceStatus:String(definition.sourceStatus||'pending'),
       walls:Object.freeze(walls), shapes:Object.freeze(shapes.map(s=>Object.freeze(s))),
-      camera:typeof definition.camera==='function'?definition.camera:null
+      camera:typeof definition.camera==='function'?definition.camera:null,
+      replays:definition.replays||null
     }));
   }
   function hasMap(index) {return Number.isInteger(index)&&registry.has(index);}
@@ -64,17 +65,21 @@
     ];
   }
   function pointInsidePolygon(x,y,points) {
-    // Exact same panel vertices are used by both Canvas drawing and collision.
-    let sign=0;
-    for(let i=0;i<points.length;i++){
-      const a=points[i],b=points[(i+1)%points.length];
-      const cross=(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]);
-      if (Math.abs(cross)<1e-7) continue;
-      const s=Math.sign(cross);
-      if(sign && sign!==s) return false;
-      sign=s;
+    // Concave polygons and clipped annuli are allowed in observed footage.
+    // This is the same vertex path that the renderer fills with evenodd.
+    let inside=false;
+    for(let i=0,j=points.length-1;i<points.length;j=i++){
+      const a=points[i],b=points[j],dx=b[0]-a[0],dy=b[1]-a[1];
+      const cross=dx*(y-a[1])-dy*(x-a[0]);
+      if(Math.abs(cross)<1e-7&&x>=Math.min(a[0],b[0])-1e-7&&
+         x<=Math.max(a[0],b[0])+1e-7&&
+         y>=Math.min(a[1],b[1])-1e-7&&y<=Math.max(a[1],b[1])+1e-7)return true;
+      if((a[1]>y)!==(b[1]>y)){
+        const at=a[0]+(y-a[1])*(b[0]-a[0])/(b[1]-a[1]);
+        if(x<at)inside=!inside;
+      }
     }
-    return true;
+    return inside;
   }
   function playerPolygon(angle, lean=0) {
     const c=Math.cos(angle),s=Math.sin(angle), x=ORBIT*c,y=ORBIT*s;
@@ -108,6 +113,10 @@
       this._wallCursor=0;
       this._shapeCursor=0;
       this._actors=[];
+      this.replay=null;
+      this.replayFrame=-1;
+      this.spectating=false;
+      this.timelineEnded=false;
     }
     setControlMode(mode) {
       if(![1,2,3].includes(mode)) throw new RangeError('Invalid control mode');
@@ -144,14 +153,47 @@
         contact:[ORBIT*Math.cos(this.angle),ORBIT*Math.sin(this.angle)]});
     }
     checkCollision(){
-      if(this.dead)return false;
+      if(this.dead||this.paused||this.spectating||this.timelineEnded)return false;
       const x=ORBIT*Math.cos(this.angle),y=ORBIT*Math.sin(this.angle);
       for(const actor of this.walls){
-        if(pointInsidePolygon(x,y,actor.points)){this.kill(actor);return true;}
+        if(pointInsidePolygon(x,y,actor.points)&&
+            !(actor.holes||[]).some(h=>pointInsidePolygon(x,y,h))) {this.kill(actor);return true;}
       }
       return false;
     }
+    attachReplay(replay,{spectating=false}={}){
+      if(!replay||!Array.isArray(replay.frames)||!replay.frames.length)
+        throw new TypeError('Source replay needs extracted frames');
+      this.replay=replay;
+      this.replayFrame=-1;
+      this.spectating=!!spectating;
+      this._actors.length=0;
+      this._wallCursor=0;
+      this.time=0;
+      this.dead=false;
+      this.timelineEnded=false;
+      this.sampleWalls();
+    }
+    seekReplay(seconds){
+      if(!this.replay||!finite(seconds)||seconds<0) return false;
+      this.time=Math.min(seconds,(this.replay.frames.length-1)/this.replay.fps*this.replay.gameRate);
+      this.dead=false;this.timelineEnded=false;this.death=null;
+      this.replayFrame=-1;this.sampleWalls();
+      return true;
+    }
     sampleWalls(){
+      if(this.replay){
+        const index=Math.min(this.replay.frames.length-1,
+          Math.max(0,Math.floor((this.time-this.replay.gameStartOffset)*this.replay.fps/this.replay.gameRate+1e-9)));
+        if(index===this.replayFrame)return;
+        this.replayFrame=index;
+        const frame=this.replay.frames[index];
+        this.walls=frame.walls;
+        this.sides=frame.sides;
+        this.rotation=frame.angle;
+        this.zoom=frame.zoom;
+        return;
+      }
       const map=this.map;
       // Spawn only once and keep each actor alive until it moves completely inside the core.
       while(this._wallCursor<map.walls.length&&map.walls[this._wallCursor].spawnAt<=this.time+1e-9){
@@ -169,13 +211,23 @@
       this._actors=this._actors.filter(actor=>actor.w.radius+actor.w.thickness-actor.w.speed*(this.time-actor.w.spawnAt)>=20);
     }
     update(delta, turn=0) {
-      if(this.dead||this.paused)return;
+      if(this.dead||this.paused||this.timelineEnded)return;
       if(!finite(delta)||delta<0)throw new RangeError('Invalid time delta');
       // Fixed small substeps catch fast wall crossings without moving actors in jumps.
       const count=Math.max(1,Math.ceil(delta/(1/240)));
       const h=delta/count;
       for(let i=0;i<count&&!this.dead;i++){
         this.time+=h;
+        if(this.replay){
+          const end=this.replay.gameStartOffset+
+            (this.replay.frames.length-1)/this.replay.fps*this.replay.gameRate;
+          if(this.time>=end){this.time=end;this.timelineEnded=true;}
+          if(this.controlMode===1)this.angle=wrap(this.angle+Math.max(-1,Math.min(1,turn))*PLAYER_SPEED*h);
+          this.sampleWalls();
+          if(!this.timelineEnded)this.checkCollision();
+          if(this.timelineEnded)break;
+          continue;
+        }
         while(this._shapeCursor+1<this.map.shapes.length&&this.map.shapes[this._shapeCursor+1].at<=this.time+1e-9){
           this._shapeCursor++;
           this.sides=this.map.shapes[this._shapeCursor].sides;
