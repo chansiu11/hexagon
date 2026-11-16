@@ -8,6 +8,7 @@
 })(typeof window!=='undefined'?window:globalThis,function(){
  'use strict';
  const cache=new Map();
+ let paletteCache=null;
  function fromBase64(text){
   const raw=String(text).trim();
   if(typeof atob==='function')return Uint8Array.from(atob(raw),ch=>ch.charCodeAt(0));
@@ -77,5 +78,18 @@
   }
   return cache.get(tag);
  }
- return Object.freeze({decode,load});
+ async function loadPalette(id){
+  if(!['1595','1596'].includes(String(id)))throw new Error('Unknown palette source');
+  if(!paletteCache){
+   paletteCache=fetch('data/hexagon-palettes.json')
+     .then(r=>{if(!r.ok)throw new Error('Palette '+r.status);return r.json();});
+   paletteCache.catch(()=>{paletteCache=null});
+  }
+  const data=await paletteCache;
+  const entry=data[String(id)];
+  if(!entry||!Array.isArray(entry.colors)||entry.colors.length<100)
+    throw new Error('Incomplete palette transcript');
+  return entry;
+ }
+ return Object.freeze({decode,load,loadPalette});
 });
