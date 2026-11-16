@@ -52,6 +52,8 @@ test('random source phrases remain deterministic under a seed, include both film
   assert.ok(session.history.some(p=>p.epoch===1),'post-60 bank used');
   assert.ok(session.history.some(p=>p.source!==first),'both film pools contribute');
   assert.ok(session.maxObservedGap<1,'no field-clearing >1-second hole');
+  assert.ok(session.maxSpawnGap<1,'source-observed new incoming outer contours must recur within one second');
+  assert.ok(session.outerArrivalEvents>300,'do not treat a static occupied field as new moving wall arrivals');
   assert.equal(ids60[0].epoch,0);assert.equal(ids60[1].epoch,1);
   assert.ok(ids60[0].ids.length>0&&ids60[2].ids.length>0);
   assert.ok(ids60[1].time===60&&ids60[2].time===60.1);
@@ -103,4 +105,16 @@ test('new HEXAGONER source session inherits player speed, collisions/death freez
  const frozen=g.time;g.update(1);assert.equal(g.time,frozen);
  const reset=g.reset();assert.equal(reset.level,1);assert.equal(reset.time,0);assert.equal(reset.dead,false);
  const base=new HexEngine.ArenaGame(0);assert.equal(base.playerSpeed,HexEngine.PLAYER_SPEED);
+});
+test('both HEXAGONER source openings remain alive with real collision enabled (non-spectator)',async()=>{
+ const films=await load();
+ for(const source of ['1595','1596']){
+  const g=new HexEngine.ArenaGame(1);
+  g.attachReplay(Parts.create(films,{seed:20261116,firstSource:source}));
+  const screenAngle=source==='1595'?-Math.PI/2:.26;
+  g.angle=((screenAngle-g.rotation)%TAU+TAU)%TAU;
+  g.update(1.1);
+  assert.equal(g.dead,false,source+' caused an unintended opening death');
+  assert.ok(g.walls.length>0,source+' missing its first arriving walls');
+ }
 });
