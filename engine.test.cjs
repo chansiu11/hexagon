@@ -32,7 +32,7 @@ test('mode 2 and mode 3 work and reject missing sectors',()=>{
  g.armDoubleStep();g.stepSector(1);assert.ok(Math.abs(g.angle-a)>1);
  const b=g.angle;g.stepSector(1);assert.ok(Math.abs(g.angle-b)<1.2);
  g.setControlMode(3);assert.equal(g.selectSector(0),true);
- assert.equal(g.selectSector(99),false);assert.equal(g.sectorForKey('Key'+g.directKeys[0]),0);
+ assert.equal(g.selectSector(99),false);assert.equal(g.sectorForKey((/^[0-9]$/.test(g.directKeys[0])?'Digit':'Key')+g.directKeys[0]),0);
 });
 test('bad wall fields are rejected',()=>{
  assert.throws(()=>new Game(0,{walls:[{at:0,radius:100,speed:-2,thickness:10,sector:0}]}),/Invalid wall/);
