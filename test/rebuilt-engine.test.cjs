@@ -67,3 +67,10 @@ test('pause/resume and restart reset only new runs',()=>{
  g.update(2);assert.equal(g.time,time);g.resume();g.update(.1);assert.ok(g.time>time);
  const r=g.reset();assert.equal(r.time,0);assert.equal(r.dead,false);
 });
+
+test('outgoing walls never invert through the center or create invalid panels',()=>{
+ const points=engine.panelPolygon(-8,32,6,0);
+ assert.ok(points.every(([x,y])=>Number.isFinite(x)&&Number.isFinite(y)));
+ assert.ok(Math.hypot(...points[0])>=19.99);
+ assert.ok(Math.hypot(...points[2])>=Math.hypot(...points[0]));
+});
