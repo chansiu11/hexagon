@@ -1,9 +1,9 @@
 /* 4-1 HYPER HEXAGON: original chronological wall silhouettes transcribed independently
    from 1594.mp4 (identical to 1595(3).mp4) and 1557(20261116-003454).mp4 (identical to 1596(3).mp4). NOT the old procedural stage-1 wall bank.
-   ?trace=1595 / ?trace=1596 selects source playback; randomized joining belongs to 4-2.
+   ?trace=1595 / ?trace=1596 selects source playback; 4-2 random joining is the default; ?trace selects full original chronology.
    These are 60 fps observed video contour samples, NOT exact original wall commands. */
 HexEngine.registerMap(3,{
-  sourceStatus:'hyper-hexagon-4-1-independent-source-chronology-60fps',
+  sourceStatus:'hyper-hexagon-4-1-film-sources+4-2-random-dodge-phrases',
   walls:[],
   shapes:[{at:0,sides:6}],
   replays:{
