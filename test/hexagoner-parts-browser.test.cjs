@@ -44,6 +44,16 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    if(t>=12)assert.ok(obs.newWallArrivals>10);
    assert.equal(obs.epoch,obs.time<60?0:1,'epoch must follow the actual running clock');
    if(t>75)assert.ok(obs.transitions>=10);
+   if(t===12.1){
+    // Pixel probe: the source-specific rank underline must remain visible
+    // on the black HUD panel, independent of the 1/2/3 control mode.
+    const underline=await page.evaluate(()=>{
+     const ctx=document.querySelector('#game').getContext('2d');
+     return Array.from(ctx.getImageData(54,32,1,1).data);
+    });
+    assert.ok(underline[0]+underline[1]+underline[2]>65,
+      'HEXAGONER filmed rank underline was missing from the HUD');
+   }
    if([1.2,59.9,60.1,121.5].includes(t))
     await page.screenshot({path:'test-artifacts/hexagoner-random-'+first+'-'+t+'.png'});
   }
