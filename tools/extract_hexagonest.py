@@ -6,8 +6,8 @@ engine geometry. Source video frame pixels are not reused from earlier maps.
 The frame actor identity is estimated by the existing replay.js tracker.
 Bright, low-saturation HUD text is excluded from chromatic wall-color selection.
 
-Run: python extract_hexagonest.py --source 1595 --video /path/video.mp4
-     python extract_hexagonest.py --source 1596 --video /path/video.mp4
+Run: python tools/extract_hexagonest.py --source 1595 --video /path/video.mp4 --fps 60
+     python tools/extract_hexagonest.py --source 1596 --video /path/video.mp4 --fps 60
 """
 import argparse
 import base64
@@ -25,7 +25,7 @@ SOURCES = {
     '1596': dict(start=227.5166666667, end=296.15, width=1152, height=720,
                  crop_x=0, source_file='1596(2).mp4', game_start_offset=0.00)
 }
-FPS = 30
+FPS = 60
 SIZE = (480, 300)
 TARGET = np.array([240, 150], dtype=float)
 
