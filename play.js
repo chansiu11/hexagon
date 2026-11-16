@@ -6,7 +6,7 @@ const canvas=document.querySelector('#game');
 const music=new HexAudio();
 const inputs=new Set(),touches=new Map();
 const directCodes=['KeyQ','KeyW','KeyE','KeyA','KeyS','KeyD','KeyZ','KeyX','KeyC','Digit0','Digit9','Digit8'];
-let game=null,mode=1,sound=true,deathPlayed=false,worldCamera=0;
+let game=null,mode=1,sound=true,deathPlayed=false,startTicket=0,deathShownAt=0;
 const point=(r,a)=>[Math.cos(a)*r,Math.sin(a)*r];
 const textColor='#fff';
 function polygon(ctx,points,color,stroke=null,width=2){
@@ -18,7 +18,13 @@ function sectorColor(i,dark,light){return i%2?dark:light}
 function drawArena(ctx,colors,opts){
  const [dark,light,accent]=colors;
  const camera=opts.settings.motion?game.rotation:0;
- ctx.save();ctx.translate(480,300);
+ ctx.save();
+ if(game.dead&&deathShownAt){
+  const age=Math.max(0,(performance.now()-deathShownAt)/1000);
+  const zoom=1+.14*(1-Math.exp(-age*14));
+  ctx.translate(480,300);ctx.scale(zoom,zoom);ctx.translate(-480,-300);
+ }
+ ctx.translate(480,300);
  ctx.rotate(camera);
  if(opts.settings.motion){
   ctx.transform(1,0,Math.sin(game.tilt)*.2,1,0,0);
@@ -36,9 +42,24 @@ function drawArena(ctx,colors,opts){
    ring.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
    ctx.closePath();
   }
-  ctx.fillStyle=accent;ctx.fill('evenodd');
+  ctx.fillStyle=accent;
+  ctx.globalAlpha=wall.opacity===undefined?1:Math.max(0,Math.min(1,wall.opacity));
+  ctx.fill('evenodd');ctx.globalAlpha=1;
  }
- const core=Array.from({length:game.sides},(_,i)=>point(50,i*TAU/game.sides));
+ let core=Array.from({length:game.sides},(_,i)=>point(50,i*TAU/game.sides));
+ const changed=game.time-game.shapeChangedAt;
+ if(changed>=0&&changed<.16&&game.shapeFrom!==game.shapeTo){
+  const t=Math.max(0,Math.min(1,changed/.16));
+  const radial=(sides,angle)=>{
+   const sector=TAU/sides;
+   const phase=((angle%sector)+sector)%sector;
+   return 50*Math.cos(Math.PI/sides)/Math.cos(phase-Math.PI/sides);
+  };
+  core=Array.from({length:60},(_,i)=>{
+   const a=i*TAU/60;
+   return point(radial(game.shapeFrom,a)*(1-t)+radial(game.shapeTo,a)*t,a);
+  });
+ }
  polygon(ctx,core,dark,accent,3);
  polygon(ctx,HexEngine.playerPolygon(game.angle),game.dead?'#fff':accent);
  if(game.death){
@@ -65,8 +86,12 @@ function drawArena(ctx,colors,opts){
  const centis=Math.floor(game.time*100+1e-7),seconds=Math.floor(centis/100);
  opts.text(String(seconds)+':'+String(centis%100).padStart(2,'0'),935,7,37,'#fff','right',185);
  opts.text('MODE '+mode,78,54,17,'#ddd','left');
- if(game.replay)
-  opts.text('VIDEO '+game.replay.id+' / SOURCE ORDER / '+game.replay.fps+' FPS',480,570,14,'#fff','center',730);
+ if(game.replay?.kind==='parts'){
+  if(new URLSearchParams(location.search).get('debug')==='1')
+   opts.text('FILMED PART '+game.replay.activePart+' / '+game.replay.source+' / '+
+    (game.time<60?'0–60':'60+')+' / '+game.replay.transitions+' SEAMS',480,570,14,'#fff','center',730);
+ }else if(game.replay)
+  opts.text('SOURCE '+game.replay.id+' / CHRONOLOGICAL REPLAY',480,570,14,'#fff','center',730);
  if(mode===2&&!game.dead){
   polygon(ctx,[[28,508],[164,508],[174,566],[18,566]],'#000a','#ffffff80',2);
   opts.text(game.doubleStepReady?'READY':'2 STEPS',96,517,21,'#fff');
@@ -74,6 +99,8 @@ function drawArena(ctx,colors,opts){
  if(mode===3&&!game.dead)opts.text('PRESS THE KEY SHOWN IN EACH SECTOR',480,493,16,'#ddd');
 }
 function replayPalette(g){
+ if(g?.replay?.kind==='parts'&&g.replay.colors)
+  return [0,3,6].map(offset=>'rgb('+g.replay.colors.slice(offset,offset+3).join(',')+')');
  const pal=g?.replay?.palette;
  if(!pal?.colors?.length)return null;
  const i=Math.min(pal.colors.length-1,Math.max(0,
@@ -105,44 +132,75 @@ function draw(ctx,opts){
 }
 async function start(index,controlMode=1,enabled=true){
  if(!HexEngine.hasMap(index))return false;
+ const ticket=++startTicket;
  const map=HexEngine.getMap(index);
  const args=new URLSearchParams(location.search);
  const requested=args.get('trace');
- // Source ordering is deterministic in 1-2. Random mixing belongs to 1-3.
- const trace=['1595','1596'].includes(requested)?requested:'1595';
- const option=map.replays?.[trace];
- if(!option)throw new Error('Video source is not registered: '+trace);
- const [recording,palette]=await Promise.all([HexReplay.load(trace,option),
-   HexReplay.loadPalette(trace)]);
- recording.palette=palette;
+ const raw=['1595','1596'].includes(requested);
+ let playback;
+ if(raw){
+  const option=map.replays?.[requested];
+  if(!option)throw new Error('Unregistered filmed run '+requested);
+  const [source,palette]=await Promise.all([
+    HexReplay.load(requested,option),HexReplay.loadPalette(requested)]);
+  source.palette=palette;playback=source;
+ }else{
+  const ids=['1595','1596'];
+  const [first,second,paletteA,paletteB]=await Promise.all([
+    HexReplay.load(ids[0],map.replays[ids[0]]),
+    HexReplay.load(ids[1],map.replays[ids[1]]),
+    HexReplay.loadPalette(ids[0]),HexReplay.loadPalette(ids[1])]);
+  first.palette=paletteA;second.palette=paletteB;
+  const value=args.get('seed');
+  const seed=value===null?(Date.now()^Math.floor(performance.now()*1000)):
+    Number.isFinite(Number(value))?Number(value):(Date.now()>>>0);
+  playback=HexParts.create({'1595':first,'1596':second},{
+    seed,firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null
+  });
+ }
+ // Pending file loads can finish after returning to stage selection.
+ if(ticket!==startTicket)return false;
  clearInput();music.stop();
  game=new HexEngine.ArenaGame(index);mode=controlMode;sound=enabled;
- game.attachReplay(recording,{spectating:args.get('spectate')==='1'});
+ game.attachReplay(playback,{spectating:args.get('spectate')==='1'});
  game.setControlMode(mode);game.sampleWalls();
- music.setEnabled(sound);deathPlayed=false;
- // Do not block gameplay time on the MP3 decode/start.
- if(sound)music.unlock().then(()=>{if(game&&!game.dead&&!game.paused)music.play(index,game.time)}).catch(()=>{});
+ music.setEnabled(sound);deathPlayed=false;deathShownAt=0;
+ if(sound)music.unlock().then(()=>{
+  if(ticket===startTicket&&game&&!game.dead&&!game.paused){
+   music.play(index,game.time);music.voice('begin');
+  }
+ }).catch(()=>{});
  return true;
 }
-function stop(){clearInput();music.stop();game=null;deathPlayed=false;}
+function stop(){++startTicket;clearInput();music.stop();game=null;deathPlayed=false;deathShownAt=0;}
 function pause(){clearInput();game?.pause();music.stop();}
 function resume(){game?.resume();if(game&&sound)music.play(game.level,game.time);}
 function clearInput(){inputs.clear();touches.clear();}
+function setMode(value){if(!game)return false;clearInput();game.setControlMode(value);mode=value;return true;}
 function setSound(value){sound=!!value;music.setEnabled(sound);if(!sound)music.stop();else if(game&&!game.dead&&!game.paused)music.unlock().then(()=>music.play(game.level,game.time)).catch(()=>{});}
 function selectSound(){music.unlock().then(()=>music.select()).catch(()=>{});}
 function onDeath(){
  if(!game?.dead||deathPlayed)return;
- deathPlayed=true;clearInput();music.death();
+ deathPlayed=true;deathShownAt=performance.now();clearInput();music.death();
 }
 function tick(dt){
  if(!game||game.dead||game.paused||game.timelineEnded)return;
  const left=inputs.has('ArrowLeft')||inputs.has('KeyA')||[...touches.values()].includes(-1);
  const right=inputs.has('ArrowRight')||inputs.has('KeyD')||[...touches.values()].includes(1);
+ const priorSides=game.sides;
  game.update(dt,mode===1?Number(right)-Number(left):0);
+ if(priorSides!==game.sides){
+  const name={3:'triangle',4:'square',5:'pentagon',6:'hexagon'}[game.sides];
+  if(name&&sound)music.voice(name);
+  if(mode===3)root.HexMenu?.buildControls();
+ }
  if(game.dead)onDeath();
  canvas.dataset.gameTime=String(game.time);
  canvas.dataset.wallCount=String(game.walls.length);
- canvas.dataset.sourceTrace=game.replay?.id||'';
+ canvas.dataset.sourceTrace=game.replay?.kind==='parts'?game.replay.source:game.replay?.id||'';
+ canvas.dataset.partId=game.replay?.kind==='parts'?game.replay.activePart:'';
+ canvas.dataset.partTransitions=String(game.replay?.transitions||0);
+ canvas.dataset.partEpoch=String(game.replay?.epoch??'');
  canvas.dataset.sourceFrame=String(game.replayFrame);
  canvas.dataset.gameState=game.dead?'dead':'running';
 }
@@ -202,6 +260,6 @@ function buildControls(button,controls){
    button('SECTOR '+directCodes[i],95+i*130,520,115,60,()=>{game.selectSector(i);if(game.dead)onDeath()});
  }
 }
-root.HexPlay={get game(){return game},start,stop,pause,resume,clearInput,setSound,selectSound,
+root.HexPlay={get game(){return game},start,stop,pause,resume,clearInput,setMode,setSound,selectSound,
  tick,draw,keydown,keyup,pointerdown,pointerup,buildControls};
 })(window);
