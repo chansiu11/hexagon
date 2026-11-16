@@ -7,7 +7,7 @@ const ease=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
 const key='hexagon-web-v2';
 let screen='title',selected=0,menuItem=0,optionIndex=0,last=0,clock=0,spin=0,uiAge=1;
 let scale=1,ox=0,oy=0,hovered=null,pressed=null,pressAge=1,hoverAmount=0,slide=0,slideDirection=1;
-let notice='',noticeAge=0,displayedHue=32,displayedSat=0,displayedLight=[14,19,93];
+let starting=false,notice='',noticeAge=0,displayedHue=32,displayedSat=0,displayedLight=[14,19,93];
 let records=Array(6).fill(0),recordsMode2=Array(6).fill(0),recordsMode3=Array(6).fill(0);
 let settings={sound:true,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,controlMode:1,hyperUnlocked:false};
 try{
@@ -71,13 +71,13 @@ function paintBackdrop(dark,light,accent){
  ctx.restore();
 }
 function switchScreen(next){
- if(['play','over','paused'].includes(screen)&&!['play','over','paused'].includes(next))root.HexPlay?.stop();
+ if(['play','over','paused','complete'].includes(screen)&&!['play','over','paused','complete'].includes(next))root.HexPlay?.stop();
  if(next==='paused')root.HexPlay?.pause();
  if(screen==='paused'&&next==='play')root.HexPlay?.resume();
  screen=next;uiAge=0;notice='';noticeAge=0;
  document.body.classList.toggle('playing',screen==='play');
  setStatus({title:'메인 메뉴',select:levels[selected][0],options:'설정',scores:'최고 기록',
-  credits:'크레딧',play:'게임 시작',over:'게임 오버',paused:'일시정지',quit:'종료'}[screen]||screen);
+  credits:'크레딧',play:'게임 시작',over:'게임 오버',complete:'영상 재생 완료',paused:'일시정지',quit:'종료'}[screen]||screen);
  buildControls();
 }
 function choose(d){
@@ -98,25 +98,38 @@ function setMode(mode){
  }
  buildControls();setStatus('조작 모드 '+mode);
 }
-function start(){
+async function start(){
+ if(starting)return;
  if(!unlocked(selected)){toast('SURVIVE 60S TO UNLOCK');return}
  if(!HexEngine.hasMap(selected)){toast('PATTERN NOT READY: '+levels[selected][0]);return}
- if(root.HexPlay?.start(selected,settings.controlMode,settings.sound))switchScreen('play');
+ const requested=selected,origin=screen;
+ starting=true;setStatus('영상에서 추출한 벽을 불러오는 중입니다.');
+ try{
+  const started=await root.HexPlay?.start(requested,settings.controlMode,settings.sound);
+  if(requested!==selected||screen!==origin){root.HexPlay?.stop();return}
+  if(started)switchScreen('play');
+ }catch(error){console.error(error);toast('재생 데이터를 불러오지 못했습니다.')}
+ finally{starting=false}
 }
 function finishDeath(){
  const g=root.HexPlay?.game;if(!g||screen!=='play')return;
- modeRecords()[selected]=Math.max(bestTime(selected),g.time);save();
+ if(!g.spectating){modeRecords()[selected]=Math.max(bestTime(selected),g.time);save();}
  switchScreen('over');
+}
+function finishSource(){
+ const g=root.HexPlay?.game;if(!g||screen!=='play'||!g.timelineEnded)return;
+ if(!g.spectating){modeRecords()[selected]=Math.max(bestTime(selected),g.time);save();}
+ switchScreen('complete');
 }
 function back(){
  if(screen==='play')switchScreen('paused');
- else if(screen==='paused'||screen==='over'||screen==='scores')switchScreen('select');
+ else if(screen==='paused'||screen==='over'||screen==='complete'||screen==='scores')switchScreen('select');
  else if(screen==='title')switchScreen('quit');else switchScreen('title');
 }
 function confirm(){
  if(screen==='title')switchScreen(['select','options','credits'][menuItem]);
  else if(screen==='select')start();
- else if(screen==='over')start();
+ else if(screen==='over'||screen==='complete')start();
  else if(screen==='paused')switchScreen('play');
  else if(screen==='quit')switchScreen('title');
  else if(screen==='options')optionActions[optionIndex]();
@@ -150,8 +163,8 @@ function buildControls(){
  }
  if(screen==='title')button('종료',735,0,225,48,back);
  if(screen==='select'){button('최고 기록',0,0,400,50,()=>switchScreen('scores'));button('메인 메뉴',560,0,400,50,back)}
- if(screen==='over'||screen==='paused'||screen==='quit'){
-  button(screen==='over'?'다시 시작':screen==='paused'?'계속하기':'계속',250,screen==='over'?535:420,460,screen==='over'?55:70,confirm);
+ if(screen==='over'||screen==='complete'||screen==='paused'||screen==='quit'){
+  button(screen==='over'||screen==='complete'?'다시 시작':screen==='paused'?'계속하기':'계속',250,screen==='over'||screen==='complete'?535:420,460,screen==='over'||screen==='complete'?55:70,confirm);
   button('메뉴로 돌아가기',630,0,330,50,back);
  }
  if(screen==='options'){
@@ -214,7 +227,7 @@ function draw(){
  ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
  ctx.save();ctx.beginPath();ctx.rect(0,0,960,600);ctx.clip();
  const colors=displayedLight.map(l=>'hsl('+displayedHue+' '+displayedSat+'% '+l+'%)');
- if(['play','over','paused'].includes(screen)){
+ if(['play','over','paused','complete'].includes(screen)){
   root.HexPlay?.draw(ctx,{screen,colors,settings,scale,ox,oy,dpr,text,polygon,header,panel,best:bestTime(selected),format});
  }else drawMenu(...colors);
  if(noticeAge>0){polygon([[135,498],[825,498],[815,548],[145,548]],'#000d','#ffffff50',2);
@@ -246,7 +259,7 @@ function frame(t){
  hoverAmount+=(Number(!!hovered)-hoverAmount)*(1-Math.exp(-dt*16));
  if(settings.motion)spin+=dt*.18;
  slide=Math.max(0,slide-dt*5);
- if(screen==='play'){root.HexPlay?.tick(dt);if(root.HexPlay?.game?.dead)finishDeath()}
+ if(screen==='play'){root.HexPlay?.tick(dt);if(root.HexPlay?.game?.dead)finishDeath();else if(root.HexPlay?.game?.timelineEnded)finishSource()}
  paletteUpdate(dt);draw();requestAnimationFrame(frame);
 }
 addEventListener('keydown',e=>{
