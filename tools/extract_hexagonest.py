@@ -4,6 +4,7 @@
 This is a first-pass *visual source transcription*, not certified original
 engine geometry. Source video frame pixels are not reused from earlier maps.
 The frame actor identity is estimated by the existing replay.js tracker.
+Bright, low-saturation HUD text is excluded from chromatic wall-color selection.
 
 Run: python extract_hexagonest.py --source 1595 --video /path/video.mp4
      python extract_hexagonest.py --source 1596 --video /path/video.mp4
@@ -24,7 +25,7 @@ SOURCES = {
     '1596': dict(start=227.5166666667, end=296.15, width=1152, height=720,
                  crop_x=0, source_file='1596(2).mp4', game_start_offset=0.00)
 }
-FPS = 60
+FPS = 30
 SIZE = (480, 300)
 TARGET = np.array([240, 150], dtype=float)
 
@@ -49,7 +50,11 @@ def color_mask(frame):
     if len(distinct) < 3:
         # A true empty start can have only two backgrounds and tiny core.
         return np.zeros(frame.shape[:2], np.uint8), (0, 0, 0)
-    accent = max(distinct[:5], key=lambda col: float(col.max()))
+    # Highly saturated stage colours must not be mistaken for the white HUD.
+    # For genuine grey/white phases no saturated major region exists, so
+    # revert to brightest visible neutral foreground as before.
+    saturated = [col for col in distinct[:5] if col.max()-col.min() >= 42]
+    accent = max(saturated or distinct[:5], key=lambda col: float(col.max()))
     # Bright foreground colour, allowing codec noise and anti-aliasing.
     difference = np.abs(frame.astype(np.int16) - accent.astype(np.int16))
     mask = (np.max(difference, axis=2) <= 22).astype(np.uint8) * 255
@@ -168,6 +173,10 @@ def process(video, source, output, fps=FPS, preview=0):
         img=np.frombuffer(raw,np.uint8).reshape(300,480,3)
         mask,accent=color_mask(img)
         walls,core=extract_shapes(mask)
+        if source == '1596' and processed < int(round(.60*fps)):
+            # Original 1596 starts with an oversized animated central core,
+            # not an incoming wall. The first approaching wall is later.
+            walls=[]
         if core:
             measured=core['sides']
             if measured==prev_side:
@@ -219,5 +228,5 @@ if __name__=='__main__':
     parser.add_argument('--fps',type=int,default=FPS)
     parser.add_argument('--preview',type=int,default=0)
     args=parser.parse_args()
-    out=args.output or f'data/hexagonest-{args.source}.b64'
+    out=args.output or f'/mnt/data/hexagonest-{args.source}.b64'
     process(args.video,args.source,out,args.fps,args.preview)
