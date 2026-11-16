@@ -35,14 +35,16 @@ const fs=require('node:fs');
  await page.screenshot({path:'test-artifacts/play-no-pattern.png'});
  await page.waitForTimeout(120);
  assert.ok(await page.evaluate(()=>HexPlay.game.time>0));
- // Inject a tiny TEST-ONLY wall; none of it ships as a filmed stage pattern.
- await page.evaluate(()=>HexEngine.registerMap(0,{
-  sourceStatus:'test-only',shapes:[{at:0,sides:6}],
-  walls:[{id:'browser-qa',spawnAt:0,radius:150,speed:120,thickness:32,sides:6,blocked:[0]}]
- }));
- await page.keyboard.press('Escape');await page.keyboard.press('Escape');
- assert.equal(await page.evaluate(()=>HexMenu.screen),'select');
- await page.keyboard.press('Space');
+ // Swap only this running test instance to synthetic actor geometry.
+ // The registered video stage and both real source recordings remain intact.
+ await page.evaluate(()=>{
+  const g=HexPlay.game;
+  g.map={sourceStatus:'test-only',shapes:[{at:0,sides:6}],
+   walls:[{id:'browser-qa',spawnAt:0,radius:150,speed:120,thickness:32,sides:6,blocked:[0]}]};
+  g.replay=null;g.replayFrame=-1;g.timelineEnded=false;g.dead=false;
+  g._wallCursor=0;g._actors=[];g.time=0;g.angle=Math.PI/6;
+  g.sampleWalls();
+ });
  await page.waitForFunction(()=>HexMenu.screen==='over',{timeout:3500});
  assert.equal(await page.evaluate(()=>HexPlay.game.dead),true);
  const frozen=await page.evaluate(()=>HexPlay.game.time);
