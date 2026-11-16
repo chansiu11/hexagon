@@ -127,7 +127,12 @@
     const points=verts(),holes=[];
     const holeCount=u8();
     for(let j=0;j<holeCount;j++)holes.push(verts());
-    if(sourcePlayerFragment(points)||sourceHudFragment(points))continue;
+    // HEXAGONEST frames are already source-masked before HXRF encoding.
+    // Do not re-classify their large top-edge sectors as HUD or late small
+    // moving wall fragments as the source triangle. Keep stages 1-2 intact.
+    const measuredHexagonest=typeof info.path==='string'&&
+      /^data\/hexagonest-(1595|1596)\.b64$/.test(info.path);
+    if(!measuredHexagonest&&(sourcePlayerFragment(points)||sourceHudFragment(points)))continue;
     walls.push({id:'trace-'+f+'-'+i,sourceFrame:f,points,holes});
    }
    frames.push({angle,sides,zoom,walls});
@@ -157,14 +162,15 @@
  }
  async function loadPalette(id,stage=0){
   if(!['1595','1596'].includes(String(id)))throw new Error('Unknown palette source');
-  const isHexagoner=stage===1;
-  const path=isHexagoner?'data/hexagoner-'+String(id)+'-palette.json':'data/hexagon-palettes.json';
+  const isHexagoner=stage===1,isHexagonest=stage===2;
+  const path=isHexagonest?'data/hexagonest-'+String(id)+'-palette.json':
+   isHexagoner?'data/hexagoner-'+String(id)+'-palette.json':'data/hexagon-palettes.json';
   if(!paletteCache.has(path)){
    const request=fetch(path).then(r=>{if(!r.ok)throw new Error('Palette '+r.status);return r.json();});
    paletteCache.set(path,request);request.catch(()=>paletteCache.delete(path));
   }
   const data=await paletteCache.get(path);
-  const entry=isHexagoner?data:data[String(id)];
+  const entry=(isHexagoner||isHexagonest)?data:data[String(id)];
   if(!entry||!Array.isArray(entry.colors)||entry.colors.length<100)
     throw new Error('Incomplete palette transcript');
   return entry;
