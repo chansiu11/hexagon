@@ -106,14 +106,39 @@ function drawArena(ctx,colors,opts){
  if(mode===3&&!game.dead)opts.text('PRESS THE KEY SHOWN IN EACH SECTOR',480,493,16,'#ddd');
 }
 function replayPalette(g){
- if(g?.replay?.kind==='parts'&&g.replay.colors)
-  return [0,3,6].map(offset=>'rgb('+g.replay.colors.slice(offset,offset+3).join(',')+')');
- const pal=g?.replay?.palette;
+ if(!g?.replay)return null;
+ const parts=g.replay.kind==='parts';
+ const source=parts?g.replay.source:g.replay.id;
+ const original=parts?g.replay.recordings[source]:g.replay;
+ const pal=original?.palette;
  if(!pal?.colors?.length)return null;
- const i=Math.min(pal.colors.length-1,Math.max(0,
-  Math.floor((g.time-g.replay.gameStartOffset)*pal.fps/g.replay.gameRate+1e-9)));
- const frame=pal.colors[i];
- return [0,3,6].map(offset=>'rgb('+frame.slice(offset,offset+3).join(',')+')');
+ const sampleIndex=parts?g.replay.sourceFrame:g.replayFrame;
+ const i=Math.max(0,Math.min(pal.colors.length-1,
+   Math.floor(sampleIndex/original.fps*pal.fps)));
+ const sampled=parts&&g.replay.colors?g.replay.colors:pal.colors[i];
+ const color=sampled.slice(0,9);
+ // Dark pixels from the source-video intro/occlusion were occasionally
+ // mislabeled as wall-color pixels. They must never turn the visible ship
+ // and central outline black. Opening fallback colors are measured directly
+ // from the respective filmed ship/core border.
+ if(Math.max(...color.slice(6,9))<90){
+  let replacement=null;
+  if(original===g.replay&&g.time<1.2 || parts&&g.time<1.2){
+   replacement=source==='1595'?[206,54,35]:[200,121,26];
+  }else{
+   const n=Math.max(0,Math.min(pal.colors.length-1,i));
+   for(let d=1;d<=5&&!replacement;d++){
+    for(const j of [n-d,n+d]){
+     if(j<0||j>=pal.colors.length)continue;
+     const candidate=pal.colors[j].slice(6,9);
+     if(Math.max(...candidate)>125)replacement=candidate;
+    }
+   }
+   replacement ||= source==='1595'?[206,54,35]:[200,121,26];
+  }
+  color.splice(6,3,...replacement);
+ }
+ return [0,3,6].map(offset=>'rgb('+color.slice(offset,offset+3).join(',')+')');
 }
 function draw(ctx,opts){
  if(!game)return;
