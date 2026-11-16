@@ -92,7 +92,7 @@ function drawArena(ctx,colors,opts){
  opts.text('TIME',654,8,27,'#fff','left',112);
  const centis=Math.floor(game.time*100+1e-7),seconds=Math.floor(centis/100);
  opts.text(String(seconds)+'.'+String(centis%100).padStart(2,'0'),935,7,37,'#fff','right',185);
- opts.text('MODE '+mode,78,54,17,'#ddd','left');
+ if(!levelBanner)opts.text('MODE '+mode,78,54,17,'#ddd','left');
  if(game.replay?.kind==='parts'){
   if(new URLSearchParams(location.search).get('debug')==='1')
    opts.text('FILMED PART '+game.replay.activePart+' / '+game.replay.source+' / '+
