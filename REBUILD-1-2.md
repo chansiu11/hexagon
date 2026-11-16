@@ -39,6 +39,9 @@ The 60-second boundary is NOT a fresh source load: the continuous sampled video 
 
 Source frame masks were segmented by image-color modes, the on-screen center and HUD were masked out, and wall contours were fitted into vector loops including holes. This is a **source-frame geometric trace**, not an independently measured actor-level wall wave bank. Shape detections were median-smoothed to suppress brief misclassifications. The screen-space vectors are reverse-transformed by an independently estimated camera phase and zoom, and re-transformed for Canvas painting and shared collision geometry.
 
+### Post-reconnect decoder correction
+The original source masks also contained the recorded player's small triangle and small central-core remnants. Those are **not descending walls**. `replay.js` now removes only small, near-center source contours (10 or fewer vertices, at most 52 original sample pixels from center, contour area at most 65 sample pixels²) at decoding time before drawing or collision. The compressed original derived-geometry assets are not changed, so the raw observations remain available for audit. `test/video-replay.test.cjs` asserts those false wall fragments have been filtered for **both** recordings. Some truly small wall details close to the core may be lost under this conservative geometric rule, so this is not a claim of perfect actor reconstruction.
+
 ## Evidence and measured limits
 
 Twenty-five extracted source-frame contour-mask / stored-vector reconstruction comparisons were run across two films, including launch, mid-run, morphs, immediately before and after 60, and late sections. IoU range: **0.872–0.982**, average about **0.952**. This statistic compares the extracted **wall masks to the vectorized masks**, not full rendered game video to the original and not per-pixel original-game fidelity.
