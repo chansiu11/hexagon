@@ -98,3 +98,19 @@ test('real geometry can be passed through an open sector and touched at a blocke
   assert.ok(next.seekReplay(60.01));
  }
 });
+
+test('real-stage intro is not killed by falsely detected background wedges',async()=>{
+ for(const id of ['1595','1596']){
+  const film=await source(id);
+  const game=new Engine.ArenaGame(3);
+  game.attachReplay(film); // non-spectator collision checks are enabled.
+  assert.equal(game.spectating,false);
+  for(let i=0;i<170;i++){
+   game.update(1/240,0);
+   assert.equal(game.dead,false,'false opening collision from source '+id+' at '+game.time);
+  }
+  const first=film.frames.findIndex(f=>f.walls.length>0);
+  assert.ok(first>=1&&first/film.fps*film.gameRate<1,
+   'first confirmed wall is not present within one game second: '+id);
+ }
+});
