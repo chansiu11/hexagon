@@ -231,7 +231,7 @@
    this.last=null;this.maxObservedGap=0;this._emptyDuration=0;this.maxSpawnGap=0;
    this._pendingPlayerDelta=0;
    this.nextRunId=1;this.activeRunId=1;
-   this._seenOuterActors=new Set();this._lastOuterArrival=0;
+   this._seenOuterActors=new Set();this._lastOuterArrival=.55;
    this.outerArrivalEvents=0;this.maxSpawnGap=0;
   }
   choose(now,playerAngle){
@@ -360,6 +360,7 @@
    const delta=seconds-this.lastTime;
    this._emptyDuration=walls.length?0:this._emptyDuration+Math.max(0,delta);
    this.maxObservedGap=Math.max(this._emptyDuration,this.maxObservedGap);
+   // The first 0.55s is the filmed, wall-free launch/zoom animation.
    // Proxy only: first *visible* outer-ring appearances of independently
    // segmented contours, NOT the original game's offscreen spawn commands.
    // Keep this separate from any old wall/empty-frame occupancy metric.
