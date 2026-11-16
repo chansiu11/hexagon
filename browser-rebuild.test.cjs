@@ -32,6 +32,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
  await page.getByRole('button',{name:'다음'}).click();
  await page.waitForFunction(()=>selected===1,null,{timeout:6000});
  await page.getByRole('button',{name:'게임 시작'}).click();
+ await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('새 벽 패턴 준비 중'),null,{timeout:6000});
  assert.equal(await page.evaluate(()=>screen),'select','Unimplemented map must not start');
  for(let i=0;i<5;i++){await page.getByRole('button',{name:'다음'}).click();await page.waitForFunction(expected=>selected===expected,(i+2)%6,{timeout:6000});}
  assert.equal(await page.evaluate(()=>selected),0,'Navigation must wrap after sixth map');
