@@ -188,7 +188,9 @@
         if(index===this.replayFrame)return;
         this.replayFrame=index;
         const frame=this.replay.frames[index];
-        this.walls=frame.walls;
+        // Startup footage briefly contains the shrinking CENTRAL CORE, not
+        // incoming wall actors. Never treat that outline as a collision wall.
+        this.walls=this.time<.55?[]:frame.walls;
         this.sides=frame.sides;
         this.rotation=frame.angle;
         this.zoom=frame.zoom;
