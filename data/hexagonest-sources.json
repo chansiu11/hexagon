@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "stage": "HEXAGONEST",
+  "method": "first-pass 30fps original-video pixel-color contour transcription; not original engine parameters",
+  "sourceVideos": [
+    "1595(2).mp4",
+    "1596(2).mp4"
+  ],
+  "recordings": {
+    "1595": {
+      "sourceFile": "1595(2).mp4",
+      "path": "data/hexagonest-1595.b64",
+      "videoStart": 277,
+      "videoEnd": 371.3666666666667,
+      "gameRate": 1.0416666666666667,
+      "sampleFps": 30,
+      "gameStartOffset": 0.1
+    },
+    "1596": {
+      "sourceFile": "1596(2).mp4",
+      "path": "data/hexagonest-1596.b64",
+      "videoStart": 227.5166666667,
+      "videoEnd": 296.1166666667,
+      "gameRate": 1.0416666666666667,
+      "sampleFps": 30,
+      "gameStartOffset": 0
+    }
+  }
+}
