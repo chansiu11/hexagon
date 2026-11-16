@@ -14,8 +14,9 @@ test('only HEXAGON and HEXAGONER are available; former 7th map stays removed',()
  for(let i=2;i<6;i++)assert.equal(HexEngine.hasMap(i),false);
  assert.equal(HexEngine.hasMap(6),false);
  const stage=HexEngine.getMap(1);
- assert.equal(stage.sourceStatus,'source-contour-replay-task2-1-no-random');
+ assert.equal(stage.sourceStatus,'video-contour-37-dodge-phrases-task2-2');
  assert.equal(stage.walls.length,0,'no legacy HEXAGONER procedural walls');
+ assert.equal(stage.playerSpeed,8.2,'HEXAGONER movement is independent of HEXAGON');
  assert.deepEqual(Object.keys(stage.replays),['1595','1596']);
 });
 for(const [id,expectation] of Object.entries(film)){
