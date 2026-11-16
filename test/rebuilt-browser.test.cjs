@@ -13,7 +13,7 @@ const fs=require('node:fs');
    settings:{sound:false,motion:true,controlMode:1,hyperUnlocked:true}
   }));
  });
- await page.goto('http://127.0.0.1:4173/?level=7');
+ await page.goto('http://127.0.0.1:4173/?level=7&trace=1595&spectate=1');
  await page.waitForFunction(()=>window.HexMenu?.screen==='title');
  fs.mkdirSync('test-artifacts',{recursive:true});
  await page.screenshot({path:'test-artifacts/title.png'});
@@ -41,7 +41,7 @@ const fs=require('node:fs');
   const g=HexPlay.game;
   g.map={sourceStatus:'test-only',shapes:[{at:0,sides:6}],
    walls:[{id:'browser-qa',spawnAt:0,radius:150,speed:120,thickness:32,sides:6,blocked:[0]}]};
-  g.replay=null;g.replayFrame=-1;g.timelineEnded=false;g.dead=false;
+  g.replay=null;g.replayFrame=-1;g.timelineEnded=false;g.dead=false;g.spectating=false;
   g._wallCursor=0;g._actors=[];g.time=0;g.angle=Math.PI/6;
   g.sampleWalls();
  });
