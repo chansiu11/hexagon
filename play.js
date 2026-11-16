@@ -170,6 +170,12 @@ async function start(index,controlMode=1,enabled=true){
  clearInput();music.stop();
  game=new HexEngine.ArenaGame(index);mode=controlMode;sound=enabled;
  game.attachReplay(playback,{spectating:args.get('spectate')==='1'});
+ // Original source footage starts with the ship above-right of the core.
+ // The stored wall coordinates are camera-corrected, so cancel the first
+ // recorded camera phase to place the arrow in that same screen sector.
+ const initialSource=playback.kind==='parts'?playback.source:playback.id;
+ const sourceScreenAngle=initialSource==='1595'?-1.15:-1.18;
+ game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
  game.setControlMode(mode);game.sampleWalls();
  music.setEnabled(sound);deathPlayed=false;deathShownAt=0;
  if(sound)music.unlock().then(()=>{
