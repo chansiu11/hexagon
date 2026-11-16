@@ -111,14 +111,22 @@
  function interpolatePath(a,b,t){
   if(t<=1e-7||a===b)return a;
   if(a.length!==b.length||a.length>60)return t<.5?a:b;
-  let best=Infinity,index=0;
-  for(let shift=0;shift<a.length;shift++){
-   let sum=0;
-   for(let k=0;k<a.length;k++){
-    const [x,y]=a[k],p=b[(k+shift)%b.length];
-    sum+=(x-p[0])**2+(y-p[1])**2;
+  // The two sampled source arrays repeat at 240Hz; cache winding alignment.
+  const cache=interpolatePath._shifts||(interpolatePath._shifts=new WeakMap());
+  let matches=cache.get(a);
+  if(!matches){matches=new WeakMap();cache.set(a,matches);}
+  let index=matches.get(b);
+  if(index===undefined){
+   let best=Infinity;index=0;
+   for(let shift=0;shift<a.length;shift++){
+    let sum=0;
+    for(let k=0;k<a.length;k++){
+     const [x,y]=a[k],p=b[(k+shift)%b.length];
+     sum+=(x-p[0])**2+(y-p[1])**2;
+    }
+    if(sum<best){best=sum;index=shift;}
    }
-   if(sum<best){best=sum;index=shift;}
+   matches.set(b,index);
   }
   return a.map(([x,y],k)=>{
    const q=b[(k+index)%b.length];return [x+(q[0]-x)*t,y+(q[1]-y)*t];
@@ -161,8 +169,17 @@
    // Broken contour identity is not proof that a travelling wall vanished:
    // preserve its last observed geometry and estimated velocity briefly.
    // Do not invent a new wall or retain a finished one forever.
-   if(seconds>.42)continue;
-   const [vx,vy]=initial.estimatedVelocity||[0,0];
+   if(seconds>1.5)continue;
+   const [rawX,rawY]=initial.estimatedVelocity||[0,0];
+   const center=initial.points.reduce((p,q)=>[p[0]+q[0]/initial.points.length,p[1]+q[1]/initial.points.length],[0,0]);
+   const length=Math.hypot(...center)||1;
+   // Wall movement is primarily towards the core. Filter obviously wrong
+   // cross-actor tracking jumps before carrying an unmatched contour.
+   const projected=(rawX*center[0]+rawY*center[1])/length;
+   const radial=projected<-30?clamp(projected,-380,-45):-180;
+   const tangential=clamp((rawX*(-center[1])+rawY*center[0])/length,-100,100);
+   const vx=radial*center[0]/length-tangential*center[1]/length;
+   const vy=radial*center[1]/length+tangential*center[0]/length;
    const translate=ring=>ring.map(([x,y])=>[x+vx*seconds,y+vy*seconds]);
    retained.push({...initial,points:translate(initial.points),
     holes:(initial.holes||[]).map(translate)});
@@ -213,6 +230,7 @@
    this.replayFrame=-1;this.colors=null;this.carry=[];this.lastTime=0;
    this.last=null;this.maxObservedGap=0;this._emptyDuration=0;this.maxSpawnGap=0;
    this._pendingPlayerDelta=0;
+   this.nextRunId=1;this.activeRunId=1;
   }
   choose(now,playerAngle){
    const previous=this.current;
@@ -221,7 +239,8 @@
    for(const part of pool){
     if(part.from===0||part.sideIn!==previous.sideOut)continue;
     let bestShift=null;
-    for(let k=0;k<part.sideIn;k++){
+    const contiguous=part.source===previous.source&&part.from===previous.to;
+    for(let k=0;k<(contiguous?1:part.sideIn);k++){
      const shiftBins=Math.round(k*SLOTS/part.sideIn);
      if(entryReachable(previous,part,playerAngle,this.speed,shiftBins)){
       const mismatch=signatureDistance(previous.exitSignature,part.entrySignature,shiftBins);
@@ -260,8 +279,13 @@
     this.ended=true;return;
    }
    const reference=outgoing.last.angle+this.cameraOffset;
-   const carry={part:outgoing,start:deadline,offset:this.cameraOffset,epoch:this.transitions+1};
-   this.carry.push(carry);
+   const contiguous=outgoing.source===selected.part.source&&outgoing.to===selected.part.from;
+   // A natural adjacent source interval already continues the same actor; do
+   // not render it twice or give it a new identity at a source-phrase cut.
+   if(!contiguous){
+    this.carry.push({part:outgoing,start:deadline,offset:this.cameraOffset,runId:this.activeRunId});
+    this.activeRunId=++this.nextRunId;
+   }
    this.carry=this.carry.filter(c=>deadline-c.start<1.5);
    this.start=deadline;this.current=selected.part;
    const shift=(selected.sectorShift||0)*TAU/selected.part.sideIn;
@@ -284,7 +308,7 @@
    this.source=this.current.source;this.sourceFrame=position.index;
    this.replayFrame=position.index;this.activePart=this.current.id;
    const camera=frame.angle+this.cameraOffset;
-   const walls=frame.walls.map(w=>({...w,id:this.current.id+':'+w.id}));
+   const walls=frame.walls.map(w=>({...w,id:this.activeRunId+':'+w.id}));
    const still=[];
    for(const c of this.carry){
     const elapsed=seconds-c.start;
@@ -296,7 +320,7 @@
      const points=rotatePolygon(w.points,phase,scale);
      // Once a filmed actor has fully crossed the central core, retire it.
      if(Math.max(...points.map(([x,y])=>Math.hypot(x,y)))<38)continue;
-     walls.push({...w,id:c.part.id+':'+w.id,points,
+     walls.push({...w,id:c.runId+':'+w.id,points,
       holes:(w.holes||[]).map(ring=>rotatePolygon(ring,phase,scale))});
     }
     if(tail.frame.walls.length)still.push(c);
