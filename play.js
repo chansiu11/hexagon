@@ -168,7 +168,7 @@ function replayPalette(g){
  const i=Math.max(0,Math.min(pal.colors.length-1,
    Math.floor(sampleIndex/original.fps*pal.fps)));
  const sampled=parts&&g.replay.colors?g.replay.colors:pal.colors[i];
- const color=sampled.slice(0,9);
+ const color=sampled.flat().slice(0,9);
  // Dark pixels from the source-video intro/occlusion were occasionally
  // mislabeled as wall-color pixels. They must never turn the visible ship
  // and central outline black. Opening fallback colors are measured directly
@@ -176,7 +176,8 @@ function replayPalette(g){
  if(Math.max(...color.slice(6,9))<90){
   let replacement=null;
   if(original===g.replay&&g.time<1.2 || parts&&g.time<1.2){
-   replacement=g.level===1?(source==='1595'?[140,172,60]:[228,36,116]):
+   replacement=g.level===3?(source==='1595'?[42,151,238]:[76,111,221]):
+     g.level===1?(source==='1595'?[140,172,60]:[228,36,116]):
     (source==='1595'?[206,54,35]:[200,121,26]);
   }else{
    const n=Math.max(0,Math.min(pal.colors.length-1,i));
@@ -242,15 +243,15 @@ async function start(index,controlMode=1,enabled=true){
     firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
     playerSpeed:map.playerSpeed});
   }
- }else if(index===2){
-  // HEXAGONEST task 3-1: source order ONLY. 3-2 will provide connected
+ }else if(index===2||index===3){
+  // HEXAGONEST task 3-1 / HYPER HEXAGON task 4-1: source order ONLY. 3-2 will provide connected
   // random dodge phrases after both complete source runs are measured.
   // Never fall through to the unrelated HEXAGON stage-zero part sampler.
   const id=raw?requested:'1595';
   const option=map.replays?.[id];
-  if(!option)throw new Error('HEXAGONEST source video missing: '+id);
+  if(!option)throw new Error('Filmed stage '+index+' source video missing: '+id);
   const [film,palette]=await Promise.all([
-   HexReplay.load(id,option),HexReplay.loadPalette(id,2)]);
+   HexReplay.load(id,option),HexReplay.loadPalette(id,index)]);
   film.palette=palette;playback=film;
  }else if(raw){
   const option=map.replays?.[requested];
@@ -286,7 +287,7 @@ async function start(index,controlMode=1,enabled=true){
  // HEXAGONEST filmed ship bearing is not yet measured. Keep the engine's
  // normal initial angle until video measurement, rather than borrowing the
  // ship bearing measured in the HEXAGON / HEXAGONER recordings.
- if(index!==2){
+ if(index!==2&&index!==3){
   const sourceScreenAngle=index===1?(initialSource==='1595'?-Math.PI/2:.26):
    (initialSource==='1595'?-1.15:-1.18);
   game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
