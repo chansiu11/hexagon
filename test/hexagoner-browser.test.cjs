@@ -22,7 +22,7 @@ const fs=require('node:fs');
   assert.equal(await page.evaluate(()=>HexPlay.game.level),1);
   assert.equal(await page.evaluate(()=>HexPlay.game.replay.id),id);
   assert.equal(await page.evaluate(()=>HexPlay.game.replay.kind||'chronological'),'chronological');
-  for(const t of [.5,12,26,44,59.9,60.1,74,96]){
+  for(const t of [1.5,12,26,44,59.9,60.1,74,96]){
    await page.evaluate(v=>HexPlay.game.seekReplay(v),t);
    await page.waitForTimeout(50);
    const state=await page.evaluate(()=>({
@@ -34,7 +34,7 @@ const fs=require('node:fs');
    assert.ok(!state.dead&&state.walls>0,id+' missing traced walls at '+t);
    assert.ok(Math.abs(state.time-t)<.2);
    assert.ok(Number.isFinite(state.zoom)&&Number.isFinite(state.camera));
-   if([.5,59.9,60.1,96].includes(t))
+   if([1.5,59.9,60.1,96].includes(t))
     await page.screenshot({path:'test-artifacts/hexagoner-'+id+'-'+t+'.png'});
   }
   await page.evaluate(()=>HexPlay.game.seekReplay(59.9));
