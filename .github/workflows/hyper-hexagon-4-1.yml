@@ -47,6 +47,8 @@ jobs:
           node test/hexagoner-browser.test.cjs
           node test/hexagon-parts-browser.test.cjs
           node test/hexagoner-parts-browser.test.cjs
+      - name: Regression browser play for map 3 HEXAGONEST
+        run: node test/hyper-hexagon-4-1-prior-stage3-browser.test.cjs
       - name: Store chronological playback screenshots
         if: always()
         uses: actions/upload-artifact@v4
