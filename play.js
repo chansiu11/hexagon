@@ -290,6 +290,13 @@ async function start(index,controlMode=1,enabled=true){
     seed,firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
     playerSpeed:map.playerSpeed});
   }
+ }else if(index===4){
+  // Step 5-1: chronological source only. This adapter deliberately refuses
+  // to substitute old fifth-stage patterns when video trace data is missing.
+  const id=raw?requested:'1595';
+  const option=map.replays?.[id];
+  if(!option)throw new Error('Missing HYPER HEXAGONER original source '+id);
+  playback=await HyperHexagonerFilm.load(id,option);
  }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
