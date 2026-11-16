@@ -1,0 +1,20 @@
+name: Task 5-1 source replay checks
+on:
+  push:
+    branches: [task5-1-hyper-hexagoner-rebuild-20261116]
+  workflow_dispatch:
+jobs:
+  validate-video-order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Parse and execute both complete source timelines
+        run: |
+          node --check task5/rebuilt-engine.js
+          node --check task5/rebuilt-play.js
+          node --check task5/hyper-hexagoner-order.js
+          node --check task5/preview.js
+          node --test task5/replay.test.cjs
