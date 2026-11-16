@@ -7,20 +7,20 @@
     {
       "id": "1595",
       "sourceFile": "1595(3).mp4",
-      "videoStart": 382.94,
+      "videoStart": 382.99,
       "videoEnd": 472.59,
-      "gameEnd": 93.3854167,
-      "frameCount": 1794,
+      "gameEnd": 93.3333333,
+      "frameCount": 1793,
       "geometry": "data/hyper-hexagon-1595.b64",
       "palette": "data/hyper-hexagon-1595-palette.json"
     },
     {
       "id": "1596",
       "sourceFile": "1596(3).mp4",
-      "videoStart": 303.52,
+      "videoStart": 303.32,
       "videoEnd": 398.57,
-      "gameEnd": 99.0104167,
-      "frameCount": 1902,
+      "gameEnd": 99.21875,
+      "frameCount": 1906,
       "geometry": "data/hyper-hexagon-1596.b64",
       "palette": "data/hyper-hexagon-1596-palette.json"
     }
