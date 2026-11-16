@@ -1,50 +1,49 @@
-name: Hexagon wall and input regressions
+name: Rebuilt HEXAGON 1-1 validation
 on:
   push:
-    branches: [main]
+    branches: [main, rebuild-step-*]
   pull_request:
   workflow_dispatch:
-
 jobs:
-  validate:
+  smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate engine and source timelines
+      - name: Syntax checks
         run: |
-          node --check hard-mode.js
-          node hard-mode.test.cjs
-          node hard-variation.test.cjs
-          node hard-video-parts.test.cjs
-          node --check hexagonest-video.js
-          node --check hexagonest-camera.js
-          node --check hexagonest-mode.js
-          node hexagonest-mode.test.cjs
-          node hexagonest-gap-bridges.test.cjs
-          node --check hexagoner-parts.js
-          node hexagoner-parts.test.cjs
-          node --check hexagon-beat.js
-          node --check hexagonest-beat-early.js
-          node --check hexagonest-beat-mono.js
-          node hard-motion.test.cjs
-          node beat-video.test.cjs
-          node camera-source-freeze.test.cjs
-          node audio-feedback.test.cjs
-          node --check play.js
           node --check engine.js
           node --check audio.js
-          node --check wall-lifecycle-patches.js
-          node engine.test.cjs
-          node rigid-walls.test.cjs
-          node stage-one-continuity.test.cjs
-          node waves.test.cjs
-          node wall-continuity.test.cjs
-          node player-speed.test.cjs
-          node observed-waves.test.cjs
-          node seventeen-second.test.cjs
-          node stage-two-lifecycle.test.cjs
-          node wall-morph-stability.test.cjs
-          node teleport-and-clock.test.cjs
+          node --check play.js
+          node --check menu.js
+          node --check stages/hexagon.js
+          node --check test/rebuilt-engine.test.cjs
+          node --check test/rebuilt-browser.test.cjs
+      - name: New engine and map continuity tests
+        run: node --test test/rebuilt-engine.test.cjs
+      - name: Install Chromium browser test tools
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Start static server
+        run: |
+          node server.cjs >/tmp/hexagon-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Verify title/select and new play/death flows in Chromium
+        run: node test/rebuilt-browser.test.cjs
+      - name: Save browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-hexagon-1-1-screenshots
+          path: test-artifacts/
+          if-no-files-found: ignore
