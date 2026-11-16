@@ -117,6 +117,9 @@
       this.replayFrame=-1;
       this.spectating=false;
       this.timelineEnded=false;
+      this.shapeChangedAt=-100;
+      this.shapeFrom=this.sides;
+      this.shapeTo=this.sides;
     }
     setControlMode(mode) {
       if(![1,2,3].includes(mode)) throw new RangeError('Invalid control mode');
@@ -156,14 +159,16 @@
       if(this.dead||this.paused||this.spectating||this.timelineEnded)return false;
       const x=ORBIT*Math.cos(this.angle),y=ORBIT*Math.sin(this.angle);
       for(const actor of this.walls){
+        if(actor.opacity!==undefined&&actor.opacity<.5)continue;
         if(pointInsidePolygon(x,y,actor.points)&&
             !(actor.holes||[]).some(h=>pointInsidePolygon(x,y,h))) {this.kill(actor);return true;}
       }
       return false;
     }
     attachReplay(replay,{spectating=false}={}){
-      if(!replay||!Array.isArray(replay.frames)||!replay.frames.length)
-        throw new TypeError('Source replay needs extracted frames');
+      if(!replay||(!Array.isArray(replay.frames)&&typeof replay.sample!=='function')||
+         (Array.isArray(replay.frames)&&!replay.frames.length))
+        throw new TypeError('Source replay needs extracted frames or a part sampler');
       this.replay=replay;
       this.replayFrame=-1;
       this.spectating=!!spectating;
@@ -175,13 +180,32 @@
       this.sampleWalls();
     }
     seekReplay(seconds){
-      if(!this.replay||!finite(seconds)||seconds<0) return false;
+      if(!this.replay||this.replay.kind==='parts'||!finite(seconds)||seconds<0) return false;
       this.time=Math.min(seconds,(this.replay.frames.length-1)/this.replay.fps*this.replay.gameRate);
       this.dead=false;this.timelineEnded=false;this.death=null;
       this.replayFrame=-1;this.sampleWalls();
       return true;
     }
+    applyShape(sides){
+      if(sides!==this.sides){
+        this.shapeFrom=this.sides;
+        this.shapeTo=sides;
+        this.shapeChangedAt=this.time;
+        this.sides=sides;
+      }
+    }
     sampleWalls(){
+      if(this.replay?.kind==='parts'){
+        const frame=this.replay.sample(this.time,this.angle);
+        if(frame.playerAngleDelta)this.angle=wrap(this.angle+frame.playerAngleDelta);
+        this.replayFrame=frame.replayFrame;
+        this.walls=frame.walls;
+        this.applyShape(frame.sides);
+        this.rotation=frame.angle;
+        this.zoom=frame.zoom;
+        this.tilt=0;
+        return;
+      }
       if(this.replay){
         const index=Math.min(this.replay.frames.length-1,
           Math.max(0,Math.floor((this.time-this.replay.gameStartOffset)*this.replay.fps/this.replay.gameRate+1e-9)));
@@ -191,7 +215,7 @@
         // Startup footage briefly contains the shrinking CENTRAL CORE, not
         // incoming wall actors. Never treat that outline as a collision wall.
         this.walls=this.time<.55?[]:frame.walls;
-        this.sides=frame.sides;
+        this.applyShape(frame.sides);
         this.rotation=frame.angle;
         this.zoom=frame.zoom;
         return;
@@ -221,9 +245,11 @@
       for(let i=0;i<count&&!this.dead;i++){
         this.time+=h;
         if(this.replay){
-          const end=this.replay.gameStartOffset+
-            (this.replay.frames.length-1)/this.replay.fps*this.replay.gameRate;
-          if(this.time>=end){this.time=end;this.timelineEnded=true;}
+          if(this.replay.kind!=='parts'){
+            const end=this.replay.gameStartOffset+
+              (this.replay.frames.length-1)/this.replay.fps*this.replay.gameRate;
+            if(this.time>=end){this.time=end;this.timelineEnded=true;}
+          }
           if(this.controlMode===1)this.angle=wrap(this.angle+Math.max(-1,Math.min(1,turn))*PLAYER_SPEED*h);
           this.sampleWalls();
           if(!this.timelineEnded)this.checkCollision();
