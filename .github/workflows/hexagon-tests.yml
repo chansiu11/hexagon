@@ -18,14 +18,17 @@ jobs:
       - name: Syntax checks
         run: |
           node --check engine.js
+          node --check replay.js
           node --check audio.js
           node --check play.js
           node --check menu.js
           node --check stages/hexagon.js
           node --check test/rebuilt-engine.test.cjs
           node --check test/rebuilt-browser.test.cjs
+          node --check test/video-replay.test.cjs
+          node --check test/video-browser.test.cjs
       - name: New engine and map continuity tests
-        run: node --test test/rebuilt-engine.test.cjs
+        run: node --test test/rebuilt-engine.test.cjs test/video-replay.test.cjs
       - name: Install Chromium browser test tools
         run: |
           npm install --no-save --no-package-lock playwright
@@ -39,7 +42,9 @@ jobs:
           done
           exit 1
       - name: Verify title/select and new play/death flows in Chromium
-        run: node test/rebuilt-browser.test.cjs
+        run: |
+          node test/rebuilt-browser.test.cjs
+          node test/video-browser.test.cjs
       - name: Save browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
