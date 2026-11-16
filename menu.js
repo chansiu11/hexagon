@@ -90,11 +90,16 @@ function unlockHyper(){
  if(!settings.hyperUnlocked){settings.hyperUnlocked=true;save();root.HexPlay?.selectSound()}
  toast('하이퍼 모드 전체 해금');buildControls();
 }
-function setMode(mode){
+async function setMode(mode){
  if(![1,2,3].includes(mode))return;
  settings.controlMode=mode;save();
  if(screen==='play'||screen==='paused'){
-  if(root.HexPlay?.start(selected,mode,settings.sound)){switchScreen('play')}
+  root.HexPlay?.pause();
+  const level=selected;
+  try{
+   const started=await root.HexPlay?.start(level,mode,settings.sound);
+   if(started&&selected===level)switchScreen('play');
+  }catch(error){console.error(error);switchScreen('select');toast('조작 모드 전환 실패');}
  }
  buildControls();setStatus('조작 모드 '+mode);
 }
