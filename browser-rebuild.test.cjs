@@ -30,10 +30,10 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
  await page.keyboard.press('Escape');
  await page.waitForFunction(()=>document.querySelector('#game').dataset.screen==='select',null,{timeout:6000});console.log('Select ready');
  await page.getByRole('button',{name:'다음'}).click();
- assert.equal(await page.evaluate(()=>selected),1);
+ await page.waitForFunction(()=>selected===1,null,{timeout:6000});
  await page.getByRole('button',{name:'게임 시작'}).click();
  assert.equal(await page.evaluate(()=>screen),'select','Unimplemented map must not start');
- for(let i=0;i<5;i++)await page.getByRole('button',{name:'다음'}).click();
+ for(let i=0;i<5;i++){await page.getByRole('button',{name:'다음'}).click();await page.waitForFunction(expected=>selected===expected,(i+2)%6,{timeout:6000});}
  assert.equal(await page.evaluate(()=>selected),0,'Navigation must wrap after sixth map');
  assert.equal(errors.length,0,errors.join('\n'));
  await browser.close();console.log('PASS: menu, launch, input, collision, death, retry, pause, return, six-map wrapping');
