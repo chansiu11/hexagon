@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Sample RGB colors directly from HEXAGONEST 1595/1596 film, every 30fps frame."""
+"""Sample RGB colors directly from HEXAGONEST 1595/1596 film, every 60fps frame."""
 import json,subprocess,sys
 from pathlib import Path
 import cv2
 import numpy as np
-sys.path.insert(0,'/mnt/data')
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 from extract_hexagonest import SOURCES
 FPS=60
 
