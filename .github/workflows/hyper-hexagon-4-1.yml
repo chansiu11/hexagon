@@ -24,7 +24,9 @@ jobs:
           node --check test/hyper-hexagon-4-1.test.cjs
           node --check test/hyper-hexagon-4-1-browser.test.cjs
           node --test test/hyper-hexagon-4-1.test.cjs
-          node --test test/rebuilt-engine.test.cjs test/hexagonest-opening.test.cjs
+          node --test test/rebuilt-engine.test.cjs test/hexagonest-opening.test.cjs \
+            test/hexagon-parts.test.cjs test/hexagoner-parts.test.cjs \
+            test/hexagonest-real-films.test.cjs
       - name: Install Chromium
         run: |
           npm install --no-save --no-package-lock playwright
@@ -39,6 +41,12 @@ jobs:
           exit 1
       - name: Play HYPER HEXAGON source 1595 and 1596 in Chromium
         run: node test/hyper-hexagon-4-1-browser.test.cjs
+      - name: Regression browser play for maps 1 and 2
+        run: |
+          node test/video-browser.test.cjs
+          node test/hexagoner-browser.test.cjs
+          node test/hexagon-parts-browser.test.cjs
+          node test/hexagoner-parts-browser.test.cjs
       - name: Store chronological playback screenshots
         if: always()
         uses: actions/upload-artifact@v4
