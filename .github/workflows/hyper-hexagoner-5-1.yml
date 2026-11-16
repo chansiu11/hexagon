@@ -1,0 +1,20 @@
+name: HYPER HEXAGONER 5-1 source-adapter checks
+on:
+  push:
+    branches:
+      - rebuild-step-5-1-hyper-hexagoner-20261116
+  workflow_dispatch:
+jobs:
+  source-adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Stage 5 video-adapter shape and 60s continuity (synthetic fixtures only)
+        run: node --test test/hyper-hexagoner-5-1.test.cjs
+      - name: Shared engine and completed 1-4 maps regression
+        run: |
+          node --test test/hyper-hexagon-4-1.test.cjs test/hyper-hexagon-4-2.test.cjs test/hexagoner-parts.test.cjs
