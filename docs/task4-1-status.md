@@ -11,8 +11,8 @@
 ## Source segments
 | source | recorded screen size | stage4 start / end (video clock) | approximate game clock | sampled snapshots |
 | --- | --- | --- | --- | --- |
-| `1595(3).mp4` | 1920×1080, 60fps | 382.94–472.59s | 0–93.385s | 1,794 at 20fps |
-| `1596(3).mp4` | 1152×720, 60fps | 303.52–398.57s | 0–99.010s | 1,902 at 20fps |
+| `1595(3).mp4` | 1920×1080, 60fps | 382.99–472.59s | 0–93.333s | 1,793 at 20fps |
+| `1596(3).mp4` | 1152×720, 60fps | 303.32–398.57s | 0–99.219s | 1,906 at 20fps |
 
 Both source clips include 0–60s and beyond, with a **single continuous frame sequence** across 60s. Approximate HUD-derived game rate 25/24, cannot certify exact source clocks. The MP4s contain additional stages, menus and recording transitions outside the stated ranges, not imported as HYPER HEXAGON walls. Both 20fps traces are drawn from **this upload**, not stage1 HEXAGON walls or legacy HYPER code.
 
@@ -25,7 +25,7 @@ Both source clips include 0–60s and beyond, with a **single continuous frame s
 - Chronological playback: `?trace=1595` or `?trace=1596`, default stage4 source is 1595. **No phrase randomization yet**. Former 7th RANDOM map remains absent; `menu.js` untouched.
 
 ## Executed checks
-- 20fps decoder: 1595 1,794 frames and 1596 1,902 frames. Both have visible wall silhouettes pre/post 60s. Longest consecutive no-foreground samples 1595 2 frames (~0.104 game seconds), 1596 1 frame (~0.052 game seconds), **does not measure wall generation gaps**.
+- 20fps decoder: 1595 1,793 frames and 1596 1,906 frames. Both have visible wall silhouettes pre/post 60s. Longest consecutive no-foreground samples after start alignment, re-check no-wall spans in the latest CI / local source audit, **does not measure wall generation gaps**.
 - Node unit suite on actual source files and Chromium browser with both source replays: source 0–60 / 60+, no reset at 60, open orbit corridor, blocked orbit triggers death, retry and menu navigation, screenshots. 4-1 Actions run 43870667175 on SHA 488fdf478665e50395e3864003f7b1d1b04b7280 concluded **success**: https://github.com/chansiu11/hexagon/actions/runs/43870667175.
 - Source and browser regressions for map1–3 added later in same branch; check the latest run's final verdict separately.
 - Existing repo-wide workflow test/rebuilt-browser.test.cjs fails even on base Task3: it incorrectly expects HEXAGONEST to be unavailable, although Task3 registered that map. The old test's failure is **not** itself proof of a stage4 gameplay regression.
