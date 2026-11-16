@@ -113,7 +113,7 @@ test('both HEXAGONER source openings remain alive with real collision enabled (n
   g.attachReplay(Parts.create(films,{seed:20261116,firstSource:source}));
   const screenAngle=source==='1595'?-Math.PI/2:.26;
   g.angle=((screenAngle-g.rotation)%TAU+TAU)%TAU;
-  g.update(1.1);
+  g.update(1.5);
   assert.equal(g.dead,false,source+' caused an unintended opening death');
   assert.ok(g.walls.length>0,source+' missing its first arriving walls');
  }
