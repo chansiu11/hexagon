@@ -249,7 +249,9 @@ async function start(index,controlMode=1,enabled=true){
   const id=raw?requested:'1595';
   const option=map.replays?.[id];
   if(!option)throw new Error('HEXAGONEST source video missing: '+id);
-  playback=await HexReplay.load(id,option);
+  const [film,palette]=await Promise.all([
+   HexReplay.load(id,option),HexReplay.loadPalette(id,2)]);
+  film.palette=palette;playback=film;
  }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
