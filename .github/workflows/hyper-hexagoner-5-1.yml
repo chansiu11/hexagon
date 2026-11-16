@@ -18,7 +18,7 @@ jobs:
       - name: Install video analysis test dependencies
         run: python -m pip install --disable-pip-version-check opencv-python-headless numpy
       - name: Test video decoding, contours and stable actor IDs (synthetic only)
-        run: python -m unittest discover -s test -p 'test-hyper-hexagoner-transcribe.py' -v
+        run: python test/test-hyper-hexagoner-transcribe.py -v
       - name: Shared engine and completed 1-4 maps regression
         run: |
           node --test test/hyper-hexagon-4-1.test.cjs test/hyper-hexagon-4-2.test.cjs test/hexagoner-parts.test.cjs
