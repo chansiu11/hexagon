@@ -84,7 +84,7 @@
   if(fps<1||fps>60||count<1||count>30000||w!==480||h!==300)
    throw new Error('Invalid HEXAGON replay metadata');
   const measuredStage3=typeof info.path==='string'&&
-    /^data\/hexagonest-(1595|1596)\.b64$/.test(info.path);
+    /^data\/(?:hexagonest|hyper-hexagon)-(1595|1596)\.b64$/.test(info.path);
   const frames=[];
   for(let f=0;f<count;f++){
    const angle=i32()/10000,sides=u8(),zoom=u16()/1000,n=u8();
@@ -167,15 +167,16 @@
  }
  async function loadPalette(id,stage=0){
   if(!['1595','1596'].includes(String(id)))throw new Error('Unknown palette source');
-  const isHexagoner=stage===1,isHexagonest=stage===2;
-  const path=isHexagonest?'data/hexagonest-'+String(id)+'-palette.json':
+  const isHexagoner=stage===1,isHexagonest=stage===2,isHyperHexagon=stage===3;
+  const path=isHyperHexagon?'data/hyper-hexagon-'+String(id)+'-palette.json':
+   isHexagonest?'data/hexagonest-'+String(id)+'-palette.json':
    isHexagoner?'data/hexagoner-'+String(id)+'-palette.json':'data/hexagon-palettes.json';
   if(!paletteCache.has(path)){
    const request=fetch(path).then(r=>{if(!r.ok)throw new Error('Palette '+r.status);return r.json();});
    paletteCache.set(path,request);request.catch(()=>paletteCache.delete(path));
   }
   const data=await paletteCache.get(path);
-  const entry=(isHexagoner||isHexagonest)?data:data[String(id)];
+  const entry=(isHexagoner||isHexagonest||isHyperHexagon)?data:data[String(id)];
   if(!entry||!Array.isArray(entry.colors)||entry.colors.length<100)
     throw new Error('Incomplete palette transcript');
   return entry;
