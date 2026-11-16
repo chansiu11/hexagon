@@ -229,7 +229,10 @@ async function start(index,controlMode=1,enabled=true){
  // The stored wall coordinates are camera-corrected, so cancel the first
  // recorded camera phase to place the arrow in that same screen sector.
  const initialSource=playback.kind==='parts'?playback.source:playback.id;
- const sourceScreenAngle=initialSource==='1595'?-1.15:-1.18;
+ // The HEXAGONER film opens at different ship bearings from stage-1 HEXAGON.
+ // Measured in the *screen* plane at the source gameplay start frame.
+ const sourceScreenAngle=index===1?(initialSource==='1595'?-Math.PI/2:.26):
+  (initialSource==='1595'?-1.15:-1.18);
  game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
  game.setControlMode(mode);game.sampleWalls();
  music.setEnabled(sound);deathPlayed=false;deathShownAt=0;announcedRank=0;
