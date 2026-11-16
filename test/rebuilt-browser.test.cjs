@@ -24,11 +24,15 @@ const fs=require('node:fs');
  assert.equal(await page.evaluate(()=>HexMenu.screen),'select');
  for(let i=1;i<=6;i++)await page.keyboard.press('ArrowRight');
  assert.equal(await page.evaluate(()=>HexMenu.selected),0,'six maps wrap to zero');
- await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
+ // Stage 3 HEXAGONEST now has a verified replay; verify an *actually*
+ // unavailable stage (index 4), while preserving six-map navigation.
+ for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');
+ assert.equal(await page.evaluate(()=>HexMenu.selected),4);
  await page.keyboard.press('Space');
  assert.equal(await page.evaluate(()=>HexMenu.screen),'select','missing map cannot play wrong map');
  assert.match(await page.locator('#status').textContent(),/PATTERN NOT READY/);
- await page.keyboard.press('ArrowLeft');await page.keyboard.press('ArrowLeft');await page.keyboard.press('Space');
+ for(let i=0;i<4;i++)await page.keyboard.press('ArrowLeft');
+ await page.keyboard.press('Space');
  await page.waitForFunction(()=>HexMenu.screen==='play');
  assert.equal(await page.evaluate(()=>HexPlay.game.level),0);
  assert.equal(await page.evaluate(()=>HexPlay.game.dead),false);
