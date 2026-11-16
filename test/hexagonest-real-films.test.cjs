@@ -36,6 +36,11 @@ test('both complete, distinct 60s+ films actually decode and audit',async()=>{
   assert.ok(info.endSecond>60);
   assert.ok(info.birthsBefore60>0);
   assert.ok(info.birthsAfter60>0);
+  // The same descending wall must still be tracked on both sides of 60s;
+  // earlier white-HUD misclassification broke this identity for film 1595.
+  assert.ok(info.actorsContinuousAt60.length>0,
+    'HEXAGONEST wall identity breaks exactly at 60s in film '+id);
+  assert.equal(film.fps,60,'real video trace must preserve full 60fps cadence');
   assert.ok(Number.isFinite(info.minWallRadius));
   assert.ok(film.frames[Math.round(60/film.gameRate*film.fps)].walls.length>0);
   assert.ok(film.frames.every(f=>Array.isArray(f.walls)));
