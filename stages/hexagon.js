@@ -12,7 +12,7 @@
  * No 0-60 / post-60 segmentation or randomization is performed here.
  */
 HexEngine.registerMap(0,{
- sourceStatus:'recorded-two-video-contours-1-2',
+ sourceStatus:'video-traced-and-randomized-53-connected-parts-1-3',
  shapes:[{at:0,sides:6}],
  walls:[],
  replays:{
