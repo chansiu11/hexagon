@@ -91,4 +91,4 @@ addEventListener('keyup',e=>pressed.delete(e.code));
 addEventListener('blur',()=>{pressed.clear();paused=true;toggle.textContent='재생'});
 cv.addEventListener('pointerdown',e=>{pressed.add(e.clientX<cv.getBoundingClientRect().left+cv.clientWidth/2?'ArrowLeft':'ArrowRight')});
 addEventListener('pointerup',()=>{pressed.delete('ArrowLeft');pressed.delete('ArrowRight')});
-pick(0);requestAnimationFrame(frame);
+pick(new URLSearchParams(location.search).get('source')==='2'?1:0);requestAnimationFrame(frame);
