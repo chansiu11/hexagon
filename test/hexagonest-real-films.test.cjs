@@ -41,6 +41,7 @@ test('both complete, distinct 60s+ films actually decode and audit',async()=>{
   assert.ok(info.actorsContinuousAt60.length>0,
     'HEXAGONEST wall identity breaks exactly at 60s in film '+id);
   assert.equal(film.fps,60,'real video trace must preserve full 60fps cadence');
+  assert.ok(film.trackStats.actorTracks>100,'new source wall IDs must not remain per-frame trace labels');
   assert.ok(Number.isFinite(info.minWallRadius));
   assert.ok(film.frames[Math.round(60/film.gameRate*film.fps)].walls.length>0);
   assert.ok(film.frames.every(f=>Array.isArray(f.walls)));
@@ -79,5 +80,51 @@ test('reference frames never fully seal the player orbit',async()=>{
    checked++;
   }
   assert.ok(checked>100);
+ }
+});
+
+test('real HEXAGONEST source allows safe passage, kills on wall touch, and restarts',async()=>{
+ const {films}=await sources();
+ const TAU=Math.PI*2;
+ for(const id of Source.IDS){
+  const recorded=films[id];
+  const game=new Engine.ArenaGame(2);
+  game.attachReplay(recorded);
+  game.update(.5,0);
+  assert.equal(game.dead,false,'source intro caused immediate death: '+id);
+  let chosen=null;
+  for(let i=180;i<recorded.frames.length-5&&!chosen;i+=25){
+   const frame=recorded.frames[i];
+   let safe=null,blocked=null;
+   for(let k=0;k<96;k++){
+    const angle=(k+.5)*TAU/96;
+    const x=Engine.ORBIT*Math.cos(angle),y=Engine.ORBIT*Math.sin(angle);
+    const wall=frame.walls.find(w=>Engine.pointInsidePolygon(x,y,w.points)&&
+      !(w.holes||[]).some(h=>Engine.pointInsidePolygon(x,y,h)));
+    if(wall&&!blocked)blocked={angle,id:wall.id};
+    if(!wall&&safe===null)safe=angle;
+   }
+   if(blocked&&safe!==null)
+    chosen={at:recorded.gameStartOffset+i/recorded.fps*recorded.gameRate,safe,blocked};
+  }
+  assert.ok(chosen,'no measured open/blocked sectors in source '+id);
+  assert.ok(game.seekReplay(chosen.at));
+  game.angle=chosen.safe;
+  assert.equal(game.checkCollision(),false,'recorded opening killed ship: '+id);
+  game.angle=chosen.blocked.angle;
+  assert.equal(game.checkCollision(),true,'recorded wall did not collide: '+id);
+  assert.equal(game.dead,true);
+  assert.equal(game.death.wallId,chosen.blocked.id);
+  const restart=game.reset();
+  restart.attachReplay(recorded);
+  assert.equal(restart.time,0);
+  assert.equal(restart.dead,false);
+  restart.update(.5,0);
+  assert.equal(restart.dead,false,'restart causes instant death: '+id);
+  assert.ok(restart.seekReplay(59.97));
+  const before=new Set(restart.walls.map(w=>w.id));
+  assert.ok(restart.seekReplay(60.03));
+  assert.ok(restart.walls.some(w=>before.has(w.id)),
+    'wall deleted/recreated when replay reaches 60s: '+id);
  }
 });
