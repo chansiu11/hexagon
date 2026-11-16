@@ -242,6 +242,14 @@ async function start(index,controlMode=1,enabled=true){
     firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
     playerSpeed:map.playerSpeed});
   }
+ }else if(index===2){
+  // HEXAGONEST task 3-1: source order ONLY. 3-2 will provide connected
+  // random dodge phrases after both complete source runs are measured.
+  // Never fall through to the unrelated HEXAGON stage-zero part sampler.
+  const id=raw?requested:'1595';
+  const option=map.replays?.[id];
+  if(!option)throw new Error('HEXAGONEST source video missing: '+id);
+  playback=await HexReplay.load(id,option);
  }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
@@ -273,9 +281,14 @@ async function start(index,controlMode=1,enabled=true){
  const initialSource=playback.kind==='parts'?playback.source:playback.id;
  // The HEXAGONER film opens at different ship bearings from stage-1 HEXAGON.
  // Measured in the *screen* plane at the source gameplay start frame.
- const sourceScreenAngle=index===1?(initialSource==='1595'?-Math.PI/2:.26):
-  (initialSource==='1595'?-1.15:-1.18);
- game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
+ // HEXAGONEST filmed ship bearing is not yet measured. Keep the engine's
+ // normal initial angle until video measurement, rather than borrowing the
+ // ship bearing measured in the HEXAGON / HEXAGONER recordings.
+ if(index!==2){
+  const sourceScreenAngle=index===1?(initialSource==='1595'?-Math.PI/2:.26):
+   (initialSource==='1595'?-1.15:-1.18);
+  game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
+ }
  game.setControlMode(mode);game.sampleWalls();
  music.setEnabled(sound);deathPlayed=false;deathShownAt=0;announcedRank=0;
  if(sound)music.unlock().then(()=>{
