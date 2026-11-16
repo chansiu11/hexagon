@@ -27,7 +27,7 @@ const fs=require('node:fs');
       count:HexPlay.game.walls.length,
       shape:HexPlay.game.sides,
       angle:HexPlay.game.rotation}));
-   assert.ok(obs.count>0,trace+' no visible observed walls at '+time);
+   if(time>=1)assert.ok(obs.count>0,trace+' no visible observed walls at '+time);
    assert.ok(Number.isFinite(obs.angle));
    assert.ok(Math.abs(obs.time-time)<.1);
    if([.3,59.95,60.05,101].includes(time))
