@@ -51,10 +51,27 @@
     return out;
    }
    const walls=[];
+   function sourcePlayerFragment(points){
+    // Source frames also contain the filmed player's small bright triangle
+    // and tiny center-core fragments. Neither is a descending wall.
+    // Recover the original 480x300 source-pixel radius and polygon area
+    // from the inverse-camera coordinates; rotation preserves both.
+    if(points.length>10)return false;
+    const radius=Math.max(...points.map(([x,y])=>Math.hypot(x,y)))*zoom/2;
+    if(radius>52)return false;
+    let area=0;
+    for(let k=0;k<points.length;k++){
+     const a=points[k],b=points[(k+1)%points.length];
+     area+=a[0]*b[1]-a[1]*b[0];
+    }
+    const sourceArea=Math.abs(area)*zoom*zoom/8;
+    return sourceArea<=65;
+   }
    for(let i=0;i<n;i++){
     const points=verts(),holes=[];
     const holeCount=u8();
     for(let j=0;j<holeCount;j++)holes.push(verts());
+    if(sourcePlayerFragment(points))continue;
     walls.push({id:'trace-'+f+'-'+i,sourceFrame:f,points,holes});
    }
    frames.push({angle,sides,zoom,walls});
