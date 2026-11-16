@@ -7,10 +7,10 @@ HexEngine.registerMap(3,{
   walls:[],
   shapes:[{at:0,sides:6}],
   replays:{
-    '1595':{path:'data/hyper-hexagon-1595.b64',videoStart:382.94,
+    '1595':{path:'data/hyper-hexagon-1595.b64',videoStart:382.99,
       videoEnd:472.59,gameStartOffset:0,gameRate:25/24,sampleFps:20,
       sourceFile:'1595(3).mp4'},
-    '1596':{path:'data/hyper-hexagon-1596.b64',videoStart:303.52,
+    '1596':{path:'data/hyper-hexagon-1596.b64',videoStart:303.32,
       videoEnd:398.57,gameStartOffset:0,gameRate:25/24,sampleFps:20,
       sourceFile:'1596(3).mp4'}
   }
