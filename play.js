@@ -73,9 +73,17 @@ function drawArena(ctx,colors,opts){
  }
  if(mode===3&&!game.dead)opts.text('PRESS THE KEY SHOWN IN EACH SECTOR',480,493,16,'#ddd');
 }
+function replayPalette(g){
+ const pal=g?.replay?.palette;
+ if(!pal?.colors?.length)return null;
+ const i=Math.min(pal.colors.length-1,Math.max(0,
+  Math.floor((g.time-g.replay.gameStartOffset)*pal.fps/g.replay.gameRate+1e-9)));
+ const frame=pal.colors[i];
+ return [0,3,6].map(offset=>'rgb('+frame.slice(offset,offset+3).join(',')+')');
+}
 function draw(ctx,opts){
  if(!game)return;
- drawArena(ctx,opts.colors,opts);
+ drawArena(ctx,replayPalette(game)||opts.colors,opts);
  if(opts.screen==='paused'){
   ctx.fillStyle='#0009';ctx.fillRect(0,130,960,260);
   opts.text('PAUSED',480,220,65);opts.panel('PRESS SPACE TO RESUME',435,500);
@@ -104,7 +112,9 @@ async function start(index,controlMode=1,enabled=true){
  const trace=['1595','1596'].includes(requested)?requested:'1595';
  const option=map.replays?.[trace];
  if(!option)throw new Error('Video source is not registered: '+trace);
- const recording=await HexReplay.load(trace,option);
+ const [recording,palette]=await Promise.all([HexReplay.load(trace,option),
+   HexReplay.loadPalette(trace)]);
+ recording.palette=palette;
  clearInput();music.stop();
  game=new HexEngine.ArenaGame(index);mode=controlMode;sound=enabled;
  game.attachReplay(recording,{spectating:args.get('spectate')==='1'});
