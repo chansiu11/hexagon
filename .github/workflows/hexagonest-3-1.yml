@@ -1,0 +1,18 @@
+name: HEXAGONEST task 3-1 reference verification
+on:
+  push:
+    branches:
+      - rebuild-step-3-1-hexagonest-20261116
+  workflow_dispatch:
+jobs:
+  filmed-hexagonest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify source chronology, contours and engine launch
+        run: |
+          node --test test/hexagonest-chronology.test.cjs test/hexagonest-source.test.cjs test/hexagonest-opening.test.cjs test/hexagonest-real-films.test.cjs
