@@ -1,42 +1,62 @@
-# 작업 4-1 — HYPER HEXAGON 독립 영상 순차 벽 재생 상태
-2026-11-16
+# 작업 4-1 — HYPER HEXAGON 영상별 순차 벽 재현 (60fps)
 
-## 작업 시작점
-- Base: `rebuild-step-3-1-hexagonest-20261116` @ `1a429d1b5a33172d7b0dd37a87f85fb1eccca7c6`.
-- Work branch: `rebuild-step-4-1-hyper-hexagon-20261116`.
-- Stage index 3 (fourth map), only chronological video-wall replay. Stage 5/4-2 not started.
-- Original prompt mentions `1557(20261116-003454).mp4` and `1594.mp4`, **not attached to this chat**. Actual directly read files: `1595(3).mp4` and `1596(3).mp4`.
-- An unrelated older `task4-1-hyper-sequential-20261116` branch descends from the legacy engine, not Task3. No code from that branch copied.
+2026-11-16. 작업 범위는 **4-1만**이며, 4-2 랜덤 파트 연결 및 5번 맵 구현을 시작하지 않았다.
 
-## Source segments
-| source | recorded screen size | stage4 start / end (video clock) | approximate game clock | sampled snapshots |
-| --- | --- | --- | --- | --- |
-| `1595(3).mp4` | 1920×1080, 60fps | 382.99–472.59s | 0–93.333s | 1,793 at 20fps |
-| `1596(3).mp4` | 1152×720, 60fps | 303.32–398.57s | 0–99.219s | 1,906 at 20fps |
+## 기반과 브랜치
 
-Both source clips include 0–60s and beyond, with a **single continuous frame sequence** across 60s. Approximate HUD-derived game rate 25/24, cannot certify exact source clocks. The MP4s contain additional stages, menus and recording transitions outside the stated ranges, not imported as HYPER HEXAGON walls. Both 20fps traces are drawn from **this upload**, not stage1 HEXAGON walls or legacy HYPER code.
+- 작업 3 기준: `rebuild-step-3-1-hexagonest-20261116`, `1a429d1b5a33172d7b0dd37a87f85fb1eccca7c6`
+- 작업 브랜치: `rebuild-step-4-1-hyper-hexagon-20261116`
+- 새 `engine.js` 재생 구조에 HYPER HEXAGON 전용 `stages/hyper-hexagon.js`를 등록했다. 구형 절차형 HYPER 생성기를 복사하지 않았다. 기본 메뉴와 1–3번 단계의 소스 파일을 유지하고 7번 RANDOM 맵도 등록하지 않았다.
+- 이번 대화에서 직접 분석한 영상: **`1595(3).mp4`**, **`1596(3).mp4`**. 처음 지시문에 적힌 `1557(20261116-003454).mp4`와 `1594.mp4`는 이 채팅에 직접 첨부되지 않았으므로, 동일 파일이라고 단정하거나 그 이름으로 검증 완료 처리하지 않았다.
 
-## Files and integration
-- `data/hyper-hexagon-1595.b64`, `data/hyper-hexagon-1596.b64`: compressed HXRF source-frame foreground polygons, includes per-frame 20fps camera/core approximations. **Per-frame silhouettes, not original engine wall creation records**.
-- `data/hyper-hexagon-{1595,1596}-palette.json`: independent 20fps RGB sequences.
-- `data/hyper-hexagon-sources.json`: provenance and data limitations.
-- `stages/hyper-hexagon.js`: registers only stage4; both source recordings and zero procedural wall entries.
-- `engine.js`, `replay.js`, `play.js`, `index.html`: load stage4 source replays and palettes, maintain other maps' source bindings.
-- Source-start alignment: rejected one 1595 transition frame at 382.94s (source begins 382.99s), and prepended 4 previously omitted source frames for 1596 (source begins 303.32s instead of 303.52s). Both palette banks now align to geometry at 20fps.\n- Original ~0.1–0.8s colored alternating background sectors were sometimes misread as incoming wall polygons. Removed false 60k-pixel color regions only during stage4 source launch. Both non-spectator intros were tested against death before 0.7 game seconds.\n- Chronological playback: `?trace=1595` or `?trace=1596`, default stage4 source is 1595. **No phrase randomization yet**. Former 7th RANDOM map remains absent; `menu.js` untouched.
+## HYPER HEXAGON만 분리한 영상 구간
 
-## Executed checks
-- 20fps decoder: 1595 1,793 frames and 1596 1,906 frames. Both have visible wall silhouettes pre/post 60s. Longest consecutive no-foreground samples after source alignment and opening-background filtering, measured maximum no-foreground spans 1595 16 frames (~0.833 game seconds), 1596 17 frames (~0.885 game seconds). First observed wall silhouette arrives before one game second in both recordings, **does not measure wall generation gaps**.
-- Node unit suite on actual source files and Chromium browser with both source replays: source 0–60 / 60+, no reset at 60, open orbit corridor, blocked orbit triggers death, retry and menu navigation, screenshots. 4-1 Actions run 43870667175 on SHA 488fdf478665e50395e3864003f7b1d1b04b7280 concluded **success**: https://github.com/chansiu11/hexagon/actions/runs/43870667175.
-- Source and browser regressions for map1–3 added later in same branch; check the latest run's final verdict separately.
-- Existing repo-wide workflow test/rebuilt-browser.test.cjs fails even on base Task3: it incorrectly expects HEXAGONEST to be unavailable, although Task3 registered that map. The old test's failure is **not** itself proof of a stage4 gameplay regression.
+| 내용 | 1595(3).mp4 | 1596(3).mp4 |
+| --- | ---: | ---: |
+| 원본 영상 해상도 | 1920×1080 | 1152×720 |
+| 실제 HYPER 구간 시작(영상 시각) | 382.990초 | 303.320초 |
+| 추출 마지막 프레임(영상 시각) | 472.623초 | 398.603초 |
+| 환산 게임 종료 시간(추정) | 93.368초 | 99.253초 |
+| 독립 벽 실루엣 추출 | **5,379프레임·60fps** | **5,718프레임·60fps** |
+| 게임 0–60초 프레임 | 3,456개 | 3,456개 |
+| 게임 60초 이후 프레임 | 1,923개 | 2,262개 |
+| 첫 실제 외곽 벽 윤곽 도달(게임 시각, 추정) | 0.816초 | 0.868초 |
 
-## Remaining differences / do not call pixel identical
-1. Direct source videos are 60fps, but full extraction was interrupted; stage4 bank is **20fps**. Interim interpolation and walls moving faster than frame cadence may differ from source video. Re-extract at 60fps and compare the full source-frame sequence.
-2. Foreground polygons measured from source pixels combine moving walls and camera motion. Individual original spawn timestamps, radial speeds, thicknesses, lane bearings, shape-change rules, actor identity under cut/morph and continuous collision paths are **not independently reverse engineered**. Need a stronger wall-actor correspondence audit and video-vs-browser pixel IoU.
-3. The no-wall gap audit is not an arrival-event audit: cannot certify every newly entering wall arrives within <=1s. That test belongs with part building; source-mode long idle gaps remain subject to validation.
-4. Start ship bearing, stage-specific player speed, camera rotations/zoom, angle changes, tilted camera, hard shakes, synced sound/voice, exact HUD and death animation are not done in 4-1; scheduled in 4-2.
-5. Two-video corridor/source replay passes do **not** prove original full runs are continuously survivable under human-speed inputs. Part connectivity, 60s transition and random selection not yet implemented.
-6. Since `1557(20261116-003454).mp4` and `1594.mp4` were absent, those particular files and their game-clock coverage are **unverified**. Do not represent the other uploads as those filenames.
+게임 시간 환산은 영상 HUD 대비 **25/24** 배의 추정치다. 영상에서 편집 컷·메뉴와 다른 단계는 제외했고, 두 영상의 HYPER 플레이는 서로 별도 데이터로 인코딩했다.
 
-## Next
-**4-2: address remaining verified 4-1 fidelity gaps if they affect joining, divide independent source timelines into pre-60 and 60+ dodge phrases, ensure traversable transitions with <=1s arrivals and no in-flight wall loss, then HUD/controls/camera/voice/death and browser video comparison. Do not start until the user says “이어서”.**
+## 재생 방식과 보정
+
+- `data/hyper-hexagon-1595.b64`, `data/hyper-hexagon-1596.b64`: 프레임별 벽 전경 외곽선을 보관한 HXRF 60fps 데이터. **원작 엔진의 벽 생성 명령, 두께, 하강 속도를 개별적으로 복원한 스크립트는 아니다.**
+- `data/hyper-hexagon-1595-palette.json`과 `...1596-palette.json`: 영상별 20fps RGB 색상 샘플. 벽 좌표는 60fps로 독립 적용한다.
+- `data/hyper-hexagon-sources.json`: 소스 시간/데이터 범위/검증 한계.
+- `?trace=1595`, `?trace=1596`으로 0초부터 원본 순서 재생. 일반 시작은 1595 순서 재생. 60초에서 재생 시퀀스를 끊거나 벽을 새로 생성하지 않는다.
+- 시작 배경의 회전 삼각형이 벽으로 잘못 추출되어 1595의 0.3125초에 즉사하던 문제를 발견했다. 영상 프레임을 다시 확인하여 **1595 0–46번**, **1596 0–49번**에만 포함된 배경 폴리곤 **71개/76개**를 삭제하고 첫 실제 벽부터는 해당 데이터 그대로 유지했다.
+- 원본 중심 도형의 7/8각으로 잘못 인식된 프레임을 보정했으나, 전환 순간의 원본 엔진 측 형상 변화를 완전히 역복원한 것은 아니다.
+
+## 확인한 데이터 무결성
+
+- 압축 복원한 60fps 기록의 헤더, 모든 프레임과 외곽선 구조를 확인했다.
+- 60초 경계는 두 영상 모두 **3455→3456번 프레임**이며, 전후의 연속 벽이 추적 ID를 유지할 수 있는지 별도로 검사했다.
+- 1초 이상의 **전경 벽 전체 미검출** 구간은 없었다. 가장 긴 연속 미검출은 1595 **0.816초**, 1596 **0.868초**로 시작 연출 구간이었다. 주의: 이것은 새 벽의 실제 **생성 간격**이 1초 미만이라는 증명은 아니다.
+- 궤도 120방향 표본 검사: 1595 **662프레임**, 1596 **703프레임**을 검사해 모든 방향이 동시에 막힌 샘플은 0개였다. **실제 플레이 전체 구간의 생존 경로가 입증된 것은 아니다.**
+
+## 브라우저 및 회귀 검증
+
+`.github/workflows/hyper-hexagon-4-1.yml`은 두 영상 0–60초/60초 이후 순차 플레이, 60초 경계, 통로 진입·벽 충돌·사망, 재시작·메뉴 복귀, 기존 1–3번 맵의 브라우저 회귀 테스트를 수행한다.
+
+- 60fps 시작 오인식 수정 커밋 `dbfda81c73fdc1759ae74a59848a792ae01ce80a`에서 HYPER 전용 워크플로 **성공** (Actions `43875537464`), 공통 1–2번 맵 워크플로 **성공** (Actions `43875537313`). 최신 커밋의 CI가 따로 있다면 그 실행 결과를 최종 판정으로 사용해야 한다.
+- 기존 공통 테스트가 이미 구현된 HEXAGONEST를 '미구현'으로 가정하던 오류는 테스트 대상만 실제 미구현 5번 맵으로 변경하여 해결했다. 메인 화면 로직은 바꾸지 않았다.
+- 실제 게임 영상과 브라우저 화면을 원본 60fps 전체에 걸쳐 픽셀 단위로 검수하여 일치율을 확정한 것은 아니다.
+
+## 4-1에서 아직 미완료 또는 미검증인 사항
+
+1. 색상 마스크로 추출한 윤곽의 작은 파편, 화면 회전/줌과 실제 벽 이동의 수학적 분리, 벽별 생성 시각·방향·통로·두께·속도·변형 애니메이션 독립 복원과 픽셀 단위 원본 일치.
+2. 60초를 넘는 **원본 벽 객체별 ID가 전환·색상 급변에도 항상 유지되는지** 전체 구간에 대한 완전한 추적 검증. 60초 바로 경계는 확인했다.
+3. 모든 연속 벽에 대해 실제 플레이 이동속도로 생존 가능한 전체 경로를 찾는 동작 검증. 단위 충돌/열린 통로 검사는 통과했다.
+4. 연속 회피 단위의 0–60/60초 이후 파트 수, 두 영상 파트의 랜덤 연결, 연결 호환성, 생성 간격 1초 이하 보장. 이는 4-2에 배정되며 **아직 구현하지 않았다**.
+5. HYPER 전용 플레이 HUD, 캐릭터 이동속도, 카메라 기울기·떨림·줌·회전, 음성·효과음·사망 화면의 원본 영상 정밀 일치(4-2 대상).
+6. 최초 지시서에서 이름이 지정된 `1557(20261116-003454).mp4`, `1594.mp4` **그 파일명 자체에 대한 검증**.
+
+## 다음 작업
+
+사용자가 같은 채팅에서 **'이어서'**라고 말했을 때에만 **4-2 — 영상별 회피 파트 분할, 호환되는 랜덤 연결, HYPER 전용 플레이 완성**으로 넘어간다. 이번 작업에서는 시작하지 않는다.
