@@ -1,0 +1,48 @@
+name: HYPER HEXAGON 4-1 real filmed chronology
+on:
+  push:
+    branches:
+      - rebuild-step-4-1-hyper-hexagon-20261116
+  workflow_dispatch:
+jobs:
+  hyper-hexagon-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and data-backed collision/chronology checks
+        run: |
+          node --check stages/hyper-hexagon.js
+          node --check engine.js
+          node --check replay.js
+          node --check play.js
+          node --check test/hyper-hexagon-4-1.test.cjs
+          node --check test/hyper-hexagon-4-1-browser.test.cjs
+          node --test test/hyper-hexagon-4-1.test.cjs
+          node --test test/rebuilt-engine.test.cjs test/hexagonest-opening.test.cjs
+      - name: Install Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Serve local website
+        run: |
+          node server.cjs >/tmp/hyper-hexagon-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Play HYPER HEXAGON source 1595 and 1596 in Chromium
+        run: node test/hyper-hexagon-4-1-browser.test.cjs
+      - name: Store chronological playback screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyper-hexagon-4-1-screenshots
+          path: test-artifacts/
+          if-no-files-found: ignore
