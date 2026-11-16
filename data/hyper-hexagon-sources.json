@@ -44,5 +44,7 @@
     "Core contour transient 7/8-sided misclassification corrected to closest following valid 4-6 sides; not exact engine shape transition reconstruction."
   ],
   "originalFilenameIdentityVerified": true,
-  "verificationMethod": "SHA-256 byte-for-byte match of original named Library videos with attached 1595(3).mp4 / 1596(3).mp4"
+  "verificationMethod": "SHA-256 byte-for-byte match of original named Library videos with attached 1595(3).mp4 / 1596(3).mp4",
+  "colorPaletteMethod": "Full-color RGB24 source extraction, quantized independent 20fps palette. Earlier BGR-as-RGB color channel reversal corrected during task 4-2.",
+  "sourceGeometryMethod": "60fps HXRF vector contour transcription, interpolated at 240Hz only for matching wall actors."
 }

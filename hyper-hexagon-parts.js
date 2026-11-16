@@ -41,6 +41,27 @@
   }
   return result;
  }
+ // At a join, orbit-only signatures can falsely match even when large
+ // incoming walls pop across the outer screen. Sample four actual radii.
+ const RADII=[ORBIT,108,166,232];
+ function radialSignature(frame){
+  const out=new Uint8Array(SLOTS*RADII.length);
+  for(let ring=0;ring<RADII.length;ring++)for(let k=0;k<SLOTS;k++){
+   const a=(k+.5)*TAU/SLOTS;
+   out[ring*SLOTS+k]=blocked(frame,RADII[ring]*Math.cos(a),RADII[ring]*Math.sin(a))?1:0;
+  }
+  return out;
+ }
+ function radialMismatch(oldFrame,newFrame,oldShift,newShift){
+  const oldBins=Math.round(oldShift/TAU*SLOTS),newBins=Math.round(newShift/TAU*SLOTS);
+  const weights=[3,2,2,1];let differing=0;
+  for(let r=0;r<RADII.length;r++)for(let k=0;k<SLOTS;k++){
+   const pos=r*SLOTS;
+   if(oldFrame[pos+(k-oldBins+SLOTS*3)%SLOTS]!==newFrame[pos+(k-newBins+SLOTS*3)%SLOTS])
+    differing+=weights[r];
+  }
+  return differing/(SLOTS*weights.reduce((a,b)=>a+b,0));
+ }
  function at(replay,start,t,end=replay.frames.length-1){
   return clamp(start+Math.round(t*FPS/replay.gameRate),0,end);
  }
@@ -83,6 +104,7 @@
      first,last,sideIn:first.sides,sideOut:last.sides,
      duration:(to-from)/FPS*replay.gameRate,
      filmedStart:from/FPS*replay.gameRate,epoch:from<manifest.boundaryFrame?0:1};
+    p.entryRadial=radialSignature(first);p.exitRadial=radialSignature(last);
     p.entry=masks(replay,from,to);
     p.tail=masks(replay,to,replay.frames.length-1,true);
     p.arrivalDelay=incomingDelay(replay,from,to);
@@ -116,8 +138,15 @@
    const upcoming=new Set();
    for(const prior of states)for(let k=-maxStep;k<=maxStep;k++){
     const dest=(prior+k+SLOTS)%SLOTS;
-    if(!oldMasks[t][(dest-oldBin+SLOTS)%SLOTS] &&
-       !newMasks[t][(dest-newBin+SLOTS)%SLOTS])upcoming.add(dest);
+    // Check every angular lane the ship crosses, not only the endpoint:
+    // endpoint-only tests could teleport over a blocked sector in 0.12s.
+    const sign=Math.sign(k);let pass=true;
+    for(let step=0;step<=Math.abs(k);step++){
+     const pos=(prior+sign*step+SLOTS)%SLOTS;
+     if(oldMasks[t][(pos-oldBin+SLOTS)%SLOTS]||
+        newMasks[t][(pos-newBin+SLOTS)%SLOTS]){pass=false;break;}
+    }
+    if(pass)upcoming.add(dest);
    }
    if(!upcoming.size)return false;
    states=upcoming;
@@ -127,6 +156,22 @@
  function palette(replay,sourceFrame){
   const pal=replay.palette;if(!pal?.colors?.length)return null;
   return pal.colors[clamp(Math.floor(sourceFrame/replay.fps*pal.fps),0,pal.colors.length-1)];
+ }
+ function interpolateWall(a,b,t){
+  // Source samples are 60fps, but gameplay samples collision at 240Hz.
+  // Interpolate an individually tracked, consistently shaped wall so a thin,
+  // fast wall cannot skip the player orbit between two film snapshots.
+  if(!b||a.points.length!==b.points.length||
+     (a.holes||[]).length!==(b.holes||[]).length)return a;
+  const interpolate=(first,second)=>first.map(([x,y],i)=>[
+   x*(1-t)+second[i][0]*t,y*(1-t)+second[i][1]*t]);
+  const ah=a.holes||[],bh=b.holes||[];
+  if(ah.some((h,i)=>h.length!==bh[i].length))return a;
+  // Polygon topology changes during an actual source morph: never blend
+  // unrelated contour vertices across that transition.
+  const maxJump=Math.max(...a.points.map(([x,y],i)=>Math.hypot(x-b.points[i][0],y-b.points[i][1])));
+  if(maxJump>38)return a;
+  return {...a,points:interpolate(a.points,b.points),holes:ah.map((h,i)=>interpolate(h,bh[i]))};
  }
  function extrapolate(w,elapsed){
   // Last-resort tracking bridge on contour split/merge: extrapolate inward,
@@ -169,8 +214,8 @@
      const lane=sameNeighbor?this.shift:step*TAU/next.sideIn;
      if(sameNeighbor&&step!==0)continue;
      if(!isSafe(oldMasks,next.entry,playerAngle,this.speed,this.shift,lane))continue;
-     const mismatchScore=mismatch(outgoing.tail[0],next.entry[0],Math.round((lane-this.shift)*SLOTS/TAU));
-     if(!sameNeighbor&&mismatchScore>.46)continue;
+     const mismatchScore=radialMismatch(outgoing.exitRadial,next.entryRadial,this.shift,lane);
+     if(!sameNeighbor&&mismatchScore>.43)continue;
      const recent=this.history.slice(-6).filter(h=>h.part===next.id).length;
      const other=next.source!==outgoing.source;
      const visualPenalty=mismatchScore*3.5;
@@ -204,6 +249,8 @@
    const prev=this.current,deadline=this.start+prev.duration;
    const chosen=this.choose(deadline,playerAngle);
    if(!chosen)return;
+   // Use the exact cut frame rather than the last rendered sub-frame.
+   // Otherwise each cut introduces a small camera snap at 60fps.
    const oldCamera=prev.last.angle+this.cameraOffset;
    // Contiguous raw-source segments maintain the exact same wall ID and run.
    if(!chosen.contiguous){
@@ -215,6 +262,7 @@
    }
    this.carry=this.carry.filter(x=>deadline-x.created<MAX_TAIL);
    this.current=chosen.part;this.start=deadline;
+   this._joinedNewSource=!chosen.contiguous;
    this.shift=chosen.shift;
    this.cameraOffset=oldCamera-this.current.first.angle;
    this.source=this.current.source;this.activePart=this.current.id;this.transitions++;
@@ -246,6 +294,21 @@
   sample(seconds,playerAngle=TAU/12){
    if(!finite(seconds)||seconds<0)throw RangeError('HYPER 4-2 invalid game time');
    if(seconds+1e-8<this.lastTime)throw RangeError('HYPER 4-2 source time cannot rewind');
+   // Exactly at 60 seconds, finish the currently playing pre-60 phrase
+   // *at its real filmed frame*, not at a made-up wall state. Continue its
+   // still-visible actors via the outgoing tail while selecting a post-60
+   // phrase. The source manifest itself stays chronological and intact.
+   if(seconds>=60&&this.current.epoch===0&&this.start<60&&
+      this.start+this.current.duration>60){
+    const old=this.current,film=this.recordings[old.source];
+    const to=at(film,old.from,60-this.start,old.to);
+    if(to>old.from){
+     const cut={...old,id:old.id+'@60',to,last:film.frames[to],
+      duration:60-this.start,tail:masks(film,to,film.frames.length-1,true),
+      exitRadial:radialSignature(film.frames[to])};
+     this.bank.byId[cut.id]=cut;this.current=cut;
+    }
+   }
    let guard=0;
    while(!this.ended&&seconds>=this.start+this.current.duration-1e-9){
     this.cross(seconds,playerAngle);
@@ -253,11 +316,19 @@
    }
    const local=clamp(seconds-this.start,0,this.current.duration);
    const film=this.recordings[this.current.source];
-   const k=at(film,this.current.from,local,this.current.to);
+   const exact=clamp(this.current.from+local*FPS/film.gameRate,this.current.from,this.current.to);
+   const k=Math.floor(exact+1e-9);
+   const fraction=exact-k;
    const frame=film.frames[k],camera=frame.angle+this.cameraOffset;
+   const next=k<this.current.to?film.frames[k+1]:null;
+   const following=next&&fraction>1e-6?new Map(next.walls.map(w=>[w.id,w])):null;
    const rotate=ring=>turn(ring,this.shift);
-   const walls=frame.walls.map(w=>({...w,id:this.runId+':'+w.id,
-    points:rotate(w.points),holes:(w.holes||[]).map(rotate)}));
+   const admission=this._joinedNewSource?clamp(local/.14,0,1):1;
+   const walls=frame.walls.map(w=>{
+    const observed=following?interpolateWall(w,following.get(w.id),fraction):w;
+    return {...observed,id:this.runId+':'+w.id,
+      points:rotate(observed.points),holes:(observed.holes||[]).map(rotate),opacity:admission};
+   });
    const ongoing=[];
    for(const carry of this.carry){
     const elapsed=seconds-carry.created;
@@ -299,5 +370,5 @@
   }
  }
  return Object.freeze({FPS,RATE,makeBank,Session,create:(recordings,manifest,opts)=>new Session(recordings,manifest,opts),
-  inside,blocked,mask,isSafe,incomingDelay});
+  inside,blocked,mask,isSafe,incomingDelay,radialSignature,radialMismatch,interpolateWall});
 });

@@ -48,7 +48,7 @@ test('reachable seam search rejects an actual blocked source lane',()=>{
 test('both films occur in live randomized pre/post-60 timeline; sampled walls are not wiped at seams',async()=>{
  const {meta,films}=await setup();
  for(const seed of [1,8,23,59]){
-  const session=Parts.create(films,meta,{seed,firstSource:seed%2?'1595':'1596',playerSpeed:8.5});
+  const session=Parts.create(films,meta,{seed,firstSource:seed%2?'1595':'1596',playerSpeed:Engine.PLAYER_SPEED});
   const all=new Set(),pre=new Set(),post=new Set();
   let prev=0,maxEmpty=0,empty=0,hadCarry=false;
   for(let t=0;t<=165;t+=.10){
@@ -69,6 +69,10 @@ test('both films occur in live randomized pre/post-60 timeline; sampled walls ar
   assert.ok(pre.size>=2&&post.size>=2,'both source videos required before and after 60s: '+seed);
   assert.ok(maxEmpty<=1.01,'all walls disappeared for more than 1s at seed '+seed+' ('+maxEmpty+')');
   assert.ok(session.history.every((e,i)=>i===0||e.at>=session.history[i-1].at));
+  const after60=session.history.find(h=>h.epoch===1);
+  assert.ok(after60 && after60.at>=60 && after60.at<=60.00001,
+   'source must switch to the post-60 bank at exactly 60 seconds');
+  assert.ok(session.history.some(h=>h.epoch===0&&h.at<60));
   assert.ok(hadCarry,'non-contiguous joins did not preserve previous in-flight walls');
   assert.ok(session.history.every(h=>h.score===undefined||Number.isFinite(h.score)||h.fallback),
    'a blocked fallback was incorrectly marked as verified');
@@ -76,7 +80,7 @@ test('both films occur in live randomized pre/post-60 timeline; sampled walls ar
 });
 test('HYPER stage uses filmed polygons for both passable gaps and genuine collision',async()=>{
  const {meta,films}=await setup();
- const replay=Parts.create(films,meta,{seed:100,firstSource:'1595',playerSpeed:8.5});
+ const replay=Parts.create(films,meta,{seed:100,firstSource:'1595',playerSpeed:Engine.PLAYER_SPEED});
  const game=new Engine.ArenaGame(3);game.attachReplay(replay,{spectating:true});
  game.update(1.0,0);assert.equal(game.dead,false);
  const TAU=Math.PI*2;
@@ -100,4 +104,29 @@ test('HYPER stage uses filmed polygons for both passable gaps and genuine collis
  assert.ok(game.death?.wallId);
  const restart=game.reset();restart.attachReplay(Parts.create(films,meta,{seed:100,firstSource:'1595'}));
  assert.equal(restart.time,0);assert.equal(restart.dead,false);
+});
+
+test('interpolation follows 60fps wall actors and catches in-between orbit crossing',()=>{
+ const wall=(left)=>({id:'wall',points:[[left,-8],[left+4,-8],[left+4,8],[left,8]],holes:[]});
+ const old=wall(73),next=wall(55);
+ const halfway=Parts.interpolateWall(old,next,.5);
+ assert.equal(Parts.blocked({walls:[old]},66,0),false);
+ assert.equal(Parts.blocked({walls:[next]},66,0),false);
+ assert.equal(Parts.blocked({walls:[halfway]},66,0),true,
+   'a fast narrow wall must not tunnel between adjacent 60fps frames');
+});
+
+test('random joins never silently claim an incompatible fallback or a longer-than-1s outer arrival gap',async()=>{
+ const {meta,films}=await setup();
+ for(const seed of [1,8,23,59,1234,441,7,98,18,6666]){
+  const session=Parts.create(films,meta,{seed,firstSource:seed%2?'1595':'1596',playerSpeed:8.5});
+  for(let k=0;k<=1600&&!session.ended;k++)session.sample(k/10,.35);
+  assert.equal(session.ended,false,'random session became stuck at seed '+seed);
+  assert.equal(session.fallbacks,0,'a supposedly reached seam is an unverified fallback: '+seed);
+  assert.equal(session.unsafeSeams,0,'unsafe part seam at seed '+seed);
+  // This is a source-contour outer actor arrival proxy, not the game's
+  // original (unobservable) procedural wall-spawn command clock.
+  assert.ok(session.maxSpawnGap<=1.001,
+   'traced outer actor arrivals gap >1 second at seed '+seed+': '+session.maxSpawnGap);
+ }
 });

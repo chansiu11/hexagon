@@ -48,11 +48,14 @@ function drawHyperHUD(ctx,opts,accent){
  const t=game.time,best=opts.best||0;
  const rank=['POINT','LINE','TRIANGLE','SQUARE','PENTAGON','HEXAGON'][Math.min(5,Math.floor(t/10))];
  const record=t>=60&&t>best;
- const label=record?'NEW RECORD':best>0&&t<best?'BEST: '+opts.format(best):t>=60?'LEVEL UP':rank;
+ const levelMoment=t>=59.8&&t<61.65;
+ const label=levelMoment?'LEVEL UP':record?'NEW RECORD':best>0&&t<best?'BEST: '+opts.format(best):t>=60?'HEXAGON':rank;
  const width=Math.max(185,Math.min(325,label.length*19+35));
- polygon(ctx,[[0,0],[width+16,0],[width-6,37],[0,37]],'#000');
+ const panelH=levelMoment?76:37;
+ polygon(ctx,[[0,0],[width+16,0],[width-6,panelH],[0,panelH]],'#000');
  opts.text(label,13,5,label.length>11?19:24,'#fff','left',width-12);
- if(record){ctx.fillStyle=accent;ctx.fillRect(14,33,Math.min(width-20,235),2);}
+ if(levelMoment)opts.text('HEXAGON',13,34,31,'#fff','left',width-12);
+ if(record&&!levelMoment){ctx.fillStyle=accent;ctx.fillRect(14,33,Math.min(width-20,235),2);}
  polygon(ctx,[[610,0],[960,0],[960,62],[800,62],[788,36],[626,36]],'#000');
  opts.text('HYPER MODE',636,7,20,'#fff','left',159);
  const ticks=Math.floor(t*100+1e-7);
@@ -196,7 +199,7 @@ function replayPalette(g){
  // mislabeled as wall-color pixels. They must never turn the visible ship
  // and central outline black. Opening fallback colors are measured directly
  // from the respective filmed ship/core border.
- if(Math.max(...color.slice(6,9))<90){
+ if(g.level!==3&&Math.max(...color.slice(6,9))<90){
   let replacement=null;
   if(original===g.replay&&g.time<1.2 || parts&&g.time<1.2){
    replacement=g.level===3?(source==='1595'?[42,151,238]:[76,111,221]):
