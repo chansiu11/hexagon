@@ -9,7 +9,7 @@ let displayedHue=32,displayedSat=0,displayedLight=[14,19,93],optionIndex=0,trans
 const ease=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
 function queueAction(fn,bounds=null){if(pendingAction)return;pressed=bounds;pressAge=0;pendingAction={fn,left:settings.motion?.11:0}}
 function captureTransition(){if(!settings.motion)return;const snapshot=document.createElement('canvas');snapshot.width=canvas.width;snapshot.height=canvas.height;snapshot.getContext('2d').drawImage(canvas,0,0);transition={snapshot,age:0}}
-function enableAudio(){if(!settings.sound)return;music.enabled=true;music.unlock().then(()=>{if(screen==='play'&&!music.active)music.play(selected,game?.time||0)}).catch(()=>{status.textContent='소리를 시작하지 못했습니다.'})}
+function enableAudio(){if(!settings.sound)return;music.enabled=true;music.unlock().then(()=>{music.loadVoices().catch(()=>{});if(screen==='play'&&!music.active)music.play(selected,game?.time||0)}).catch(()=>{status.textContent='소리를 시작하지 못했습니다.'})}
 function directKeys(g=game){return g?.directKeys||[]}
 function directMove(sector){if(screen==='play'&&game?.selectSector(sector))music.effect('select')}
 const keys=new Set(),touches=new Map();let records=Array(levels.length).fill(0),recordsMode2=Array(levels.length).fill(0),recordsMode3=Array(levels.length).fill(0),settings={sound:true,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,controlMode:1,hyperUnlocked:false};
@@ -117,8 +117,8 @@ function frame(t){
   const left=keys.has('ArrowLeft')||keys.has('KeyA')||[...touches.values()].includes(-1);
   const right=keys.has('ArrowRight')||keys.has('KeyD')||[...touches.values()].includes(1);
   game.update(dt,settings.controlMode===1?Number(right)-Number(left):0);
-  if(game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3}
-  if(game.dead){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save();change('over');beep(90,.3)}
+  if(game.timeline.walls.length&&game.time>=60&&bestTime(selected)<60){modeRecords()[selected]=game.time;save();unlockedNow=selected<3}
+  if(game.dead){if(game.timeline.walls.length){modeRecords()[selected]=Math.max(bestTime(selected),game.time);save()}change('over');beep(90,.3)}
  }
  draw();
  if(clock-audioStamp>.25){
