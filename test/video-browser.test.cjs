@@ -30,6 +30,10 @@ const fs=require('node:fs');
    if(time>=1)assert.ok(obs.count>0,trace+' no visible observed walls at '+time);
    assert.ok(Number.isFinite(obs.angle));
    assert.ok(Math.abs(obs.time-time)<.1);
+   if(time===59.95||time===60.05){
+     const observedShape=trace==='1595'?4:6;
+     assert.equal(obs.shape,observedShape,'match the filmed core at the 60s boundary');
+   }
    if([.3,59.95,60.05,101].includes(time))
     await page.screenshot({path:'test-artifacts/'+trace+'-at-'+time+'.png'});
   }
