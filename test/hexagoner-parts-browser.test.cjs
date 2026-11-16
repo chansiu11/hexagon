@@ -21,7 +21,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    bank:HexPlay.game.replay.bank.all.length,first:HexPlay.game.replay.activePart}));
   assert.equal(initial.level,1);assert.equal(initial.kind,'parts');
   assert.equal(initial.source,first);assert.equal(initial.bank,37);
-  assert.ok(initial.playerSpeed>HexEngine.PLAYER_SPEED);
+  assert.ok(initial.playerSpeed>7.3,'HEXAGONER speed must be independently set');
   assert.equal(initial.first,first+'-00');
   for(const t of [1.2,12.1,32,59.9,60.1,75.1,121.5]){
    await page.evaluate(time=>HexPlay.game.update(Math.max(0,time-HexPlay.game.time)),t);
