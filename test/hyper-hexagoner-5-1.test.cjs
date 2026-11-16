@@ -30,6 +30,23 @@ test('unverified or missing 60+ video chronology cannot masquerade as verified o
  assert.throws(()=>Film.parse(fixture('1595'),'1595'),/not been verified/);
  assert.throws(()=>Film.parse({...fixture('1595'),id:'1596'},'1595'),/Incomplete/);
 });
+test('a source clock running at 25/24 keeps game-time 60s at source frame 3456',()=>{
+ const source=fixture('1595');
+ source.gameRate=25/24;
+ source.frames[3455].walls=[{id:'crosses-60',points:[[55,-7],[90,-7],[90,7],[55,7]]}];
+ source.frames[3456].walls=source.frames[3455].walls;
+ source.frames[3457].walls=source.frames[3455].walls;
+ const film=Film.parse(source,'1595',{allowFixture:true});
+ const metrics=Film.stats(film);
+ assert.equal(metrics.boundaryFrame,3456);
+ assert.equal(metrics.carriedAcross60,1);
+ assert.ok(Math.abs(metrics.gameEnd-(source.frames.length-1)/60*25/24)<1e-8);
+ const game=new Engine.ArenaGame(4);
+ game.attachReplay(film,{spectating:true});
+ assert.equal(game.seekReplay(60),true);
+ assert.equal(game.replayFrame,3456);
+ assert.equal(game.walls[0].id,film.frames[3455].walls[0].id);
+});
 test('first genuine filmed wall contour is not silently removed at game launch',()=>{
  const source=fixture('1595');
  source.frames[0].walls=[{id:'first-real-approach',
