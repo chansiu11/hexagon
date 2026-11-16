@@ -231,6 +231,8 @@
    this.last=null;this.maxObservedGap=0;this._emptyDuration=0;this.maxSpawnGap=0;
    this._pendingPlayerDelta=0;
    this.nextRunId=1;this.activeRunId=1;
+   this._seenOuterActors=new Set();this._lastOuterArrival=0;
+   this.outerArrivalEvents=0;this.maxSpawnGap=0;
   }
   choose(now,playerAngle){
    const previous=this.current;
@@ -358,6 +360,20 @@
    const delta=seconds-this.lastTime;
    this._emptyDuration=walls.length?0:this._emptyDuration+Math.max(0,delta);
    this.maxObservedGap=Math.max(this._emptyDuration,this.maxObservedGap);
+   // Proxy only: first *visible* outer-ring appearances of independently
+   // segmented contours, NOT the original game's offscreen spawn commands.
+   // Keep this separate from any old wall/empty-frame occupancy metric.
+   let outerArrival=false;
+   for(const wall of walls){
+    if(this._seenOuterActors.has(wall.id))continue;
+    this._seenOuterActors.add(wall.id);
+    if(wall.points.some(([x,y])=>x*x+y*y>220*220))outerArrival=true;
+   }
+   if(outerArrival){
+    this.outerArrivalEvents++;
+    this.maxSpawnGap=Math.max(this.maxSpawnGap,seconds-this._lastOuterArrival);
+    this._lastOuterArrival=seconds;
+   }else this.maxSpawnGap=Math.max(this.maxSpawnGap,seconds-this._lastOuterArrival);
    this.lastTime=seconds;
    this.last={angle:camera,zoom:frame.zoom,sides:frame.sides,walls,
     replayFrame:position.index,source:this.source,partId:this.current.id,playerAngleDelta:this._pendingPlayerDelta};
