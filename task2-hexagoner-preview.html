@@ -1,0 +1,40 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HEXAGONER · Task 2-1 Source Trace Check</title>
+<style>body{background:#161616;color:#eee;font-family:system-ui;margin:24px auto;max-width:940px;padding:0 16px}
+canvas{width:100%;max-width:864px;display:block;background:#101015;border:1px solid #666}
+input[type=range]{width:min(100%,600px)}label{margin-right:16px}
+.notice{color:#ffcb72}button,select{font:inherit}small{color:#aaa}</style></head><body>
+<h1>HEXAGONER 영상 순서 점검 · 2-1</h1>
+<p class="notice">이 화면은 실제 게임이 아닙니다. 영상에서 검출한 6방향 × 4거리의 밝은 벽 색상만 표시합니다. 벽 두께·각도·카메라·충돌은 원본과 일치한다고 검증되지 않았습니다.</p>
+<p><label>영상 <select id="source"><option value="1595">1595.mp4</option><option value="1596">1596.mp4</option></select></label>
+<button id="toggle" type="button">▶ 재생</button><button id="start" type="button">0초</button><button id="minute" type="button">60초</button></p>
+<p><input id="seek" type="range" min="0" max="1000" value="0" step="1"></p>
+<p id="readout" aria-live="polite">원본 데이터 읽는 중</p><canvas id="preview" width="576" height="360"></canvas>
+<p><small>고정 소스 순서, 랜덤 연결 없음. 60초에서 데이터가 재시작되지 않는지 확인할 수 있습니다. 메인 화면과 배포 게임에는 적용하지 않습니다.</small></p>
+<script src="./task2-hexagoner-1595-data.js"></script><script src="./task2-hexagoner-1596-data.js"></script>
+<script src="./task2-hexagoner-source-replay.js"></script>
+<script>
+(async function(){
+const source=document.getElementById('source'),seek=document.getElementById('seek'),readout=document.getElementById('readout');
+const cvs=document.getElementById('preview'),ctx=cvs.getContext('2d'),toggle=document.getElementById('toggle');
+const runs={};
+try{for(const id of ['1595','1596'])runs[id]=await HexagonerSourceReplay.load(id);}
+catch(e){readout.textContent='원본 데이터 오류: '+e.message;return;}
+let playing=false,last=performance.now(),time=0;
+function draw(){
+const run=runs[source.value];time=Math.min(run.gameDuration,Math.max(0,time));
+ctx.fillStyle='#101015';ctx.fillRect(0,0,576,360);
+const frame=run.at(time);
+HexagonerSourceReplay.drawScreenBands(ctx,frame,{fillStyle:'#e6d77b'});
+seek.max=Math.round(run.gameDuration*10);seek.value=Math.round(time*10);
+readout.textContent=source.value+'.mp4 · 게임 '+time.toFixed(2)+'초 · 영상 '+frame.videoTime.toFixed(2)+'초 · 기록 프레임 '+frame.index+' / '+run.meta.frames;
+}
+function loop(now){if(playing){time+=(now-last)/1000;if(time>=runs[source.value].gameDuration){time=runs[source.value].gameDuration;playing=false;toggle.textContent='▶ 재생';}}
+ last=now;draw();requestAnimationFrame(loop)}
+source.addEventListener('change',()=>{time=0;playing=false;toggle.textContent='▶ 재생';});
+seek.addEventListener('input',()=>{time=Number(seek.value)/10});
+toggle.addEventListener('click',()=>{playing=!playing;toggle.textContent=playing?'⏸ 일시정지':'▶ 재생'});
+document.getElementById('start').onclick=()=>time=0;document.getElementById('minute').onclick=()=>time=60;
+requestAnimationFrame(loop);
+})();
+</script></body></html>
