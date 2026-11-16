@@ -21,6 +21,49 @@
   const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
  }
+ // Track connected visible contours between consecutive original source frames.
+ // This is an estimate; split/merge events legitimately terminate tracks.
+ function trackFrames(frames,source,fps,rate){
+  let serial=0,previous=[],matched=0,total=0;
+  function describe(w){
+   const pts=w.points,n=pts.length;
+   let cx=0,cy=0,twiceArea=0;
+   for(let i=0;i<n;i++){
+    const a=pts[i],b=pts[(i+1)%n];
+    cx+=a[0]/n;cy+=a[1]/n;
+    twiceArea+=a[0]*b[1]-a[1]*b[0];
+   }
+   return {w,center:[cx,cy],area:Math.sqrt(Math.max(1,Math.abs(twiceArea)/2))};
+  }
+  for(const frame of frames){
+   const now=frame.walls.map(describe),candidates=[];
+   for(const before of previous)for(const after of now){
+    const distance=Math.hypot(before.center[0]-after.center[0],before.center[1]-after.center[1]);
+    const radius=Math.max(Math.hypot(...before.center),Math.hypot(...after.center));
+    const scale=Math.max(before.area,after.area);
+    const score=distance/(10+.15*radius+.15*scale)+
+      Math.abs(Math.log(after.area/before.area))*.8;
+    if(score<1.5)candidates.push({score,before,after});
+   }
+   candidates.sort((a,b)=>a.score-b.score);
+   const oldUsed=new Set(),newUsed=new Set();
+   for(const pair of candidates){
+    if(oldUsed.has(pair.before)||newUsed.has(pair.after))continue;
+    oldUsed.add(pair.before);newUsed.add(pair.after);
+    pair.after.w.id=pair.before.w.id;
+    const dx=pair.after.center[0]-pair.before.center[0];
+    const dy=pair.after.center[1]-pair.before.center[1];
+    pair.after.w.estimatedVelocity=[dx*fps/rate,dy*fps/rate];
+    matched++;
+   }
+   for(const item of now){
+    total++;
+    if(!item.w.id)item.w.id='video-'+source+'-actor-'+(++serial);
+   }
+   previous=now;
+  }
+  return Object.freeze({matched,total,matchRatio:total?matched/total:0,actorTracks:serial});
+ }
  function parse(bytes, info={}){
   if(bytes.length<14)throw new Error('HXRF data is too small');
   const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
@@ -77,7 +120,9 @@
    frames.push({angle,sides,zoom,walls});
   }
   if(p!==bytes.length)throw new Error('Unexpected trailing HXRF data');
-  return {fps,frames,id:info.id||'',gameRate:Number(info.gameRate)||1.04,
+  const rate=Number(info.gameRate)||1.04;
+  const trackStats=trackFrames(frames,info.id||'unknown',fps,rate);
+  return {fps,frames,trackStats,id:info.id||'',gameRate:rate,
    gameStartOffset:Number(info.gameStartOffset)||0,sourceStart:Number(info.videoStart)||0,
    sourceEnd:Number(info.videoEnd)||0};
  }
