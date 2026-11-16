@@ -34,6 +34,10 @@ const fs=require('node:fs');
     await page.screenshot({path:'test-artifacts/'+trace+'-at-'+time+'.png'});
   }
   assert.deepEqual(errors,[]);
+  await page.keyboard.press('Digit2');
+  await page.waitForFunction(()=>HexMenu.screen==='play'&&
+    HexPlay.game?.controlMode===2,{timeout:8000});
+  assert.equal(await page.evaluate(()=>HexPlay.game.dead),false);
   await page.keyboard.press('Escape');
   assert.equal(await page.evaluate(()=>HexMenu.screen),'paused');
   await page.keyboard.press('Escape');
