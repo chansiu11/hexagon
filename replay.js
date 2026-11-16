@@ -23,7 +23,7 @@
  }
  // Track connected visible contours between consecutive original source frames.
  // This is an estimate; split/merge events legitimately terminate tracks.
- function trackFrames(frames,source,fps,rate){
+ function trackFrames(frames,source,fps,rate,measuredStage3=false){
   let serial=0,previous=[],matched=0,total=0;
   function describe(w){
    const pts=w.points,n=pts.length;
@@ -58,7 +58,12 @@
    }
    for(const item of now){
     total++;
-    if(!item.w.id)item.w.id='video-'+source+'-actor-'+(++serial);
+    // Stage 3 actor IDs must identify each *new* traced wall, not merely
+    // inherit the per-frame temporary 'trace-N-M' labels. Matched objects
+    // keep their former ID; unmatched ones get a new source-scoped actor ID.
+    // The older stage 1/2 tracking behavior is unchanged.
+    if((measuredStage3&&!newUsed.has(item))||!item.w.id)
+     item.w.id='video-'+source+'-actor-'+(++serial);
    }
    previous=now;
   }
@@ -78,6 +83,8 @@
   const fps=u8(),count=u32(),w=u16(),h=u16();
   if(fps<1||fps>60||count<1||count>30000||w!==480||h!==300)
    throw new Error('Invalid HEXAGON replay metadata');
+  const measuredStage3=typeof info.path==='string'&&
+    /^data\/hexagonest-(1595|1596)\.b64$/.test(info.path);
   const frames=[];
   for(let f=0;f<count;f++){
    const angle=i32()/10000,sides=u8(),zoom=u16()/1000,n=u8();
@@ -130,16 +137,14 @@
     // HEXAGONEST frames are already source-masked before HXRF encoding.
     // Do not re-classify their large top-edge sectors as HUD or late small
     // moving wall fragments as the source triangle. Keep stages 1-2 intact.
-    const measuredHexagonest=typeof info.path==='string'&&
-      /^data\/hexagonest-(1595|1596)\.b64$/.test(info.path);
-    if(!measuredHexagonest&&(sourcePlayerFragment(points)||sourceHudFragment(points)))continue;
+    if(!measuredStage3&&(sourcePlayerFragment(points)||sourceHudFragment(points)))continue;
     walls.push({id:'trace-'+f+'-'+i,sourceFrame:f,points,holes});
    }
    frames.push({angle,sides,zoom,walls});
   }
   if(p!==bytes.length)throw new Error('Unexpected trailing HXRF data');
   const rate=Number(info.gameRate)||1.04;
-  const trackStats=trackFrames(frames,info.id||'unknown',fps,rate);
+  const trackStats=trackFrames(frames,info.id||'unknown',fps,rate,measuredStage3);
   return {fps,frames,trackStats,id:info.id||'',gameRate:rate,
    gameStartOffset:Number(info.gameStartOffset)||0,sourceStart:Number(info.videoStart)||0,
    sourceEnd:Number(info.videoEnd)||0};
