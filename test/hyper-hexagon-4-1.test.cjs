@@ -41,6 +41,9 @@ test('both independent source recordings contain uninterrupted pre/post-60 chron
   assert.ok(f.frames.slice(boundary).some(fr=>fr.walls.length));
   assert.ok(f.frames[boundary-1].walls.length>0);
   assert.ok(f.frames[boundary].walls.length>0);
+  const actorsBefore=new Set(f.frames[boundary-1].walls.map(w=>w.id));
+  assert.ok(f.frames[boundary].walls.some(w=>actorsBefore.has(w.id)),
+    id+' 60s seam changed the actor ID of every already-descending wall');
   assert.ok(f.frames.every(fr=>fr.walls.every(w=>w.points.length>=3)));
   // Frame records are continuous across 60; no different source is loaded.
   const g=new Engine.ArenaGame(3);
@@ -109,6 +112,11 @@ test('real-stage intro is not killed by falsely detected background wedges',asyn
    game.update(1/240,0);
    assert.equal(game.dead,false,'false opening collision from source '+id+' at '+game.time);
   }
+  const expectedFirst=id==='1595'?47:50;
+  assert.ok(film.frames.slice(0,expectedFirst).every(fr=>fr.walls.length===0),
+    'intro background wedges are still misclassified as incoming walls in '+id);
+  assert.ok(film.frames[expectedFirst].walls.length>0,
+    'the first filmed approaching wall was incorrectly removed in '+id);
   const first=film.frames.findIndex(f=>f.walls.length>0);
   assert.ok(first>=1&&first/film.fps*film.gameRate<1,
    'first confirmed wall is not present within one game second: '+id);
