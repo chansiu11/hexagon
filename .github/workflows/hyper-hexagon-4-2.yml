@@ -1,0 +1,56 @@
+name: HYPER HEXAGON 4-2 two-film phrase playback
+on:
+  push:
+    branches:
+      - rebuild-step-4-2-hyper-hexagon-20261116
+  workflow_dispatch:
+jobs:
+  hyper-hexagon-random-parts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify syntax and real data for stage 4
+        run: |
+          node --check hyper-hexagon-parts.js
+          node --check play.js
+          node --check stages/hyper-hexagon.js
+          node --check test/hyper-hexagon-4-2.test.cjs
+          node --check test/hyper-hexagon-4-2-browser.test.cjs
+          node --test test/hyper-hexagon-4-2.test.cjs test/hyper-hexagon-4-1.test.cjs
+          node --test test/rebuilt-engine.test.cjs test/hexagonest-opening.test.cjs \
+            test/hexagon-parts.test.cjs test/hexagoner-parts.test.cjs \
+            test/hexagonest-real-films.test.cjs
+      - name: Install Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Launch local website
+        run: |
+          node server.cjs >/tmp/hyper-hexagon-4-2.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Validate random and chronological HYPER footage in Chromium
+        run: node test/hyper-hexagon-4-2-browser.test.cjs
+      - name: Regress all earlier maps in Chromium
+        run: |
+          node test/video-browser.test.cjs
+          node test/hexagoner-browser.test.cjs
+          node test/hexagon-parts-browser.test.cjs
+          node test/hexagoner-parts-browser.test.cjs
+          node test/hyper-hexagon-4-1-prior-stage3-browser.test.cjs
+      - name: Capture stage 4 browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyper-hexagon-4-2-screenshots
+          path: test-artifacts/
+          if-no-files-found: ignore
