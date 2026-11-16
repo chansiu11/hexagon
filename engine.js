@@ -84,10 +84,12 @@
   function playerPolygon(angle, lean=0) {
     const c=Math.cos(angle),s=Math.sin(angle), x=ORBIT*c,y=ORBIT*s;
     const t=[-s,c],forward=[Math.cos(angle+lean),Math.sin(angle+lean)];
+    // The source game's ship spans about 14–16 canvas pixels at the
+    // reconstructed 960-wide video scale. Keep its collision center at ORBIT.
     return [
-      [x+forward[0]*12,y+forward[1]*12],
-      [x-forward[0]*8+t[0]*6,y-forward[1]*8+t[1]*6],
-      [x-forward[0]*8-t[0]*6,y-forward[1]*8-t[1]*6]
+      [x+forward[0]*9,y+forward[1]*9],
+      [x-forward[0]*6+t[0]*4.5,y-forward[1]*6+t[1]*4.5],
+      [x-forward[0]*6-t[0]*4.5,y-forward[1]*6-t[1]*4.5]
     ];
   }
   class ArenaGame {
