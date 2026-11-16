@@ -31,6 +31,8 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
     transitions:HexPlay.game.replay.transitions,epoch:HexPlay.game.replay.epoch,
     source:HexPlay.game.replay.source,part:HexPlay.game.replay.activePart,
     maxObservedGap:HexPlay.game.replay.maxObservedGap,
+    maxSpawnGap:HexPlay.game.replay.maxSpawnGap,
+    newWallArrivals:HexPlay.game.replay.outerArrivalEvents,
     camera:HexPlay.game.rotation,zoom:HexPlay.game.zoom}));
    assert.ok(!obs.dead,'spectator must not die at '+t);
    assert.ok(obs.walls>0,'visible walls missing at '+t);
@@ -38,6 +40,8 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    assert.ok(Math.abs(obs.time-t)<.17);
    assert.ok(Number.isFinite(obs.zoom)&&Number.isFinite(obs.camera));
    assert.ok(obs.maxObservedGap<1,'wall field gap exceeded 1s in QA seed');
+   assert.ok(obs.maxSpawnGap<1,'observed outer-wall arrivals delayed over 1s in QA seed');
+   if(t>=12)assert.ok(obs.newWallArrivals>10);
    assert.equal(obs.epoch,obs.time<60?0:1,'epoch must follow the actual running clock');
    if(t>75)assert.ok(obs.transitions>=10);
    if([1.2,59.9,60.1,121.5].includes(t))
