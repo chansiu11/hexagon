@@ -16,6 +16,33 @@ function polygon(ctx,points,color,stroke=null,width=2){
  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke()}
 }
 function sectorColor(i,dark,light){return i%2?dark:light}
+function drawHexagonerHUD(ctx,opts,accent){
+ // Source 1595/1596: film HUD has a coloured rank underline, a narrower
+ // high-contrast TIME label, and big *condensed* timer digits.
+ // Do not change the distinct stage-0 HEXAGON HUD.
+ const elapsed=game.time;
+ const ranks=['POINT','LINE','TRIANGLE','SQUARE','SQUARE','PENTAGON'];
+ const record=elapsed>=60 && elapsed>(opts.best||0);
+ const heading=record?'NEW RECORD':(elapsed>=60?'BEST: '+opts.format(opts.best):ranks[Math.min(5,Math.floor(elapsed/10))]);
+ const headingSize=heading.length>9?19:24;
+ const headingWidth=Math.min(285,(heading.length*.95-.1)*headingSize);
+ polygon(ctx,[[0,0],[Math.max(210,headingWidth+40),0],[Math.max(190,headingWidth+22),40],[0,40]],'#000');
+ opts.text(heading,16,4,headingSize,'#fff','left',290);
+ if(!record&&elapsed<60){
+  ctx.fillStyle=accent;
+  ctx.fillRect(16,31,Math.max(70,headingWidth-5),3);
+ }
+ polygon(ctx,[[622,0],[960,0],[960,64],[785,64],[766,40],[645,40]],'#000');
+ opts.text('TIME',655,5,25,'#fff','left',115);
+ const ticks=Math.floor(elapsed*100+1e-7);
+ const timeText=String(Math.floor(ticks/100))+'.'+String(ticks%100).padStart(2,'0');
+ const digitHeight=ticks>=10000?43:48;
+ ctx.save();
+ // Original timer numerals are markedly narrower than the stage-0 font.
+ ctx.translate(960,0);ctx.scale(.70,1);
+ opts.text(timeText,-22,4,digitHeight,'#fff','right',275);
+ ctx.restore();
+}
 function drawArena(ctx,colors,opts){
  const [dark,light,accent]=colors;
  const camera=opts.settings.motion?game.rotation:0;
@@ -89,6 +116,9 @@ function drawArena(ctx,colors,opts){
   }
  }
  ctx.restore();
+ // HEXAGONER has its own source-measured HUD geometry, leaving HEXAGON
+ // unchanged. Render after the arena transform so text stays screen-fixed.
+ if(game.level===1){drawHexagonerHUD(ctx,opts,accent);return;}
  // Gameplay HUD is intentionally a new implementation. Video-specific
  // proportions, dynamic camera and timed voice cues belong to step 1-3.
  const rankNames=['POINT','LINE','TRIANGLE','SQUARE','SQUARE','PENTAGON'];
