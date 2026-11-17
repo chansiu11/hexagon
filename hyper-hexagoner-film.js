@@ -41,6 +41,14 @@
   if(raw.independentlyVerified!==true&&!allowFixture)
    throw new Error('Stage 5 chronological walls have not been verified against the film');
   if(raw.frames.length>FPS*600)throw new Error('Unexpectedly long HYPER HEXAGONER chronology');
+  // Camera rotates/scales the background sectors and every wall together.
+  // The original screenshot tracer records pixels in CAMERA/SCREEN space.
+  // Convert those points back into the unrotated world frame exactly once,
+  // otherwise the renderer rotates screenshots a second time and filmed
+  // walls visibly drift off the background's radial sector boundaries.
+  const space=raw.coordinateSpace===undefined?'world':raw.coordinateSpace;
+  if(space!=='world'&&space!=='screen')
+   throw new Error('Unknown HYPER HEXAGONER wall coordinate space');
   let total=0;
   const frames=raw.frames.map((f,i)=>{
    if(!f||!finite(f.angle)||Math.abs(f.angle)>TAU*1000||
@@ -49,6 +57,12 @@
     !Array.isArray(f.walls)||f.walls.length>200)
     throw new Error('Invalid stage-5 frame '+i);
    const ids=new Set();
+   const ca=Math.cos(f.angle),sa=Math.sin(f.angle),zoom=f.zoom;
+   const convert=pt=>{
+    if(space==='world')return Object.freeze(pt.slice());
+    const [x,y]=pt;
+    return Object.freeze([(x*ca+y*sa)/zoom,(-x*sa+y*ca)/zoom]);
+   };
    const walls=f.walls.map((w,k)=>{
     if(!w||typeof w.id!=='string'||w.id.length<1||w.id.length>120||
      ids.has(w.id)||!validPolygon(w.points)||
@@ -56,13 +70,14 @@
      throw new Error('Invalid stage-5 wall/contour at frame '+i+' #'+k);
     ids.add(w.id);total++;
     return Object.freeze({id:'hyper5-'+id+'-'+w.id,sourceFrame:i,
-     points:w.points.map(p=>Object.freeze(p.slice())),holes:(w.holes||[]).map(h=>h.map(p=>Object.freeze(p.slice())))});
+     points:w.points.map(convert),holes:(w.holes||[]).map(h=>h.map(convert))});
    });
    return Object.freeze({angle:f.angle,zoom:f.zoom,sides:f.sides,walls:Object.freeze(walls)});
   });
   return Object.freeze({id:String(id),fps:FPS,gameRate:rate,gameStartOffset:offset,
    sourceStart:raw.videoStart,sourceEnd:raw.videoEnd,sourceFile:String(raw.sourceFile||''),
-   independentlyVerified:raw.independentlyVerified===true,frames:Object.freeze(frames),
+   independentlyVerified:raw.independentlyVerified===true,coordinateSpace:space,
+   cameraMeasured:raw.cameraMeasured===true,frames:Object.freeze(frames),
    wallPolygons:total,sourceHasFull60:frames.length>boundary});
  }
  function stats(film){
