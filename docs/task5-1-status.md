@@ -38,3 +38,11 @@
 - 완료: 소스 비디오 후보 추출 프로그램, 시간축/ID 연속성 감사 코드, 합성 영상 자동 검사.
 - 미완료: 사용자 첨부 두 MP4의 실제 5번 맵 시작·종료 프레임 및 각 60초 전/후 벽 데이터 실측, 영상별 플레이 재현 및 화면 검증. 원본 파트 수는 아직 미정.
 - 5-2 및 작업 6은 시작하지 않음.
+
+### 추가 실행 검사 — GitHub Actions Chromium (2026-11-17)
+
+- test/hyper-hexagoner-5-1-browser.test.cjs: 네트워크 요청을 테스트 전용 60fps 합성 프레임으로 대체하여 실제 Chrome에서 5번 맵을 실행했다.
+- 두 영상 ID(1595, 1596) 각각 5번 맵 진입, 게임 시간 59.99초에서 60초 이후로 벽 ID 및 프레임 진행 유지, 벽 접촉/열린 구간 충돌, 사망/재시작/메뉴 복귀가 모두 통과했다.
+- Source-adapter workflow: https://github.com/chansiu11/hexagon/actions/runs/43984653828 — JS unit 6개, Python synthetic video 4개, 기존 1~4번 Node 회귀 14개, Chrome synthetic 5번 맵 검증 모두 성공.
+- Shared smoke workflow: https://github.com/chansiu11/hexagon/actions/runs/43984654097 — 성공.
+- 주의: 이 합성 5번 맵 브라우저 테스트는 실제 MP4 추출이 아니며, 두 영상의 원작 정확도 검증이나 5-1 완료를 뜻하지 않는다.
