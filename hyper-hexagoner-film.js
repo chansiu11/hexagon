@@ -63,7 +63,7 @@
   return Object.freeze({id:String(id),fps:FPS,gameRate:rate,gameStartOffset:offset,
    sourceStart:raw.videoStart,sourceEnd:raw.videoEnd,sourceFile:String(raw.sourceFile||''),
    independentlyVerified:raw.independentlyVerified===true,frames:Object.freeze(frames),
-   wallPolygons:total,sourceHasFull60:frames.length>FPS*60});
+   wallPolygons:total,sourceHasFull60:frames.length>boundary});
  }
  function stats(film){
   if(!film||!film.frames||film.fps!==FPS)throw new Error('Invalid stage-5 recording');
