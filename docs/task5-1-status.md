@@ -16,3 +16,25 @@
 - 영상 파일의 기록 프레임(60fps)과 원본 게임 HUD 시간은 항상 같지 않으므로, 기록별 `gameRate`와 `gameStartOffset`을 검증하고 엔진에 전달하도록 수정.
 - 60초 기준 프레임을 고정값 3600 대신 `ceil((60-gameStartOffset)*fps/gameRate)`로 계산. 게임 시간 60초 경계를 가로지르는 동일 벽 ID 유지 테스트(25/24 배속)를 추가.
 - 본 수정은 **실제 MP4 내용 추출이 아님**. 제공된 `1595(4).mp4` / `1596(4).mp4`의 원본 영상 프레임 분석 및 두 JSON 생성은 여전히 차단되어 5-1 완료 판정 불가.
+
+## 2026-11-17 이어서 진행 — MP4 후보 추출 및 검증 도구
+
+- 사용자 첨부 파일 1595(4).mp4 (351,267,696 bytes), 1596(4).mp4 (198,171,930 bytes)의 존재와 파일 서비스 복사를 확인했다. 하지만 로컬 영상 디코딩 환경에서 ClientError가 지속되어 실제 프레임의 내용은 읽지 못했다.
+- tools/transcribe-hyper-hexagoner.py: 원본 MP4의 FPS/영상시간 조회, 게임 영역 16:10 정규화, 60fps 후보 컨투어와 구멍 추출, 중앙 코어/상단 HUD 일부 제거, 연속 벽 ID 추적, 소스 JSON 및 검토용 첫 프레임 표시 이미지 작성.
+- 추출 결과는 잠정적인 화면 좌표이고 카메라 각도/줌은 아직 실측되지 않았으므로 cameraMeasured:false 및 independentlyVerified:false를 기본으로 한다. 이 파일은 정식 5번 맵 데이터로 불러올 수 없도록 검증 게이트를 유지한다.
+- tools/audit-hyper-hexagoner-source.cjs: 두 원본의 시간 보정 및 60초 경계, 벽 ID 지속 여부, 첫 벽과 벽 탐지 공백, 영상 길이와 프레임 개수 일치 여부를 독립적으로 검사. ID 추적/색상 인식 오류는 실제 원본 화면에서 수동 재검토가 필요하다.
+- test/test-hyper-hexagoner-transcribe.py는 합성 화면 및 합성 동영상으로 컨투어/구멍/중앙 코어 제외/ID 연속성/프레임 샘플링을 검증한다. GitHub Actions에서 기존 5번 맵 엔진 검사와 1~4번 회귀 검사에 더하여 실행한다.
+
+### 원본 추출 명령 (시작/종료 시간 실측 필요)
+
+1. python tools/transcribe-hyper-hexagoner.py --probe "1595(4).mp4"
+2. 원본 영상에서 5번 맵 실제 시작·종료 시각, HUD 시간 보정, 오각형 등 형태 변화를 직접 판독한다. 이전 맵 시각을 임의로 대입하지 않는다.
+3. python tools/transcribe-hyper-hexagoner.py --video "1595(4).mp4" --id 1595 --start <시작초> --end <종료초> --out data/hyper-hexagoner-1595.json --preview /tmp/hyper5-preview.png
+4. 1596(4).mp4도 각각 추출하고 원본과 윤곽·타이밍·회전·줌·변형을 영상 대조한다. 이 검증이 끝나기 전 independentlyVerified=true를 입력하지 않는다.
+5. node tools/audit-hyper-hexagoner-source.cjs data/hyper-hexagoner-1595.json data/hyper-hexagoner-1596.json
+
+### 판정
+
+- 완료: 소스 비디오 후보 추출 프로그램, 시간축/ID 연속성 감사 코드, 합성 영상 자동 검사.
+- 미완료: 사용자 첨부 두 MP4의 실제 5번 맵 시작·종료 프레임 및 각 60초 전/후 벽 데이터 실측, 영상별 플레이 재현 및 화면 검증. 원본 파트 수는 아직 미정.
+- 5-2 및 작업 6은 시작하지 않음.
