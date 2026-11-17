@@ -3,7 +3,7 @@
  * in this branch yet. This map deliberately FAILS CLOSED when JSON is absent,
  * instead of playing old or fabricated wall order. */
 HexEngine.registerMap(4,{
- sourceStatus:'step-5-1-awaiting-verified-video-chronologies',
+ sourceStatus:'stage5-2-random-join-ready-verified-video-data-pending',
  walls:[],
  shapes:[{at:0,sides:6}],
  replays:{
