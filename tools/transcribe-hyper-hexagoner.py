@@ -121,6 +121,55 @@ def polygonize(mask,min_area=45.0):
     return walls
 
 
+def sector_phase_from_background(bgr, wall_mask, sides, previous=None):
+    """Estimate the ACTUAL camera orientation from alternating sector rays.
+
+    The previous extractor set rotation to zero, causing screenshot-derived
+    wall contours to be rotated differently from the background separators.
+    Search rays that maximize the color jump at BOTH sides of each boundary,
+    excluding pixels that are part of candidate walls.
+    The estimate is modulo one sector; unwrap to the prior frame to avoid
+    60-degree jumps. This is a *candidate* measurement to be reviewed.
+    """
+    if not 3 <= sides <= 12:
+        raise ValueError('Expected 3..12 sectors')
+    period=2*math.pi/sides
+    candidates=np.linspace(0.,period,240,endpoint=False,dtype=np.float64)
+    rays=candidates[:,None]+np.arange(sides)[None,:]*period
+    lab=cv2.cvtColor(bgr,cv2.COLOR_BGR2LAB)
+    total=np.zeros(candidates.size,dtype=np.float64)
+    counts=np.zeros(candidates.size,dtype=np.float64)
+    for radius in (113,145,187,225,263):
+        # Compare background a few degrees either side of radial separator.
+        delta=.045
+        positions=[]
+        for shift in (-delta,delta):
+            theta=rays+shift
+            xs=np.clip(np.rint(CENTER[0]+radius*np.cos(theta)).astype(int),
+                       0,WIDTH-1)
+            ys=np.clip(np.rint(CENTER[1]+radius*np.sin(theta)).astype(int),
+                       0,HEIGHT-1)
+            positions.append((xs,ys))
+        (lx,ly),(rx,ry)=positions
+        left=lab[ly,lx].astype(np.float64)
+        right=lab[ry,rx].astype(np.float64)
+        valid=((wall_mask[ly,lx]<128)&(wall_mask[ry,rx]<128)&
+               (ly>=68)&(ry>=68))
+        difference=np.sqrt(np.sum((left-right)**2,axis=2))
+        total+=np.sum(difference*valid,axis=1)
+        counts+=np.sum(valid,axis=1)
+    sufficient=counts>=sides*2
+    scores=np.where(sufficient,total/np.maximum(1,counts),-1.)
+    index=int(np.argmax(scores))
+    if scores[index]<8.:
+        raise ValueError('Background sector edges unclear; inspect frame/ink color')
+    phase=float(candidates[index])
+    if previous is None:
+        return phase
+    # Phase 0 and phase + 2*pi/sides describe identical sector boundaries.
+    return phase+round((previous-phase)/period)*period
+
+
 def centroid(points):
     return np.asarray(points,dtype=np.float32).mean(axis=0)
 
@@ -222,6 +271,8 @@ def main():
     ap.add_argument('--game-rate',type=float,default=1.)
     ap.add_argument('--game-start-offset',type=float,default=0.)
     ap.add_argument('--sides',type=int,default=6)
+    ap.add_argument('--camera-mode',choices=['sector','identity'],default='sector',
+                    help='Detect background sector rotation, or keep an uncalibrated 0 angle')
     ap.add_argument('--preview',type=pathlib.Path)
     args=ap.parse_args()
     if args.probe:
@@ -235,6 +286,7 @@ def main():
     previous=TrackIds()
     preview=None
     fixed=parse_color(args.accent_rgb) if args.accent_rgb else None
+    previous_angle=None
     for i,raw in source_frames(args.video,args.start,args.end):
         view=stage_view(raw)
         try:
@@ -243,10 +295,17 @@ def main():
         except ValueError as e:
             raise RuntimeError(f'Frame {i} color auto-calibration failed: {e}') from e
         walls=previous.assign(polygonize(mask))
-        # World currently means camera-independent screen contours. Do NOT
-        # fabricate camera-angle/zoom; both remain identity until independently
-        # measured against sector lines / source footage.
-        frames.append({'angle':0.,'zoom':1.,'sides':args.sides,'walls':walls})
+        # Source contours are SCREEN-space. Estimate the background rotation
+        # separately so the web renderer can undo it exactly once and keep
+        # the polygon sides aligned to the arena's radial separators.
+        # Camera zoom and shape transitions still require source verification.
+        if args.camera_mode=='sector':
+            angle=sector_phase_from_background(view,mask,args.sides,previous_angle)
+            previous_angle=angle
+        else:
+            angle=0.
+        frames.append({'angle':round(float(angle),8),
+                       'zoom':1.,'sides':args.sides,'walls':walls})
         if i==0:
             preview=annotate(view,mask,walls)
         if (i+1)%1200==0:
@@ -256,9 +315,12 @@ def main():
         'videoStart':args.start,'videoEnd':args.end,
         'gameRate':args.game_rate,'gameStartOffset':args.game_start_offset,
         'sourceFile':args.video.name,'independentlyVerified':False,
+        'coordinateSpace':'screen',
         'cameraMeasured':False,
-        'notes':'SCREEN-space candidate contours; must be visually reviewed; '
-                'not verified game-space polygons or calibrated camera',
+        'cameraAngleCandidate':args.camera_mode=='sector',
+        'notes':'SCREEN-space candidate contours with unverified sector-phase '
+                'estimate. The film parser unrotates screenshots into world '
+                'space. Zoom, shapes and the original MP4 still require review.',
         'frames':frames
     }
     args.out.parent.mkdir(parents=True,exist_ok=True)
