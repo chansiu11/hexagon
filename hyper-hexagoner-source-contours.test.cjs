@@ -24,6 +24,11 @@ new Function('module','require',fs.readFileSync(__dirname+'/hyper-hexagoner-910.
  p==='./hyper-hexagoner-910-data'?D:
  p==='./hyper-hexagoner-wall-atlas'?atlas:F);
 const H=mod.exports;
+// Raw video silhouette parity remains testable ONLY behind an explicit
+// diagnostic opt-in. Regular players never see unverified center fragments.
+const savedDoc=globalThis.document,savedLocation=globalThis.location;
+globalThis.document={};
+globalThis.location={search:'?hyperHexagonerContours=raw'};
 const game=new H.HyperHexagonerGame(H.create(null,7,88,{order:'video'}));
 const play=fs.readFileSync(__dirname+'/play.js','utf8');
 const anchor=play.indexOf('function drawWallField(');
@@ -96,4 +101,6 @@ assert.equal(calls,before,'random mode never samples film frames');
 atlas.ready=false;game.sampleWalls();
 assert.equal(game.atlasActive,false,'missing atlas returns to quad-based source events');
 assert.strictEqual(game.walls,game._collisionWalls);
+if(savedDoc===undefined)delete globalThis.document;else globalThis.document=savedDoc;
+if(savedLocation===undefined)delete globalThis.location;else globalThis.location=savedLocation;
 console.log('PASS film walls: intro collision gate, first wall active, 10 source moments, inverse camera, shared paint/hit, gap lane, random & fallback');
