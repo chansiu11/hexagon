@@ -74,6 +74,10 @@ function fixture(id){
    // The rendered wall polygon is the same one used by world collision.
    const contact=await page.evaluate(()=>{
     const g=HexPlay.game;
+    // Screenshots can take hundreds of milliseconds while requestAnimationFrame
+    // keeps playing. Restore the exact measured collision sample BEFORE
+    // making both checks synchronously in this single evaluation.
+    g.seekReplay(60);
     g.spectating=false;g.angle=Math.PI;
     const safe=!g.checkCollision();
     g.angle=0;const hit=g.checkCollision();
