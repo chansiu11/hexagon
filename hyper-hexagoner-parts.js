@@ -31,9 +31,11 @@
  const turn=(pts,rad)=>{const c=Math.cos(rad),s=Math.sin(rad);
   return pts.map(([x,y])=>[x*c-y*s,x*s+y*c]);
  };
- const rotateWall=(w,rad,id)=>({...w,id,
-  points:turn(w.points,rad),
-  holes:(w.holes||[]).map(h=>turn(h,rad))});
+ const rotateWall=(w,rad,id,scale=1)=>{
+  const transform=ring=>turn(ring,rad).map(([x,y])=>[x*scale,y*scale]);
+  return {...w,id,points:transform(w.points),
+   holes:(w.holes||[]).map(transform)};
+ };
  const radius=w=>Math.max(...w.points.map(([x,y])=>Math.hypot(x,y)));
  function rng(seed){let x=(Number(seed)>>>0)||0x9e3779b9;
   return ()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296;};
@@ -172,16 +174,24 @@
   return includePreexisting?frame.walls:
    frame.walls.filter(w=>p.births.has(w.id)&&p.births.get(w.id)<=index);
  }
- function oldCarriesAt(carries,films,seconds){
+ function oldCarriesAt(carries,films,seconds,currentCamera=0,currentZoom=1){
+  // A carried actor has its OWN continued filmed camera orientation/zoom.
+  // Re-express that actor in the CURRENT camera's world coordinates so its
+  // rendered screen position does not jump when a new phrase changes camera.
   const out=[];
   for(const c of carries){
    const elapsed=seconds-c.created;
    if(elapsed<0)continue;
    const film=films[c.source];
    const index=sourceIndex(film,c.frameIndex,elapsed);
-   const walls=actorFrame(film,index).walls;
+   const observed=actorFrame(film,index);
+   const actorCamera=observed.angle+c.cameraOffset;
+   const actorZoom=observed.zoom*c.zoomRatio;
+   const cameraDrift=actorCamera-currentCamera;
+   const scale=actorZoom/currentZoom;
+   const walls=observed.walls;
    for(const w of walls)if(c.ids.has(w.id))
-    out.push(rotateWall(w,c.shift,c.runId+':'+w.id));
+    out.push(rotateWall(w,c.shift+cameraDrift,c.runId+':'+w.id,scale));
   }
   return out;
  }
@@ -254,10 +264,11 @@
    return {index,frame,local,p,film};
   }
   activeWalls(atTime){
-   const {index,p,film}=this.fromCurrent(atTime);
+   const {index,p,film,frame}=this.fromCurrent(atTime);
    const own=sourceWalls(p,film,index,this.contiguous)
     .map(w=>rotateWall(w,this.rotationShift,this.runId+':'+w.id));
-   return own.concat(oldCarriesAt(this.carries,this.recordings,atTime));
+   return own.concat(oldCarriesAt(this.carries,this.recordings,atTime,
+    frame.angle+this.cameraOffset,frame.zoom*this.zoomRatio));
   }
   ongoingForCandidate(t){
    // Preserve every actor that existed at the actual cut time, including
@@ -266,14 +277,16 @@
    const visible=new Set(sourceWalls(current.p,current.film,current.index,this.contiguous).map(w=>w.id));
    const next=this.carries.slice();
    if(visible.size)next.push({source:current.p.source,frameIndex:current.index,
-    ids:visible,shift:this.rotationShift,runId:this.runId,created:t});
+    ids:visible,shift:this.rotationShift,runId:this.runId,created:t,
+    cameraOffset:this.cameraOffset,zoomRatio:this.zoomRatio});
    return next;
   }
   choose(t,playerAngle,postEpoch=false){
    const pool=postEpoch?this.bank.post:this.bank.pre;
    const old=this.current,oldFrame=this.fromCurrent(t);
    const carries=this.ongoingForCandidate(t);
-   const oldWallsAt=(dt)=>oldCarriesAt(carries,this.recordings,t+dt);
+   const oldCamera=oldFrame.frame.angle+this.cameraOffset;
+   const oldZoom=oldFrame.frame.zoom*this.zoomRatio;
    const candidates=[];
    for(const p of pool){
     if(p.inSides!==oldFrame.frame.sides)continue;
@@ -292,6 +305,18 @@
       Array.from({length:p.inSides},(_,k)=>k*TAU/p.inSides);
     for(const shift of shifts){
      const film=this.recordings[p.source];
+     const entry=film.frames[p.from];
+     const candidateCameraOffset=oldCamera-entry.angle;
+     const candidateZoomRatio=oldZoom/entry.zoom;
+     const cameraAt=dt=>{
+      const frame=film.frames[atPart(p,film,dt)];
+      return {angle:frame.angle+candidateCameraOffset,
+       zoom:frame.zoom*candidateZoomRatio};
+     };
+     const oldWallsAt=dt=>{
+      const camera=cameraAt(dt);
+      return oldCarriesAt(carries,this.recordings,t+dt,camera.angle,camera.zoom);
+     };
      const nextWallsAt=(dt)=>{
       const index=atPart(p,film,dt);
       return sourceWalls(p,film,index,contiguous)
