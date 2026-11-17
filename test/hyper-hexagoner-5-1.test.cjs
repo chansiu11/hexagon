@@ -104,3 +104,49 @@ test('post-60 flag is based on calibrated game clock even with fewer than 3600 f
  assert.equal(Film.stats(film).before60Frames,3456);
  assert.equal(Film.stats(film).after60Frames,44);
 });
+
+test('SCREEN-space filmed polygon edges are unrotated once and line up with the renderer sector rays',()=>{
+ const theta=0.347,zoom=1.38;
+ const source=fixture('1595');
+ const original=Engine.panelPolygon(100,34,6,1);
+ const screen=original.map(([x,y])=>[
+  zoom*(x*Math.cos(theta)-y*Math.sin(theta)),
+  zoom*(x*Math.sin(theta)+y*Math.cos(theta))
+ ]);
+ source.coordinateSpace='screen';
+ source.frames[0]={angle:theta,zoom,sides:6,
+  walls:[{id:'on-sector-rays',points:screen,holes:[]}]};
+ const film=Film.parse(source,'1595',{allowFixture:true});
+ assert.equal(film.coordinateSpace,'screen');
+ const model=new Engine.ArenaGame(4);
+ model.attachReplay(film,{spectating:true});
+ assert.equal(model.walls.length,1);
+ for(let i=0;i<4;i++){
+  const world=model.walls[0].points[i],expected=original[i];
+  assert.ok(Math.hypot(world[0]-expected[0],world[1]-expected[1])<1e-8,
+   'camera rotation was applied twice or sector edge drifted');
+  // Rendering with the CURRENT camera must recover the exact original
+  // screenshot coordinates while polygon vertices stay on world rays.
+  const projected=[
+   zoom*(world[0]*Math.cos(theta)-world[1]*Math.sin(theta)),
+   zoom*(world[0]*Math.sin(theta)+world[1]*Math.cos(theta))
+  ];
+  assert.ok(Math.hypot(projected[0]-screen[i][0],projected[1]-screen[i][1])<1e-8);
+ }
+ for(const p of model.walls[0].points){
+  const rad=Math.atan2(p[1],p[0]),step=Math.PI/3;
+  const remainder=Math.atan2(Math.sin(rad/step*Math.PI*2),Math.cos(rad/step*Math.PI*2));
+  assert.ok(Math.abs(remainder)<1e-7,'sector edge not on a radial line');
+ }
+ model.spectating=false;
+ model.angle=1.5*Math.PI/3;
+ assert.equal(model.checkCollision(),false,'wall at radius 100 should not hit orbit 66');
+});
+test('world-space fixture remains unchanged and bad coordinate tags are rejected',()=>{
+ const raw=fixture('1596');
+ const original=raw.frames[3599].walls[0].points;
+ assert.deepEqual(Film.parse(raw,'1596',{allowFixture:true}).frames[3599].walls[0].points,
+  original);
+ raw.coordinateSpace='pixels-of-another-stage';
+ assert.throws(()=>Film.parse(raw,'1596',{allowFixture:true}),/coordinate space/);
+});
