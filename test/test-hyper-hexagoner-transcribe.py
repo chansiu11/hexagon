@@ -70,5 +70,34 @@ class TranscriberTests(unittest.TestCase):
             self.assertEqual(frames[-1][0],60)
 
 
+    def test_sector_phase_follows_real_background_separator_lines(self):
+        import math
+        phase=.31
+        sample=np.empty((600,960,3),dtype=np.uint8)
+        # Synthetic alternating hexagonal sectors, not actual source footage.
+        yy,xx=np.indices(sample.shape[:2])
+        angle=np.mod(np.arctan2(yy-300,xx-480)-phase,2*math.pi)
+        sector=np.floor(angle/(math.pi/3)).astype(int)%2
+        sample[:]=np.where(sector[:,:,None]==0,
+                           np.array([32,45,54],dtype=np.uint8),
+                           np.array([105,122,136],dtype=np.uint8))
+        wall_mask=np.zeros((600,960),dtype=np.uint8)
+        cv2.rectangle(wall_mask,(580,230),(740,260),255,-1)
+        found=transcribe.sector_phase_from_background(sample,wall_mask,6)
+        circular=math.atan2(math.sin((found-phase)*6),
+                             math.cos((found-phase)*6))/6
+        self.assertLess(abs(circular),.020,
+                        'camera sector phase did not match radial source lines')
+        unwrapped=transcribe.sector_phase_from_background(
+            sample,wall_mask,6,previous=phase+2*math.pi/6)
+        self.assertLess(abs(unwrapped-(phase+2*math.pi/6)),.02)
+
+    def test_sector_phase_refuses_flat_undetectable_background(self):
+        solid=np.full((600,960,3),(49,49,49),dtype=np.uint8)
+        mask=np.zeros((600,960),dtype=np.uint8)
+        with self.assertRaises(ValueError):
+            transcribe.sector_phase_from_background(solid,mask,6)
+
+
 if __name__=='__main__':
     unittest.main()
