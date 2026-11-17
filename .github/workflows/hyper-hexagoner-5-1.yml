@@ -22,3 +22,24 @@ jobs:
       - name: Shared engine and completed 1-4 maps regression
         run: |
           node --test test/hyper-hexagon-4-1.test.cjs test/hyper-hexagon-4-2.test.cjs test/hexagoner-parts.test.cjs
+      - name: Install Chromium for stage 5 synthetic in-browser replay
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Start rebuilt game
+        run: |
+          node server.cjs >/tmp/hyper5-5-1.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Synthetic stage 5 Chrome player timeline, collision, retry
+        run: node test/hyper-hexagoner-5-1-browser.test.cjs
+      - name: Browser screenshot artifact (synthetic, not source parity)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyper-hexagoner-5-1-synthetic-screenshots
+          path: test-artifacts/hyper5-SYNTHETIC-*.png
+          if-no-files-found: ignore
