@@ -48,10 +48,6 @@
     if(Math.abs(cross)<1e-7&&x>=Math.min(ax,bx)-1e-7&&
        x<=Math.max(ax,bx)+1e-7&&y>=Math.min(ay,by)-1e-7&&
        y<=Math.max(ay,by)+1e-7)return true;
-    if((ay>by)!==(ay>y)){
-      // Explicitly use normal ray crossing below; this early condition
-      // intentionally does not make any occupancy decision.
-    }
     if((ay>y)!==(by>y)){
       const at=ax+(y-ay)*(bx-ax)/(by-ay);
       if(x<at)yes=!yes;
@@ -284,6 +280,12 @@
     const contiguous=p.source===old.source&&p.from===oldFrame.index;
     // Never clone a source segment as a fresh fake actor launch.
     if(!contiguous&&(p.arrivalDelay>MAX_ENTRY_DELAY||p.unsafeBirth))continue;
+    // 1-second spawn-budget is measured between successive OBSERVED actor
+    // arrivals, not merely relative to the seam. Reject an otherwise safe
+    // candidate if a wall would not arrive soon enough after the last birth.
+    // Contiguous original-frame playback is measured by the same rule.
+    const gapBudget=MAX_ENTRY_DELAY-Math.max(0,t-this.lastBorn);
+    if(p.arrivalDelay>gapBudget+1/FPS)continue;
     // Do not select the currently playing source segment.
     if(p.id===old.id)continue;
     const shifts=contiguous?[this.rotationShift]:
