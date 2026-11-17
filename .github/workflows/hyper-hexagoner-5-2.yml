@@ -1,0 +1,60 @@
+name: HYPER HEXAGONER 5-2 random join and Chrome regression
+on:
+  push:
+    branches:
+      - rebuild-step-5-2-hyper-hexagoner-20261117
+  workflow_dispatch:
+jobs:
+  stage5-random-play:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and original source adapter plus fifth-stage random unit tests
+        run: |
+          node --check hyper-hexagoner-parts.js
+          node --check play.js
+          node --check engine.js
+          node --check test/hyper-hexagoner-5-2-browser.test.cjs
+          node --test test/hyper-hexagoner-5-1.test.cjs test/hyper-hexagoner-5-2.test.cjs
+      - name: Preexisting stages 1-4 Node regression
+        run: |
+          node --test test/rebuilt-engine.test.cjs test/hexagon-parts.test.cjs \
+            test/hexagoner-parts.test.cjs test/hexagonest-real-films.test.cjs \
+            test/hyper-hexagon-4-1.test.cjs test/hyper-hexagon-4-2.test.cjs
+      - name: Install Chrome for real browser execution
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Start local game server
+        run: |
+          node server.cjs >/tmp/stage5-2.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Verify fifth stage in Chrome using synthetic footage
+        run: |
+          node test/hyper-hexagoner-5-1-browser.test.cjs
+          node test/hyper-hexagoner-5-2-browser.test.cjs
+      - name: Check previously completed stages in Chrome
+        run: |
+          node test/video-browser.test.cjs
+          node test/hexagoner-browser.test.cjs
+          node test/hexagon-parts-browser.test.cjs
+          node test/hexagoner-parts-browser.test.cjs
+          node test/hyper-hexagon-4-1-browser.test.cjs
+          node test/hyper-hexagon-4-2-browser.test.cjs
+      - name: Archive fifth-stage synthetic verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage5-2-SYNTHETIC-browser
+          path: test-artifacts/hyper5-*.png
+          if-no-files-found: ignore
