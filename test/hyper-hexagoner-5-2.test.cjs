@@ -108,6 +108,8 @@ test('source-based random playback crosses 60s, remains alive under spectator an
   assert.ok(origins.has(firstSource));
   assert.ok(origins.size===2,'both original film segments should be selected');
   assert.equal(session.unsafeSeams,0,'unsafe seam should not be committed');
+  assert.ok(session.maxEmpty<1.01,'source recording has >1 second of no walls');
+  assert.ok(session.maxSpawnGap<1.01,'arrival gap exceeds one second: '+session.maxSpawnGap);
  }
 });
 
@@ -127,4 +129,25 @@ test('renderer and collision engine share polygon coordinates, death reset and c
  rest.attachReplay(film,{spectating:true});
  assert.equal(rest.time,0);
  assert.equal(rest.dead,false);
+});
+
+test('wall visible at game-time 60 continues as the exact same actor at a randomized epoch seam',()=>{
+ const session=Parts.create(films(),{seed:44,firstSource:'1595',playerSpeed:8.3});
+ const lastPre=session.bank.pre.filter(p=>p.source==='1595').at(-1);
+ assert.equal(lastPre.to,3600);
+ session.current=lastPre;
+ session.start=60-lastPre.duration;
+ session.source='1595';
+ session.sourceFrame=lastPre.from;
+ session.activePart=lastPre.id;
+ session.lastTime=session.start;
+ session.contiguous=true;
+ const before=session.sample(59.98,Math.PI);
+ const tracked=before.walls.find(w=>w.id.endsWith('boundary-actor'));
+ assert.ok(tracked,'no approaching wall available for epoch seam regression');
+ const after=session.sample(60.05,Math.PI);
+ assert.equal(after.ended,false);
+ assert.ok(after.walls.some(w=>w.id===tracked.id),
+  'wall that was already descending at 60 seconds vanished or changed ID');
+ assert.equal(session.epoch,1);
 });
