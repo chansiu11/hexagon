@@ -341,7 +341,15 @@ class HyperHexagonerGame extends E.Game{
   this.recordedCamera=this.timeline.orderMode==='video'?
    filmedCameraAt(this.time):cameraAt(this.time);
   this.referenceCamera=this.recordedCamera;
-  if(this._sampleFilmedWalls(this.time))return;
+  // The 60fps optical contour bank includes broken pieces of the center
+  // ring and JPEG segmentation fragments. Its arbitrary vertices do not
+  // follow the SIX background spokes: rendering it caused flickering lines
+  // around the core and bent/offset lethal walls in the live fifth stage.
+  // Keep source footage available only for explicit offline comparison.
+  // Gameplay and collision both use the SAME rigid, six-sector quads.
+  const rawContours=typeof root.document!=='undefined'&&
+   new URLSearchParams(root.location?.search||'').get('hyperHexagonerContours')==='raw';
+  if(rawContours&&this._sampleFilmedWalls(this.time))return;
   this._samplePhysicalWalls(this.time);
   this.atlasActive=false;this.atlasColor=null;this.filmFrame=null;
   this.walls=this._collisionWalls;
