@@ -151,3 +151,51 @@ test('wall visible at game-time 60 continues as the exact same actor at a random
   'wall that was already descending at 60 seconds vanished or changed ID');
  assert.equal(session.epoch,1);
 });
+
+
+test('carried actors retain exact screen position after a cut between independently rotating and zooming films',()=>{
+ const base=films();
+ const makeFilm=(id,offset,speed,baseZoom)=>({
+  ...base[id],
+  frames:base[id].frames.map((f,i)=>({
+   ...f,
+   angle:f.angle+offset+speed*i/60,
+   zoom:baseZoom+.09*Math.sin(i/103)
+  }))
+ });
+ const altered={'1595':makeFilm('1595',.42,.11,1.10),
+  '1596':makeFilm('1596',-.73,-.16,.81)};
+ const s=Parts.create(altered,{seed:47,firstSource:'1595',playerSpeed:8.3});
+ const tail=s.bank.pre.filter(p=>p.source==='1595').at(-1);
+ const next=s.bank.post.find(p=>p.source==='1596');
+ assert.equal(tail.to,3600);
+ assert.equal(next.from,3600);
+ s.current=tail;
+ s.source=tail.source;
+ s.activePart=tail.id;
+ s.start=60-tail.duration;
+ s.lastTime=s.start;
+ s.choose=()=>({part:next,shift:TAU/6,contiguous:false});
+ s.sample(59.99,Math.PI);
+ function imagePoint(worldPoint,camera,zoom){
+  const [x,y]=worldPoint,c=Math.cos(camera),sn=Math.sin(camera);
+  return [(x*c-y*sn)*zoom,(x*sn+y*c)*zoom];
+ }
+ for(const t of [60,60.05,60.10]){
+  const view=s.sample(t,Math.PI);
+  const carried=view.walls.find(w=>w.id==='1:hyper5-1595-boundary-actor');
+  assert.ok(carried,'source A visible wall vanished at '+t);
+  const sourceIndex=3600+Math.floor((t-60)*60+1e-8);
+  const old=altered['1595'].frames[sourceIndex];
+  const original=old.walls.find(w=>w.id==='hyper5-1595-boundary-actor');
+  assert.ok(original);
+  for(let j=0;j<original.points.length;j++){
+   const expected=imagePoint(original.points[j],old.angle,old.zoom);
+   const actual=imagePoint(carried.points[j],view.angle,view.zoom);
+   assert.ok(Math.hypot(expected[0]-actual[0],expected[1]-actual[1])<1e-5,
+    'old wall teleported when camera changed: frame '+sourceIndex+
+    ', world '+j+', error '+Math.hypot(expected[0]-actual[0],expected[1]-actual[1]));
+  }
+ }
+ assert.ok(s.carries.length>0);
+});
