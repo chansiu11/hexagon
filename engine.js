@@ -211,11 +211,12 @@
         // Both films begin with a shrinking core / player flash, NOT
         // incoming lethal walls. Preserve the same launch grace used by the
         // chronological source route; it applies only once per game run.
-        this.walls=this.time<.55?[]:frame.walls;
+        this.walls=(this.level===4||this.time>=.55)?frame.walls:[];
         this.applyShape(frame.sides);
         this.rotation=frame.angle;
         this.zoom=frame.zoom;
         this.tilt=0;
+        if(this.level===4&&this.replay.ended)this.timelineEnded=true;
         return;
       }
       if(this.replay){
