@@ -94,3 +94,13 @@ test('stage-5 source audit reports missing verification, gaps and the carried 60
  assert.ok(report.longestDetectedBirthGapSeconds>1);
  assert.ok(report.warnings.some(s=>s.includes('not')||s.includes('Not')));
 });
+
+test('post-60 flag is based on calibrated game clock even with fewer than 3600 frames',()=>{
+ const data=fixture('1596');
+ data.gameRate=25/24;
+ data.frames=data.frames.slice(0,3500);
+ const film=Film.parse(data,'1596',{allowFixture:true});
+ assert.equal(film.sourceHasFull60,true);
+ assert.equal(Film.stats(film).before60Frames,3456);
+ assert.equal(Film.stats(film).after60Frames,44);
+});
