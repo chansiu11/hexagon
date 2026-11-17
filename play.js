@@ -58,6 +58,23 @@ function drawHyperHUD(ctx,opts,accent){
  const timer=String(Math.floor(ticks/100))+'.'+String(ticks%100).padStart(2,'0');
  opts.text(timer,949,3,43,'#fff','right',143);
 }
+function drawHyperHexagonerHUD(ctx,opts,accent){
+ // Provisional stage-5-only HUD while its original video frames remain
+ // unavailable. It deliberately does NOT reuse stage-4 measured HUD sizes.
+ const t=game.time,centis=Math.floor(t*100+1e-7);
+ const label=t>=60?'HYPER HEXAGONER':(opts.best>0?
+  'BEST: '+opts.format(opts.best):
+  ['POINT','LINE','TRIANGLE','SQUARE','PENTAGON','HEXAGON'][Math.min(5,Math.floor(t/10))]);
+ polygon(ctx,[[0,0],[Math.min(332,95+label.length*16),0],
+  [Math.min(309,78+label.length*16),40],[0,40]],'#000');
+ opts.text(label,13,5,label.length>14?18:24,'#fff','left',306);
+ ctx.fillStyle=accent;ctx.fillRect(13,34,118,3);
+ polygon(ctx,[[556,0],[809,0],[792,40],[565,40]],'#000');
+ opts.text('HYPER MODE',575,4,26,'#fff','left',205);
+ polygon(ctx,[[798,0],[960,0],[960,57],[826,57],[810,39]],'#000');
+ opts.text(String(Math.floor(centis/100))+'.'+String(centis%100).padStart(2,'0'),
+  951,5,41,'#fff','right',151);
+}
 function drawArena(ctx,colors,opts){
  const [dark,light,accent]=colors;
  const camera=opts.settings.motion?game.rotation:0;
@@ -133,7 +150,7 @@ function drawArena(ctx,colors,opts){
  ctx.restore();
  // HEXAGONER has its own source-measured HUD geometry, leaving HEXAGON
  // unchanged. Render after the arena transform so text stays screen-fixed.
- if(game.level===1){drawHexagonerHUD(ctx,opts,accent);}else if(game.level===3){drawHyperHUD(ctx,opts,accent);}else{
+ if(game.level===1){drawHexagonerHUD(ctx,opts,accent);}else if(game.level===3){drawHyperHUD(ctx,opts,accent);}else if(game.level===4){drawHyperHexagonerHUD(ctx,opts,accent);}else{
  // Gameplay HUD is intentionally a new implementation. Video-specific
  // proportions, dynamic camera and timed voice cues belong to step 1-3.
  const rankNames=['POINT','LINE','TRIANGLE','SQUARE','SQUARE','PENTAGON'];
@@ -291,12 +308,26 @@ async function start(index,controlMode=1,enabled=true){
     playerSpeed:map.playerSpeed});
   }
  }else if(index===4){
-  // Step 5-1: chronological source only. This adapter deliberately refuses
-  // to substitute old fifth-stage patterns when video trace data is missing.
-  const id=raw?requested:'1595';
-  const option=map.replays?.[id];
-  if(!option)throw new Error('Missing HYPER HEXAGONER original source '+id);
-  playback=await HyperHexagonerFilm.load(id,option);
+  // Stage 5-2 defaults to connected phrases from BOTH independently verified
+  // HYPER HEXAGONER films. ?trace retains exact 5-1 chronological playback.
+  // Never fall back to other stages' wall banks when sources are absent.
+  if(raw){
+   const option=map.replays?.[requested];
+   if(!option)throw new Error('Missing HYPER HEXAGONER original source '+requested);
+   playback=await HyperHexagonerFilm.load(requested,option);
+  }else{
+   const [first,second]=await Promise.all([
+    HyperHexagonerFilm.load('1595',map.replays?.['1595']),
+    HyperHexagonerFilm.load('1596',map.replays?.['1596'])
+   ]);
+   const value=args.get('seed');
+   const seed=value===null?(Date.now()^Math.floor(performance.now()*1000)):
+    Number.isFinite(Number(value))?Number(value):Date.now();
+   playback=HyperHexagonerParts.create({'1595':first,'1596':second},{
+    seed,firstSource:['1595','1596'].includes(args.get('first'))?args.get('first'):null,
+    playerSpeed:map.playerSpeed
+   });
+  }
  }else if(raw){
   const option=map.replays?.[requested];
   if(!option)throw new Error('Unregistered filmed run '+requested);
@@ -335,7 +366,7 @@ async function start(index,controlMode=1,enabled=true){
   // Distinct recorded opening ship bearings in the two HYPER films.
   const opening=initialSource==='1595'?-2.48:-.15;
   game.angle=((opening-game.rotation)%TAU+TAU)%TAU;
- }else if(index!==2){
+ }else if(index!==2&&index!==4){
   const sourceScreenAngle=index===1?(initialSource==='1595'?-Math.PI/2:.26):
    (initialSource==='1595'?-1.15:-1.18);
   game.angle=((sourceScreenAngle-game.rotation)%TAU+TAU)%TAU;
