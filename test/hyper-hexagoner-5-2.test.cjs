@@ -47,10 +47,10 @@ test('5-2 has neither invented wall patterns nor stage 7, and cannot use unverif
  assert.match(html,/stages\/hyper-hexagoner\.js/);
  assert.doesNotMatch(html,/stage-profiles\.js/);
  assert.throws(()=>Parts.create({}),/Both original/);
- const one=films().1595;
+ const one=films()['1595'];
  assert.throws(()=>Parts.create({1595:one}),/Both original/);
  assert.throws(()=>Parts.create({1595:{...one,independentlyVerified:false},
-  1596:films().1596}),/Unverified/);
+  1596:films()['1596']}),/Unverified/);
 });
 
 test('derive separate 0-60 and 60+ phrases from each of the two video sources',()=>{
@@ -74,8 +74,12 @@ test('derive separate 0-60 and 60+ phrases from each of the two video sources',(
 
 test('a nonadjacent entry does not instantly spawn actors already present at cut',()=>{
  const bank=Parts.buildBank(films());
- const phrase=bank.pre.find(p=>p.from>0&&p.births.size>0&&p.preexisting.size>0);
- assert.ok(phrase,'fixture must contain live actors at a cut');
+ const original=bank.pre.find(p=>p.source==='1595');
+ // Cut artificially in the middle of a wave, so the first visible actor
+ // belongs to the unplayed past and MUST be excluded on nonadjacent joins.
+ const phrase={...original,from:15,to:125,duration:110/60,
+  births:new Map([['hyper5-1595-wave-1',56],['hyper5-1595-wave-2',112]]),
+  preexisting:new Set(['hyper5-1595-wave-0'])};
  const session=Parts.create(films(),{seed:34,firstSource:'1595'});
  session.current=phrase;session.source=phrase.source;session.start=0;
  session.contiguous=false;session.runId=2;
@@ -108,7 +112,7 @@ test('source-based random playback crosses 60s, remains alive under spectator an
 });
 
 test('renderer and collision engine share polygon coordinates, death reset and core safety',()=>{
- const film=films().1595,game=new Engine.ArenaGame(4);
+ const film=films()['1595'],game=new Engine.ArenaGame(4);
  game.attachReplay(film,{spectating:true});
  assert.equal(game.dead,false);
  assert.equal(game.seekReplay(60),true);
