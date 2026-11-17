@@ -82,3 +82,15 @@ test('independently indexed 0–60 / 60+ frames retain source wall IDs and passa
   assert.equal(restart.dead,false);
  }
 });
+
+test('stage-5 source audit reports missing verification, gaps and the carried 60s actor',()=>{
+ const audit=require('../tools/audit-hyper-hexagoner-source.cjs').audit;
+ const report=audit(fixture('1595'),'1595');
+ assert.equal(report.pre60Frames,3600);
+ assert.equal(report.post60Frames,121);
+ assert.equal(report.uniqueWallIds,1);
+ assert.equal(report.carriedAcross60,1);
+ assert.equal(report.independentlyVerified,false);
+ assert.ok(report.longestDetectedBirthGapSeconds>1);
+ assert.ok(report.warnings.some(s=>s.includes('not')||s.includes('Not')));
+});
