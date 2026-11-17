@@ -163,7 +163,18 @@ def sector_phase_from_background(bgr, wall_mask, sides, previous=None):
     index=int(np.argmax(scores))
     if scores[index]<8.:
         raise ValueError('Background sector edges unclear; inspect frame/ink color')
-    phase=float(candidates[index])
+    # An RGB step edge produces a FLAT maximum for any candidate whose
+    # +/-delta samples straddle it. Picking argmax returns the first edge of
+    # this plateau (about 2 degrees too far clockwise/counterclockwise).
+    # Recover the centre of the complete peak using a periodic circular mean.
+    best=scores[index]
+    peak=sufficient&(scores>=best*.985)
+    unit=2*math.pi*candidates[peak]/period
+    cs=np.mean(np.cos(unit))
+    sn=np.mean(np.sin(unit))
+    if math.hypot(cs,sn)<.5:
+        raise ValueError('Multiple inconsistent sector-phase candidates')
+    phase=float((math.atan2(sn,cs)%(2*math.pi))*period/(2*math.pi))
     if previous is None:
         return phase
     # Phase 0 and phase + 2*pi/sides describe identical sector boundaries.
