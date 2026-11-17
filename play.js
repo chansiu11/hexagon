@@ -81,7 +81,11 @@ async function start(){
   // walls and suddenly switch meshes halfway through a dodge. The asset
   // is fetched ahead of play, and a failed fetch uses the old engine safely.
   const [timeline]=await Promise.all([loadTimeline(level),audioReady,
-   level===4&&typeof HexHyper910Atlas!=='undefined'?HexHyper910Atlas.load():Promise.resolve()]);
+   // Load raw optical silhouettes only when explicitly comparing footage.
+   // Live gameplay always uses six-sector quads and matching hit polygons.
+   level===4&&typeof HexHyper910Atlas!=='undefined'&&
+    new URLSearchParams(location.search).get('hyperHexagonerContours')==='raw'?
+    HexHyper910Atlas.load():Promise.resolve()]);
  if(level!==selected||screen!==origin)return;
  if(level===6)music.randomTrackIndex=timeline.musicTrack.index;
  if(settings.sound){

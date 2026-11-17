@@ -12,8 +12,12 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.HexHexagonest?.HexagonestGame&&typeof start==='function');
   const rendererUrl=await page.evaluate(()=>
    Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src||'');
-  assert(rendererUrl.includes('hexagoner-video-v15'),
-    'public Pages must load the updated Hexagonest continuous-contour renderer');
+  // The same public gameplay bundle serves every map. Compare the browser
+  // script URL against this revision's index instead of a stale cache token.
+  const expectedRenderer=fs.readFileSync(__dirname+'/index.html','utf8')
+   .match(/<script src="(play[.]js[?]v=[^"]+)"/)?.[1];
+  assert(expectedRenderer&&rendererUrl.endsWith('/'+expectedRenderer),
+    'public Pages must load the current gameplay renderer revision');
   const sourceVersions=await page.evaluate(()=>
    Array.from(document.scripts).filter(s=>s.src.includes('hexagonest-')).map(s=>s.src));
   assert(sourceVersions.some(u=>u.includes('hexagonest-video.js?v=hexest-connected-31-v9')),

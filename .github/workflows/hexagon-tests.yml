@@ -33,6 +33,12 @@ jobs:
           node beat-video.test.cjs
           node camera-source-freeze.test.cjs
           node audio-feedback.test.cjs
+          # Stage 5: no stray center lines / warped footage silhouettes.
+          node hyper-hexagoner-live-sector.test.cjs
+          node hyper-hexagoner-aligned-walls.test.cjs
+          node hyper-hexagoner-source-contours.test.cjs
+          node hyper-hexagoner-film-start.test.cjs
+          node hyper-hexagoner-camera-align.test.cjs
           node --check play.js
           node --check engine.js
           node --check audio.js

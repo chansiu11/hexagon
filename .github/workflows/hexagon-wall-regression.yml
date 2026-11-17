@@ -52,6 +52,11 @@ jobs:
         run: node reference-wall-timing.test.cjs
       - name: Ensure all six maps use only the selected original gameplay video
         run: node single-video-wall-source.test.cjs
+      - name: Ensure fifth stage walls follow spokes without optical center artifacts
+        run: |
+          node hyper-hexagoner-live-sector.test.cjs
+          node hyper-hexagoner-aligned-walls.test.cjs
+          node hyper-hexagoner-source-contours.test.cjs
       - name: Build 0-60s time-matched source-video-trace geometry comparisons
         run: node source-geometry-compare.cjs
       - name: Install browser test dependency
@@ -93,7 +98,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if curl -fsS https://chansiu11.github.io/hexagon/ |
-              grep -q 'play.js?v=hexagoner-video-v15'; then exit 0; fi
+              grep -q 'play.js?v=hyper5-sector-no-center-20261117-v1'; then exit 0; fi
             sleep 10
           done
           exit 1
