@@ -9,7 +9,13 @@ const fs=require('node:fs'),{chromium}=require('playwright');
   await p.goto(process.env.HEXAGON_URL||'http://127.0.0.1:4173/',{waitUntil:'load'});
   await p.evaluate(()=>{window.requestAnimationFrame=()=>0});
   const version=await p.evaluate(()=>Array.from(document.scripts).find(s=>s.src.includes('/play.js'))?.src);
-  assert(version.includes('hexagoner-video-v15'),'new camera must be on the deployed site');
+  // Compare against the ACTUAL page bundle in this checkout. Hardcoding an
+  // obsolete play.js cache token makes perfectly good camera regressions fail
+  // every time another stage correctly refreshes its script version.
+  const html=fs.readFileSync(__dirname+'/index.html','utf8');
+  const script=html.match(/<script src="(play\\.js\\?v=[^"]+)"/);
+  assert(script&&version&&version.endsWith('/'+script[1]),
+   'browser did not load the current gameplay bundle from this revision');
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
   for(const stage of [0,2]){
    const result=await p.evaluate(stage=>{
