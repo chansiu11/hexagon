@@ -13,7 +13,7 @@ const fs=require('node:fs'),{chromium}=require('playwright');
   // obsolete play.js cache token makes perfectly good camera regressions fail
   // every time another stage correctly refreshes its script version.
   const html=fs.readFileSync(__dirname+'/index.html','utf8');
-  const script=html.match(/<script src="(play\\.js\\?v=[^"]+)"/);
+  const script=html.match(/<script src="(play[.]js[?]v=[^"]+)"/);
   assert(script&&version&&version.endsWith('/'+script[1]),
    'browser did not load the current gameplay bundle from this revision');
   fs.mkdirSync('wall-browser-screenshots',{recursive:true});
